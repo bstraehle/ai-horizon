@@ -240,8 +240,6 @@ class AIHorizon {
             : 0;
           this.highScore = high;
           this.updateHighScore();
-          // Safely resolve the leaderboard element without assigning null to the
-          // instance field (avoids typing issues in strict environments).
           const el = this.leaderboardListEl || document.getElementById("leaderboardList");
           if (el) LeaderboardManager.render(el, entries);
         } catch (_e) {
@@ -1087,58 +1085,15 @@ class AIHorizon {
           document.getElementById("submitScoreBtn")
         );
 
-        // Only show initials UI when the score would place in the top N
-        // (LeaderboardManager.MAX_ENTRIES). Prefer using the local leaderboard
-        // snapshot so this decision can be made synchronously. If we can't
-        // determine placement, fall back to the previous behavior of showing
-        // the input only for score > 0.
-        try {
-          let showInitials = false;
-          try {
-            const local = LeaderboardManager.load({ remote: false });
-            if (Array.isArray(local)) {
-              // Normalize numeric scores and sort descending by score so we can
-              // determine the cutoff for the Nth place.
-              const entries = local
-                .map((e) => ({ id: String(e.id || ""), score: Number(e.score || 0) }))
-                .sort((a, b) => b.score - a.score || String(a.id).localeCompare(String(b.id)));
-              if (entries.length < LeaderboardManager.MAX_ENTRIES) {
-                // If the client is configured to use a remote leaderboard we
-                // cannot trust an undersized local snapshot as authoritative
-                // (it may be stale). Be conservative and hide the initials UI
-                // until we can check the remote leaderboard. If remote is not
-                // enabled, allow initials when score>0.
-                showInitials = LeaderboardManager.IS_REMOTE ? false : this.score > 0;
-              } else {
-                const cutoff = entries[LeaderboardManager.MAX_ENTRIES - 1];
-                const cutoffScore = Number(cutoff && cutoff.score ? cutoff.score : 0);
-                // Require strictly greater than the cutoff to show initials so
-                // scores below the top-N are not prompted. This avoids showing
-                // the input for scores that would not displace an existing
-                // top-N entry.
-                showInitials = this.score > 0 && Math.floor(this.score) > Math.floor(cutoffScore);
-              }
-            } else {
-              // Could not synchronously get local entries (maybe remote path returned Promise)
-              showInitials = LeaderboardManager.IS_REMOTE ? false : this.score > 0;
-            }
-          } catch (_inner) {
-            showInitials = LeaderboardManager.IS_REMOTE ? false : this.score > 0;
-          }
-          if (initialsEntry) {
-            if (showInitials) initialsEntry.classList.remove("hidden");
-            else initialsEntry.classList.add("hidden");
-          }
-        } catch (_e) {
-          /* ignore */
-        }
+        if (this.score > 0) initialsEntry.classList.remove("hidden");
+        else initialsEntry.classList.add("hidden");
 
         const _trySubmit = () => {
           if (!initialsInput) return false;
           const raw = String(initialsInput.value || "")
             .trim()
             .toUpperCase();
-          // Allow 1 to 3 letters (previously required exactly 3)
+          // Allow 1 to 3 letters
           if (/^[A-Z]{1,3}$/.test(raw)) {
             try {
               LeaderboardManager.submit(this.score, raw, { remote: LeaderboardManager.IS_REMOTE });
@@ -1450,31 +1405,7 @@ class AIHorizon {
       /* ignore */
     }
 
-    // Show Game Over. If the user submitted a score prefer to preserve
-    // scroll when focusing so the leaderboard remains immediately scrollable.
-    // Decide whether initials should be allowed (synchronously) and pass
-    // the decision to UIManager so its fallback doesn't unhide the input
-    // when the player's score would not place in the top-N.
-    let allowInitials = undefined;
-    try {
-      const local = LeaderboardManager.load({ remote: false });
-      if (Array.isArray(local)) {
-        const entries = local
-          .map((e) => ({ id: String(e.id || ""), score: Number(e.score || 0) }))
-          .sort((a, b) => b.score - a.score || String(a.id).localeCompare(String(b.id)));
-        if (entries.length < LeaderboardManager.MAX_ENTRIES) {
-          allowInitials = LeaderboardManager.IS_REMOTE ? false : this.score > 0;
-        } else {
-          const cutoff = entries[LeaderboardManager.MAX_ENTRIES - 1];
-          const cutoffScore = Number(cutoff && cutoff.score ? cutoff.score : 0);
-          allowInitials = this.score > 0 && Math.floor(this.score) > Math.floor(cutoffScore);
-        }
-      } else {
-        allowInitials = this.score > 0;
-      }
-    } catch (_e) {
-      allowInitials = this.score > 0;
-    }
+    let allowInitials = this.score > 0;
 
     UIManager.showGameOver(
       this.gameOverScreen,
@@ -1501,48 +1432,6 @@ class AIHorizon {
       /* ignore */
     }
 
-    // If the client uses a remote leaderboard and we initially hid the
-    // initials UI because the local snapshot was inconclusive, perform a
-    // remote check and reveal the input if the remote leaderboard indicates
-    // the score would place in the top-N.
-    try {
-      if (LeaderboardManager.IS_REMOTE && allowInitials === false && typeof fetch === "function") {
-        LeaderboardManager.load({ remote: true })
-          .then((entries) => {
-            if (!Array.isArray(entries)) return;
-            const arr = entries
-              .map((e) => ({ id: String(e.id || ""), score: Number(e.score || 0) }))
-              .sort((a, b) => b.score - a.score || String(a.id).localeCompare(String(b.id)));
-            if (arr.length < LeaderboardManager.MAX_ENTRIES) {
-              // Show initials since leaderboard has space.
-              UIManager.showGameOver(
-                this.gameOverScreen,
-                this.restartBtn,
-                this.finalScoreEl,
-                this.score,
-                submittedScore,
-                this.score > 0
-              );
-              return;
-            }
-            const cutoff = arr[LeaderboardManager.MAX_ENTRIES - 1];
-            const cutoffScore = Number(cutoff && cutoff.score ? cutoff.score : 0);
-            if (this.score > 0 && Math.floor(this.score) > Math.floor(cutoffScore)) {
-              UIManager.showGameOver(
-                this.gameOverScreen,
-                this.restartBtn,
-                this.finalScoreEl,
-                this.score,
-                submittedScore,
-                true
-              );
-            }
-          })
-          .catch(() => {});
-      }
-    } catch (_e) {
-      /* ignore */
-    }
     // Clear the suppression after the Game Over UI is shown — allow a short
     // grace period so any prompt-induced resizes don't trigger a fullReset.
     try {

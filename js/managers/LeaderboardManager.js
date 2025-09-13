@@ -1,5 +1,5 @@
 /**
- * LeaderboardManager: simple client-side top-N leaderboard using localStorage or a remote server.
+ * LeaderboardManager: simple top-N leaderboard using localStorage or a remote server.
  * Stores entries as [{id, score}] sorted by score desc. No PII collected.
  */
 export class LeaderboardManager {
@@ -13,29 +13,6 @@ export class LeaderboardManager {
   static _cacheEntries = null;
   /** @type {Promise<{id:string,score:number}[]>|null} */
   static _pendingLoadPromise = null;
-  // Guard to only log/trace the first load invocation to avoid duplicate console spam
-  static _hasLoggedLoad = false;
-
-  /**
-   * Load the high score derived from the persisted leaderboard.
-   * By default reads the local leaderboard (remote=false).
-   * @param {{remote?:boolean}=} options
-   * @returns {number|Promise<number>}
-   */
-  static loadHighScore({ remote = false } = {}) {
-    try {
-      const maybe = LeaderboardManager.load({ remote });
-      if (Array.isArray(maybe)) {
-        return maybe.reduce((max, e) => Math.max(max, Number(e.score || 0)), 0);
-      }
-      // remote path: returns a Promise
-      return /** @type {Promise<{id:string,score:number}[]>} */ (maybe).then((entries) =>
-        (entries || []).reduce((max, e) => Math.max(max, Number(e.score || 0)), 0)
-      );
-    } catch (_) {
-      return 0;
-    }
-  }
 
   /**
    * Update the high score display and return the current high.
@@ -49,7 +26,6 @@ export class LeaderboardManager {
     let high = prevHigh || 0;
     if (score > high) {
       high = score;
-      // no localStorage write here: high is derived from leaderboard entries
     }
     try {
       if (highScoreEl) highScoreEl.textContent = String(high);
@@ -66,21 +42,10 @@ export class LeaderboardManager {
    * @returns {{id:string,score:number}[]|Promise<{id:string,score:number}[]>}
    */
   static load({ remote = this.IS_REMOTE } = {}) {
-    if (!LeaderboardManager._hasLoggedLoad) {
-      if (typeof console !== "undefined" && console && typeof console.log === "function") {
-        console.log("LeaderboardManager: load", { remote });
-      }
-      try {
-        if (typeof console !== "undefined" && console && typeof console.trace === "function") {
-          console.trace("LeaderboardManager.load called");
-        }
-      } catch (_e) {
-        /* ignore */
-      }
-      LeaderboardManager._hasLoggedLoad = true;
-    }
+    //if (typeof console !== "undefined" && console && typeof console.log === "function") {
+    //  console.log("LeaderboardManager: load", { remote });
+    //}
 
-    // Local-only path: return cached entries when available, else read localStorage
     if (!remote) {
       try {
         if (Array.isArray(LeaderboardManager._cacheEntries))
@@ -107,57 +72,40 @@ export class LeaderboardManager {
       }
     }
 
-    // Remote path: memoize pending fetch to avoid duplicate network requests
-    if (LeaderboardManager._pendingLoadPromise) return LeaderboardManager._pendingLoadPromise;
+    if (remote) {
+      if (LeaderboardManager._pendingLoadPromise) return LeaderboardManager._pendingLoadPromise;
 
-    if (typeof fetch !== "function") {
-      try {
-        const local = LeaderboardManager.load({ remote: false });
-        return Promise.resolve(Array.isArray(local) ? local : []);
-      } catch (err) {
-        if (typeof console !== "undefined" && console && typeof console.warn === "function") {
-          console.warn(
-            "LeaderboardManager: fetch unavailable, loaded leaderboard from localStorage as fallback.",
-            err
+      LeaderboardManager._pendingLoadPromise = fetch(LeaderboardManager.REMOTE_ENDPOINT, {
+        method: "GET",
+      })
+        .then((res) => {
+          if (!res.ok) return [];
+          return res.json();
+        })
+        .then((parsed) => {
+          let arr = null;
+          if (Array.isArray(parsed)) arr = parsed;
+          else if (parsed && Array.isArray(parsed.scores)) arr = parsed.scores;
+          if (!arr) {
+            LeaderboardManager._cacheEntries = [];
+            return [];
+          }
+          const normalized = arr.map(
+            /** @param {{id:any,score:any}} e */
+            (e) => ({ id: String(e.id || ""), score: Number(e.score || 0) })
           );
-        }
-        return Promise.resolve([]);
-      }
+          LeaderboardManager._cacheEntries = normalized;
+          return normalized.slice();
+        })
+        .catch(() => [])
+        .finally(() => {
+          LeaderboardManager._pendingLoadPromise = null;
+        });
+
+      return LeaderboardManager._pendingLoadPromise;
     }
 
-    LeaderboardManager._pendingLoadPromise = fetch(LeaderboardManager.REMOTE_ENDPOINT, {
-      method: "GET",
-    })
-      .then((res) => {
-        if (!res.ok) return [];
-        return res.json();
-      })
-      .then((parsed) => {
-        let arr = null;
-        if (Array.isArray(parsed)) arr = parsed;
-        else if (parsed && Array.isArray(parsed.scores)) arr = parsed.scores;
-        if (!arr) {
-          LeaderboardManager._cacheEntries = [];
-          return [];
-        }
-        const normalized = arr.map(
-          /** @param {{id:any,score:any}} e */
-          (e) => ({ id: String(e.id || ""), score: Number(e.score || 0) })
-        );
-        try {
-          localStorage.setItem(LeaderboardManager.KEY_LEADERBOARD, JSON.stringify(normalized));
-        } catch (_e) {
-          /* ignore */
-        }
-        LeaderboardManager._cacheEntries = normalized;
-        return normalized.slice();
-      })
-      .catch(() => [])
-      .finally(() => {
-        LeaderboardManager._pendingLoadPromise = null;
-      });
-
-    return LeaderboardManager._pendingLoadPromise;
+    return [];
   }
 
   /**
@@ -168,19 +116,12 @@ export class LeaderboardManager {
    * @returns {boolean|Promise<boolean>}
    */
   static save(entries, { remote = this.IS_REMOTE } = {}) {
-    // Use debug-level logging where available and avoid logging the whole
-    // entries array to reduce console noise. Include entry count for context.
-    try {
-      if (typeof console !== "undefined" && console && typeof console.debug === "function") {
-        console.debug("LeaderboardManager: save", {
-          remote,
-          count: Array.isArray(entries) ? entries.length : undefined,
-        });
-      }
-    } catch (_) {
-      /* ignore logging failures */
-    }
+    //if (typeof console !== "undefined" && console && typeof console.log === "function") {
+    //  console.log("LeaderboardManager: save", { remote });
+    //}
+
     const payload = entries.slice(0, LeaderboardManager.MAX_ENTRIES);
+
     if (!remote) {
       try {
         localStorage.setItem(LeaderboardManager.KEY_LEADERBOARD, JSON.stringify(payload));
@@ -190,82 +131,19 @@ export class LeaderboardManager {
         return false;
       }
     }
-    // Remote: return a Promise resolving to boolean success.
-    // If fetch isn't available (older browsers or test env), fallback to local storage.
-    if (typeof fetch !== "function") {
-      try {
-        // Best-effort: persist payload locally when remote not possible.
-        localStorage.setItem(LeaderboardManager.KEY_LEADERBOARD, JSON.stringify(payload));
-        if (typeof console !== "undefined" && console && typeof console.warn === "function") {
-          console.warn(
-            "LeaderboardManager: fetch unavailable, saved leaderboard locally as fallback."
-          );
-        }
-        return Promise.resolve(true);
-      } catch (err) {
-        if (typeof console !== "undefined" && console && typeof console.error === "function") {
-          console.error("LeaderboardManager: failed to save locally as fallback", err);
-        }
-        return Promise.resolve(false);
-      }
-    }
 
-    // Send a structured payload the server expects: { scores: [...], id: <leaderboard id> }
     const body = JSON.stringify({ scores: payload });
-    if (typeof console !== "undefined" && console && typeof console.debug === "function") {
-      console.debug(
-        "LeaderboardManager: posting leaderboard to",
-        LeaderboardManager.REMOTE_ENDPOINT,
-        body
-      );
-    }
+
     return fetch(LeaderboardManager.REMOTE_ENDPOINT, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body,
     })
       .then((res) => {
-        if (!res.ok) {
-          // Attempt to persist locally as fallback
-          try {
-            localStorage.setItem(LeaderboardManager.KEY_LEADERBOARD, JSON.stringify(payload));
-          } catch (_) {
-            /* ignore */
-          }
-          if (typeof console !== "undefined" && console && typeof console.warn === "function") {
-            // Include the request payload to help debug remote save failures
-            try {
-              console.warn(
-                "LeaderboardManager: remote save failed (status " + res.status + ") - payload:",
-                body,
-                "- saved locally as fallback."
-              );
-            } catch (_e) {
-              // Fallback to a simple string message if console.warn can't handle complex objects in some envs
-              console.warn(
-                "LeaderboardManager: remote save failed (status " +
-                  res.status +
-                  "), saved locally as fallback."
-              );
-            }
-          }
-          return false;
-        }
-
         // If server responded ok, attempt to parse the response body which should use
         // the same shape as `load` (either an array of entries or { scores: [...] }).
         /** @param {{id:any,score:any}[]|null} arr */
         const handleAndPersist = (arr) => {
-          if (!arr) {
-            // No usable payload returned: persist the payload we sent as a best-effort fallback.
-            try {
-              localStorage.setItem(LeaderboardManager.KEY_LEADERBOARD, JSON.stringify(payload));
-            } catch (_) {
-              /* ignore */
-            }
-            return Promise.resolve(true);
-          }
-
           // Normalize returned entries and persist to localStorage so the client is repopulated
           try {
             const normalized = /** @type {{id:any,score:any}[]} */ (arr)
@@ -274,11 +152,6 @@ export class LeaderboardManager {
                 (e) => ({ id: String(e.id || ""), score: Number(e.score || 0) })
               )
               .slice(0, LeaderboardManager.MAX_ENTRIES);
-            try {
-              localStorage.setItem(LeaderboardManager.KEY_LEADERBOARD, JSON.stringify(normalized));
-            } catch (_) {
-              /* ignore */
-            }
             LeaderboardManager._cacheEntries = normalized.slice();
             // Dispatch a DOM event so any UI can update immediately without requiring a full reload.
             try {
@@ -302,66 +175,21 @@ export class LeaderboardManager {
           }
         };
 
-        return res
-          .json()
-          .then((parsed) => {
-            let arr = null;
-            if (Array.isArray(parsed)) arr = parsed;
-            else if (parsed && Array.isArray(parsed.scores)) arr = parsed.scores;
-            if (arr) return handleAndPersist(arr);
-
-            // If the PUT response didn't include usable data (204/no body), try a follow-up GET
-            return fetch(LeaderboardManager.REMOTE_ENDPOINT, { method: "GET" })
-              .then((r2) => {
-                if (!r2.ok) return null;
-                return r2.json();
-              })
-              .then((parsed2) => {
-                let arr2 = null;
-                if (Array.isArray(parsed2)) arr2 = parsed2;
-                else if (parsed2 && Array.isArray(parsed2.scores)) arr2 = parsed2.scores;
-                return handleAndPersist(arr2);
-              })
-              .catch(() => {
-                // If follow-up GET fails, persist the payload as fallback
-                return handleAndPersist(null);
-              });
-          })
-          .catch(() => {
-            // Couldn't parse JSON body: try a follow-up GET before falling back.
-            return fetch(LeaderboardManager.REMOTE_ENDPOINT, { method: "GET" })
-              .then((r2) => {
-                if (!r2.ok) return null;
-                return r2.json();
-              })
-              .then((parsed2) => {
-                let arr2 = null;
-                if (Array.isArray(parsed2)) arr2 = parsed2;
-                else if (parsed2 && Array.isArray(parsed2.scores)) arr2 = parsed2.scores;
-                return handleAndPersist(arr2);
-              })
-              .catch(() => handleAndPersist(null));
-          });
+        return res.json().then((parsed) => {
+          let arr = null;
+          if (Array.isArray(parsed)) arr = parsed;
+          else if (parsed && Array.isArray(parsed.scores)) arr = parsed.scores;
+          if (arr) return handleAndPersist(arr);
+          // Ensure we always return a Promise<boolean> to satisfy consistent-return.
+          return Promise.resolve(true);
+        });
       })
-      .catch((err) => {
+      .catch(() => {
         // network or other error - fallback to local storage
         try {
           localStorage.setItem(LeaderboardManager.KEY_LEADERBOARD, JSON.stringify(payload));
         } catch (_) {
           /* ignore */
-        }
-        if (typeof console !== "undefined" && console && typeof console.error === "function") {
-          // Include the request payload to help debug network errors during remote save
-          try {
-            console.error(
-              "LeaderboardManager: remote save failed - payload:",
-              body,
-              "- saved locally as fallback",
-              err
-            );
-          } catch (_e) {
-            console.error("LeaderboardManager: remote save failed, saved locally as fallback", err);
-          }
         }
         return false;
       });
@@ -396,13 +224,15 @@ export class LeaderboardManager {
       return LeaderboardManager.save(entries.slice(0, LeaderboardManager.MAX_ENTRIES), { remote });
     };
 
+    //console.log("LeaderboardManager.js load 2", { remote });
     const maybeEntries = LeaderboardManager.load({ remote });
-    // Synchronous path
+
+    // Local
     if (Array.isArray(maybeEntries)) {
       return handleEntriesAndSave(maybeEntries);
     }
 
-    // Remote: returned a Promise
+    // Remote
     return maybeEntries.then(
       /** @param {{id:string,score:number}[]} entries */ (entries) => handleEntriesAndSave(entries)
     );
@@ -459,13 +289,16 @@ export class LeaderboardManager {
       return;
     }
 
-    // Otherwise behave as before: render local entries then optionally
-    // fetch remote entries and re-render.
-    const localEntries = LeaderboardManager.load({ remote: false });
-    if (Array.isArray(localEntries)) {
-      doRender(localEntries);
+    if (!LeaderboardManager.IS_REMOTE) {
+      //console.log("LeaderboardManager.js load 3", { remote: false });
+      const localEntries = LeaderboardManager.load({ remote: false });
+      if (Array.isArray(localEntries)) {
+        doRender(localEntries);
+      }
     }
+
     if (LeaderboardManager.IS_REMOTE) {
+      //console.log("LeaderboardManager.js load 4", { remote: true });
       const remoteEntriesPromise = LeaderboardManager.load({ remote: true });
       if (
         !Array.isArray(remoteEntriesPromise) &&
