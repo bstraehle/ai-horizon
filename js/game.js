@@ -1085,8 +1085,8 @@ class AIHorizon {
           document.getElementById("submitScoreBtn")
         );
 
-        if (this.score > 0) initialsEntry.classList.remove("hidden");
-        else initialsEntry.classList.add("hidden");
+        // Do not force-show initials here; UIManager.showGameOver will decide based on leaderboard rank.
+        if (initialsEntry) initialsEntry.classList.add("hidden");
 
         const _trySubmit = () => {
           if (!initialsInput) return false;
@@ -1405,7 +1405,8 @@ class AIHorizon {
       /* ignore */
     }
 
-    let allowInitials = this.score > 0;
+    // Allow UIManager to compute gating; pass undefined so it evaluates leaderboard rank.
+    let allowInitials = undefined;
 
     UIManager.showGameOver(
       this.gameOverScreen,
@@ -1419,18 +1420,7 @@ class AIHorizon {
     // Defensive: if we decided initials must not be shown, ensure all
     // initials-related elements are hidden so other UI code can't reveal
     // them unexpectedly.
-    try {
-      if (allowInitials === false) {
-        const initialsEntryEl = document.querySelector(".initials-entry");
-        const initialsInputEl = document.getElementById("initialsInput");
-        const submitBtnEl = document.getElementById("submitScoreBtn");
-        if (initialsEntryEl) initialsEntryEl.classList.add("hidden");
-        if (initialsInputEl) initialsInputEl.classList.add("hidden");
-        if (submitBtnEl) submitBtnEl.classList.add("hidden");
-      }
-    } catch (_e) {
-      /* ignore */
-    }
+    // UIManager now controls initials visibility; no extra defensive hide needed.
 
     // Clear the suppression after the Game Over UI is shown — allow a short
     // grace period so any prompt-induced resizes don't trigger a fullReset.

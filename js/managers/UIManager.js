@@ -107,12 +107,8 @@ export class UIManager {
       /* ignore */
     }
 
-    // Ensure the initials entry and submit controls are visible when the
-    // final score is greater than zero. Game code attempts this as well,
-    // but make a robust fallback here so the input shows even if other
-    // paths fail to toggle the classes. If `allowInitials` is explicitly
-    // provided (boolean), use it to override the default score>0 check so
-    // the caller can prevent the initials UI from being shown.
+    // Show initials form only if score is >0 AND would place within top MAX_ENTRIES.
+    // If caller explicitly supplies allowInitials boolean, it overrides ranking logic.
     try {
       const initialsEntry = /** @type {HTMLElement|null} */ (
         document.querySelector(".initials-entry")
@@ -124,18 +120,136 @@ export class UIManager {
       const initialsLabel = /** @type {HTMLElement|null} */ (
         document.getElementById("initialsLabel")
       );
-      const shouldShow =
-        typeof allowInitials === "boolean" ? allowInitials : typeof score === "number" && score > 0;
-      if (shouldShow) {
-        if (initialsEntry) initialsEntry.classList.remove("hidden");
-        if (initialsInput) initialsInput.classList.remove("hidden");
-        if (submitBtn) submitBtn.classList.remove("hidden");
-        if (initialsLabel) initialsLabel.classList.remove("hidden");
+
+      /**
+       * Apply visibility to initials UI elements.
+       * @param {boolean} visible
+       */
+      const toggleInitialsUI = (visible) => {
+        const method = visible ? "remove" : "add";
+        try {
+          if (initialsEntry) initialsEntry.classList[method]("hidden");
+        } catch (_) {
+          /* ignore - DOM mutation best effort */
+        }
+        try {
+          if (initialsInput) initialsInput.classList[method]("hidden");
+        } catch (_) {
+          /* ignore - DOM mutation best effort */
+        }
+        try {
+          if (submitBtn) submitBtn.classList[method]("hidden");
+        } catch (_) {
+          /* ignore - DOM mutation best effort */
+        }
+        try {
+          if (initialsLabel) initialsLabel.classList[method]("hidden");
+        } catch (_) {
+          /* ignore - DOM mutation best effort */
+        }
+      };
+
+      // If explicitly overridden just honor it.
+      if (typeof allowInitials === "boolean") {
+        toggleInitialsUI(allowInitials);
       } else {
-        if (initialsEntry) initialsEntry.classList.add("hidden");
-        if (initialsInput) initialsInput.classList.add("hidden");
-        if (submitBtn) submitBtn.classList.add("hidden");
-        if (initialsLabel) initialsLabel.classList.add("hidden");
+        const baseline = typeof score === "number" && score > 0;
+        if (!baseline) {
+          toggleInitialsUI(false);
+        } else {
+          // Determine if score qualifies for top MAX_ENTRIES.
+          const max = LeaderboardManager.MAX_ENTRIES || 0;
+          // Use cached entries when available to avoid async flash.
+          if (Array.isArray(LeaderboardManager._cacheEntries)) {
+            const entries = LeaderboardManager._cacheEntries.slice().sort(
+              /** @param {{id:string,score:number}} a @param {{id:string,score:number}} b */
+              (a, b) => b.score - a.score
+            );
+            const qualifies =
+              entries.length < max ||
+              entries.some(
+                /** @param {{id:string,score:number}} e @param {number} idx */
+                (e, idx) => idx < max && score > e.score
+              );
+            toggleInitialsUI(qualifies);
+          } else if (LeaderboardManager._pendingLoadPromise) {
+            // Hide until load completes to avoid flicker, then decide.
+            toggleInitialsUI(false);
+            LeaderboardManager._pendingLoadPromise
+              .then(
+                /** @param {{id:string,score:number}[]|any} entries */
+                (entries) => {
+                  try {
+                    if (!Array.isArray(entries)) {
+                      toggleInitialsUI(true);
+                      return;
+                    }
+                    const sorted = entries.slice().sort(
+                      /** @param {{id:string,score:number}} a @param {{id:string,score:number}} b */
+                      (a, b) => b.score - a.score
+                    );
+                    const qualifies =
+                      sorted.length < max ||
+                      sorted.some(
+                        /** @param {{id:string,score:number}} e @param {number} idx */
+                        (e, idx) => idx < max && score > e.score
+                      );
+                    toggleInitialsUI(qualifies);
+                  } catch (_) {
+                    /* ignore - qualification check best effort */
+                  }
+                }
+              )
+              .catch(() => {});
+          } else {
+            // Trigger a load (respect remote flag) and decide afterwards.
+            const maybe = LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
+            if (Array.isArray(maybe)) {
+              const sorted = maybe.slice().sort(
+                /** @param {{id:string,score:number}} a @param {{id:string,score:number}} b */
+                (a, b) => b.score - a.score
+              );
+              const qualifies =
+                sorted.length < max ||
+                sorted.some(
+                  /** @param {{id:string,score:number}} e @param {number} idx */
+                  (e, idx) => idx < max && score > e.score
+                );
+              toggleInitialsUI(qualifies);
+            } else if (maybe && typeof maybe.then === "function") {
+              toggleInitialsUI(false); // hide while loading
+              maybe
+                .then(
+                  /** @param {{id:string,score:number}[]|any} entries */
+                  (entries) => {
+                    try {
+                      if (!Array.isArray(entries)) {
+                        toggleInitialsUI(true);
+                        return;
+                      }
+                      const sorted = entries.slice().sort(
+                        /** @param {{id:string,score:number}} a @param {{id:string,score:number}} b */
+                        (a, b) => b.score - a.score
+                      );
+                      const qualifies =
+                        sorted.length < max ||
+                        sorted.some(
+                          /** @param {{id:string,score:number}} e @param {number} idx */
+                          (e, idx) => idx < max && score > e.score
+                        );
+                      toggleInitialsUI(qualifies);
+                    } catch (_) {
+                      /* ignore - async qualification check best effort */
+                    }
+                  }
+                )
+                .catch(() => {});
+            } else {
+              // Fallback: show if baseline positive score.
+              toggleInitialsUI(true);
+            }
+          }
+        }
       }
     } catch (_) {
       /* ignore */

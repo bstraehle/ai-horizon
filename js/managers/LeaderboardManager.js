@@ -7,7 +7,7 @@ export class LeaderboardManager {
   static REMOTE_ENDPOINT =
     "https://0p6x6bw6c2.execute-api.us-west-2.amazonaws.com/dev/leaderboard?id=1";
   // Server-side leaderboard identifier used when posting scores
-  static MAX_ENTRIES = 10;
+  static MAX_ENTRIES = 3;
   static KEY_LEADERBOARD = "aiHorizonLeaderboard";
   /** @type {{id:string,score:number}[]|null} */
   static _cacheEntries = null;
@@ -134,6 +134,21 @@ export class LeaderboardManager {
 
     const body = JSON.stringify({ scores: payload });
 
+    // Optimistic update: immediately reflect the provided entries locally while the network
+    // request is in flight so the UI appears responsive. We'll reconcile with server response
+    // when the fetch resolves (already handled below). We do not write to localStorage.
+    try {
+      LeaderboardManager._cacheEntries = payload.slice();
+      if (typeof document !== "undefined") {
+        const listEl = document.getElementById("leaderboardList");
+        if (listEl) {
+          LeaderboardManager.render(listEl, LeaderboardManager._cacheEntries);
+        }
+      }
+    } catch (_) {
+      /* ignore */
+    }
+
     return fetch(LeaderboardManager.REMOTE_ENDPOINT, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -144,7 +159,9 @@ export class LeaderboardManager {
         // the same shape as `load` (either an array of entries or { scores: [...] }).
         /** @param {{id:any,score:any}[]|null} arr */
         const handleAndPersist = (arr) => {
-          // Normalize returned entries and persist to localStorage so the client is repopulated
+          // Normalize returned entries. DO NOT persist to localStorage on successful remote save
+          // (requirement). We only update in-memory cache and emit the event. Local storage is
+          // reserved for purely local leaderboards or remote failures (fallback in catch).
           try {
             const normalized = /** @type {{id:any,score:any}[]} */ (arr)
               .map(
@@ -165,6 +182,17 @@ export class LeaderboardManager {
                 if (CE) {
                   window.dispatchEvent(new CE("leaderboard:updated", { detail: normalized }));
                 }
+              }
+            } catch (_) {
+              /* ignore */
+            }
+            // Opportunistically update DOM list if it already exists (avoid waiting for event listener)
+            try {
+              const listEl =
+                typeof document !== "undefined" ? document.getElementById("leaderboardList") : null;
+              if (listEl) {
+                // Reuse render logic without triggering another load by passing entries directly
+                LeaderboardManager.render(listEl, normalized);
               }
             } catch (_) {
               /* ignore */
@@ -224,7 +252,6 @@ export class LeaderboardManager {
       return LeaderboardManager.save(entries.slice(0, LeaderboardManager.MAX_ENTRIES), { remote });
     };
 
-    //console.log("LeaderboardManager.js load 2", { remote });
     const maybeEntries = LeaderboardManager.load({ remote });
 
     // Local
@@ -283,32 +310,41 @@ export class LeaderboardManager {
       );
     };
 
-    // If entries were provided by the caller, render them and return.
+    // 1. If entries were provided by the caller, render them and return.
     if (Array.isArray(entries)) {
       doRender(entries);
       return;
     }
 
-    if (!LeaderboardManager.IS_REMOTE) {
-      //console.log("LeaderboardManager.js load 3", { remote: false });
-      const localEntries = LeaderboardManager.load({ remote: false });
-      if (Array.isArray(localEntries)) {
-        doRender(localEntries);
-      }
+    // 2. If we already have a cached array, use it without triggering another load.
+    if (Array.isArray(LeaderboardManager._cacheEntries)) {
+      doRender(LeaderboardManager._cacheEntries);
+      return;
     }
 
-    if (LeaderboardManager.IS_REMOTE) {
-      //console.log("LeaderboardManager.js load 4", { remote: true });
-      const remoteEntriesPromise = LeaderboardManager.load({ remote: true });
-      if (
-        !Array.isArray(remoteEntriesPromise) &&
-        remoteEntriesPromise &&
-        typeof remoteEntriesPromise.then === "function"
-      ) {
-        remoteEntriesPromise.then(doRender).catch(() => {});
-      }
+    // 3. If a load (remote) is currently pending, attach a once-only continuation.
+    if (LeaderboardManager._pendingLoadPromise) {
+      LeaderboardManager._pendingLoadPromise
+        .then((arr) => {
+          if (Array.isArray(LeaderboardManager._cacheEntries)) {
+            doRender(LeaderboardManager._cacheEntries);
+          } else if (Array.isArray(arr)) {
+            doRender(arr);
+          }
+        })
+        .catch(() => {});
+      return;
     }
-    return;
+
+    // 4. Kick off a load exactly once (remote or local depending on config) and render when ready.
+    const maybeEntries = LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
+    if (Array.isArray(maybeEntries)) {
+      doRender(maybeEntries);
+      return;
+    }
+    if (maybeEntries && typeof maybeEntries.then === "function") {
+      maybeEntries.then(doRender).catch(() => {});
+    }
   }
 }
 

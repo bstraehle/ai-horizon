@@ -12,7 +12,7 @@ describe("LeaderboardManager remote save", () => {
     globalThis.localStorage = dom.window.localStorage;
   });
 
-  it("persists server-returned payload and emits event", async () => {
+  it("emits event and updates in-memory cache (no localStorage write)", async () => {
     const serverPayload = {
       scores: [
         { id: "XYZ", score: 999 },
@@ -37,18 +37,14 @@ describe("LeaderboardManager remote save", () => {
     const res = await LeaderboardManager.save(entries, { remote: true });
     expect(res).toBeTruthy();
 
+    // Remote save should NOT persist to localStorage anymore
     const raw = localStorage.getItem(LeaderboardManager.KEY_LEADERBOARD);
-    expect(raw).not.toBeNull();
-    const parsed = JSON.parse(raw);
-    expect(Array.isArray(parsed)).toBe(true);
-    expect(parsed.length).toBeGreaterThan(0);
-    // Normalize check: first entry present and scores match server payload order
-    expect(parsed[0].id).toBe(String(serverPayload.scores[0].id));
-    expect(parsed[0].score).toBe(Number(serverPayload.scores[0].score));
+    expect(raw).toBeNull();
 
     // Event dispatched with normalized entries
     expect(eventDetail).not.toBeNull();
     expect(Array.isArray(eventDetail)).toBe(true);
-    expect(eventDetail[0].id).toBe(parsed[0].id);
+    expect(eventDetail[0].id).toBe(String(serverPayload.scores[0].id));
+    expect(eventDetail[0].score).toBe(Number(serverPayload.scores[0].score));
   });
 });
