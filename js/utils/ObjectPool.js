@@ -3,7 +3,7 @@
  *
  * Responsibilities:
  * - Reuse objects to reduce GC pressure & frame spikes.
- * - Provide optional warm up to avoid first interaction jank.
+ * - Provide optional warm up to avoid first interaction jank (allocation spikes).
  * - Respect an upper bound (`maxSize`) to cap memory while allowing reuse bursts.
  *
  * Reset precedence (highest first):
@@ -93,9 +93,20 @@ export class ObjectPool {
     return this._free.length;
   }
 
+  /** True if at least one free object is available (fast path hint). */
+  get hasFree() {
+    return this._free.length > 0;
+  }
+
   /** Total number of objects ever created by this pool. */
   get createdCount() {
     return this._created;
+  }
+
+  /** Remaining capacity before hitting maxSize (Infinity -> Number.POSITIVE_INFINITY). */
+  get remainingCapacity() {
+    if (this._maxSize === Infinity) return Number.POSITIVE_INFINITY;
+    return Math.max(0, this._maxSize - this._free.length);
   }
 
   /**

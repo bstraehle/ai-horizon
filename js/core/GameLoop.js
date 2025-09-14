@@ -11,7 +11,7 @@ import { CONFIG } from "../constants.js";
  * Flow per RAF tick:
  * 1. Accumulate elapsed time (capped by `stepMs * maxSubSteps`).
  * 2. While accumulator >= step -> run update(dtMs, dtSec), subtract step.
- * 3. Call draw(frameDtMs) exactly once with the real frame delta (for interpolation / FX if desired).
+ * 3. Call draw(frameDtMs) exactly once with the real frame delta (can optionally interpolate render-only values using remaining accumulator fraction if added later).
  */
 export class GameLoop {
   /**

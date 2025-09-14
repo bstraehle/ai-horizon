@@ -1,4 +1,15 @@
-/** Finite state machine for high-level game flow. */
+/**
+ * GameStateMachine – finite state machine for high-level game flow.
+ *
+ * Responsibilities:
+ * - Track coarse game phases (menu, running, paused, gameover).
+ * - Provide narrow, intention-revealing transition helpers (start, pause, resume, end).
+ * - Keep logic deterministic & side-effect free (state only), letting external systems react via events.
+ *
+ * Key decisions:
+ * - Minimal guard clauses instead of complex transition table (states small & stable).
+ * - Separate query helpers (isRunning, etc.) for readability in systems.
+ */
 export class GameStateMachine {
   constructor() {
     /** @type {'menu' | 'running' | 'paused' | 'gameover'} */

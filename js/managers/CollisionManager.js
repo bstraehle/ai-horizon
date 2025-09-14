@@ -2,15 +2,21 @@
  * CollisionManager – broad & narrow phase collision handling.
  *
  * Responsibilities:
- * - Spatial hash (uniform grid) for asteroid queries (reduces O(N^2)).
- * - Bullet ↔ Asteroid, Player ↔ Asteroid, Player ↔ Star detection.
+ * - Spatial hash (uniform grid) for asteroid queries (reduces naive O(N^2) checks).
+ * - Bullet ↔ Asteroid, Player ↔ Asteroid, Player ↔ Star detection & side-effect events.
  * - Emits typed events through EventBus (if provided) instead of hard coupling systems.
- * - Uses lightweight array pooling to avoid per-frame allocation churn.
+ * - Recycles arrays for buckets & neighbor lists via a small pool to reduce GC churn.
  *
- * Design notes:
- * - Grid cell size matches asteroid spawn size range to balance bucket fill.
- * - `intersects` accepts raw rects or objects with `getBounds()` for flexibility.
- * - Arrays allocated for grid buckets & neighbor queries are recycled (ARR_POOL) for GC stability.
+ * Algorithmic notes:
+ * - Broad phase: uniform grid keyed by integer cell coords (cx,cy); insertion cost O(A * coveredCells).
+ * - Narrow phase: bullets only test groups overlapping their bounds (expected << total asteroid set).
+ * - Worst case degenerates when all asteroids occupy same cell; still correct but slower (approaches O(B*A)).
+ * - Early exit on player-asteroid hit ends further work (assumes game-over or damage path dominates).
+ *
+ * Design decisions:
+ * - Simplicity > dynamic tree; uniform distribution of asteroids acceptable for target scale.
+ * - `intersects` supports duck-typed objects to avoid wrapping bounds per frame.
+ * - Overflow array pooling capped (ARR_POOL_MAX) to keep memory bounded.
  */
 /** @typedef {import('../types.js').Rect} Rect */
 
@@ -162,6 +168,15 @@ export class CollisionManager {
     };
 
     // Bullet vs Asteroid
+    /**
+     * Emit bulletHitAsteroid event.
+     * @param {{ x:number,y:number,width:number,height:number,isIndestructible?:boolean,onBulletHit?:(game:any)=>boolean,onShieldHit?:()=>void }} a
+     * @param {{ x:number,y:number,width:number,height:number }} b
+     */
+    const emitBulletHit = (a, b) => {
+      if (game.events) game.events.emit("bulletHitAsteroid", { asteroid: a, bullet: b });
+    };
+
     for (let i = 0; i < game.bullets.length; i++) {
       const b = game.bullets[i];
       if (!b) continue;
@@ -186,8 +201,7 @@ export class CollisionManager {
                   const shouldDestroy = a.onBulletHit(game);
                   if (shouldDestroy) {
                     toRemoveAsteroids.add(a);
-                    if (game.events)
-                      game.events.emit("bulletHitAsteroid", { asteroid: a, bullet: b });
+                    emitBulletHit(a, b);
                   }
                 } else if (typeof a.onShieldHit === "function") {
                   // If only a shield handler exists (test mocks), call it but don't destroy.
@@ -202,7 +216,7 @@ export class CollisionManager {
               } else {
                 // Regular asteroid: destroy immediately
                 toRemoveAsteroids.add(a);
-                if (game.events) game.events.emit("bulletHitAsteroid", { asteroid: a, bullet: b });
+                emitBulletHit(a, b);
               }
             } catch {
               /* noop */

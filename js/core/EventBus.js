@@ -5,8 +5,8 @@
  * - Very small: Map<event, Set<handler>> with O(1) add/remove typical cost.
  * - Safe during emission: handlers snapshot so listeners can unsubscribe or
  *   subscribe reentrantly without corrupting iteration.
- * - Failure isolation: individual handler exceptions are swallowed so a
- *   faulty effect cannot break the frame loop; consider logging if needed.
+ * - Failure isolation: individual handler exceptions are swallowed so one
+ *   faulty listener cannot break the frame loop (log externally if desired).
  *
  * @example Basic usage
  * const bus = new EventBus();
@@ -21,7 +21,7 @@
 export class EventBus {
   constructor() {
     /** @type {Map<import('../types.js').GameEvent, Set<Function>>} */
-    this._map = new Map();
+    this._handlers = new Map();
   }
 
   /**
@@ -31,10 +31,10 @@ export class EventBus {
    * @returns {()=>void} Unsubscribe function
    */
   on(type, handler) {
-    let set = this._map.get(type);
+    let set = this._handlers.get(type);
     if (!set) {
       set = new Set();
-      this._map.set(type, set);
+      this._handlers.set(type, set);
     }
     set.add(handler);
     return () => this.off(type, handler);
@@ -47,10 +47,10 @@ export class EventBus {
    * @returns {void}
    */
   off(type, handler) {
-    const set = this._map.get(type);
+    const set = this._handlers.get(type);
     if (!set) return;
     set.delete(handler);
-    if (set.size === 0) this._map.delete(type);
+    if (set.size === 0) this._handlers.delete(type);
   }
 
   /**
@@ -60,8 +60,8 @@ export class EventBus {
    * @returns {void}
    */
   emit(type, payload) {
-    const set = this._map.get(type);
-    if (!set || set.size === 0) return;
+    const set = this._handlers.get(type);
+    if (!set || set.size === 0) return; // Fast path: no listeners
     // Snapshot to ensure all handlers at emit start run even if some unsubscribe
     const handlers = Array.from(set);
     for (const fn of handlers) {
@@ -79,7 +79,22 @@ export class EventBus {
    * @returns {void}
    */
   clear(type) {
-    if (type) this._map.delete(type);
-    else this._map.clear();
+    if (type) this._handlers.delete(type);
+    else this._handlers.clear();
+  }
+
+  /**
+   * Test if at least one handler is registered for type.
+   * @param {import('../types.js').GameEvent} type
+   * @returns {boolean}
+   */
+  has(type) {
+    const set = this._handlers.get(type);
+    return !!set && set.size > 0;
+  }
+
+  /** Total number of distinct event types currently tracked. */
+  get size() {
+    return this._handlers.size;
   }
 }

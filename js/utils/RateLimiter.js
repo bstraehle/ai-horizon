@@ -1,5 +1,13 @@
 /**
- * Simple time-based rate limiter for game actions (e.g., firing).
+ * RateLimiter – simple time-based gate for discrete actions (e.g., firing).
+ *
+ * Responsibilities:
+ * - Enforce minimum interval between allowed actions.
+ * - Provide a side-effect-free test (`try`) returning success boolean.
+ *
+ * Key decisions:
+ * - Caller supplies optional fn to execute inline (avoids branching at call site).
+ * - Uses provided time source for test determinism in unit tests.
  */
 export class RateLimiter {
   /**

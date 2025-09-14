@@ -4,13 +4,20 @@ import { clamp, CONFIG, PI2 } from "../constants.js";
 /** @typedef {{ width:number, height:number }} ViewSize */
 
 /**
- * Player – user controlled ship handling input-driven movement and rendering.
+ * Player – user-controlled ship handling movement & drawing.
  *
- * Movement:
- * - Keyboard: WASD / Arrow cluster with fixed speed per axis.
- * - Mouse: Smoothly lerps toward cursor (centered) when no movement keys pressed.
+ * Responsibilities:
+ * - Merge discrete keyboard control with fallback mouse steering (keyboard wins when pressed).
+ * - Maintain positional state & clamp to current view bounds.
+ * - Render a lightweight emoji-inspired rocket via immediate mode canvas calls.
  *
- * Rendering draws an emoji‑inspired rocket (body, fins, cockpit, flame) using canvas primitives.
+ * Input precedence:
+ * - Keyboard active when any movement key held; mouse ignored to avoid jittery mixing.
+ * - When no keys: rocket smoothly lerps toward cursor center (using CONFIG.PLAYER.MOUSE_LERP).
+ *
+ * Rendering complexity intentionally kept local rather than split into sub-entities to
+ * reduce draw call overhead and keep the visual cohesive. Effects (engine trail, particles)
+ * are handled by separate entity systems.
  */
 export class Player {
   /**

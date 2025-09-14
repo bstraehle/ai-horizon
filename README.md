@@ -151,6 +151,17 @@ Entities (asteroids, bullets, explosions, particles, stars, nebula blobs, engine
 
 `js/types.js` defines shared typedefs (events, states, shapes). Runtime code remains plain JS for minimal friction while still enjoying IDE intellisense through `// @ts-check` (selectively disabled in a few high-churn files). Prefer referencing shared types via `import('./types.js').TypeName` to avoid circular imports.
 
+## Commenting style
+
+See `docs/COMMENTING_GUIDE.md` for the full style guide. Core principles:
+
+- Describe intent & rationale, not the literal code.
+- Keep top-of-file headers only for non-trivial modules (purpose, responsibilities, key decisions).
+- Public methods documented with succinct JSDoc (`@param`, `@returns`) – omit boilerplate for trivially obvious void setters.
+- Reference shared typedefs instead of re-declaring shapes.
+- Remove stale comments aggressively; correctness > quantity.
+- Justify performance-sensitive patterns (pooling, defensive clamps) with a short note.
+
 ## Testing
 
 Vitest is configured (see `tests/`). Categories:
