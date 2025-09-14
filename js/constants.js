@@ -187,6 +187,22 @@ export const CONFIG = deepFreeze({
     // Number of bullet hits required to destroy an indestructible asteroid
     INDESTRUCTIBLE_HITS: 10,
     SHIELD_FLASH_EXTRA_ALPHA: 0.4,
+    // Crater emboss tuning (visual polish). Set ENABLE to false to skip per-frame crater shading.
+    CRATER_EMBOSS: {
+      ENABLE: true,
+      COUNT_BASE: 3,
+      COUNT_VAR: 2, // up to +2 more craters
+      SIZE_MIN: 2,
+      SIZE_FACTOR: 0.3, // fraction of asteroid radius for max crater radius
+      LIGHT_DIR: { x: -0.7, y: -0.7 }, // normalized-ish light vector (top-left)
+      HIGHLIGHT_ALPHA: 0.35,
+      SHADOW_ALPHA_INNER: 0.45,
+      SHADOW_ALPHA_MID: 0.25,
+      // Damage layering: as indestructible asteroid takes hits, optionally add more craters
+      EXTRA_MAX: 4, // maximum number of extra craters to activate over full damage range
+      SHADOW_DARKEN_SCALE: 0.5, // additional multiplier up to +50% darkness at max severity
+      HIGHLIGHT_FADE_SCALE: 0.4, // reduce highlight alpha by up to 40% at max severity
+    },
   },
   BULLET: {
     HEIGHT: 15,
