@@ -95,21 +95,22 @@ const COLORS = deepFreeze({
     GRAD_OUT: "rgba(255, 50, 0, 0)",
   },
   NEBULA: {
-    // Re-themed (2025-09-13) to a soft "white / faint mist" palette per request.
-    // Subtle warm/cool shifts keep depth without pulling strong hue attention
-    // away from gameplay objects. Alphas are kept low so overlapping blobs
-    // gently build brightness instead of washing the scene.
-    // N1: neutral white core
-    N1: "rgba(255, 255, 255, 0.10)",
+    // Re-themed (2025-09-13) to a soft "white / faint mist" palette.
+    // (2025-09-14 tweak) Further reduced alphas to intentionally make the
+    // nebula appear less dense / intrusive. Lower opacity per blob means
+    // overlapping areas still build glow but overall scene stays darker.
+    // Previous stronger values kept in comments for quick revert.
+    // N1: neutral white core (was 0.10)
+    N1: "rgba(255, 255, 255, 0.07)",
     N1_OUT: "rgba(255, 255, 255, 0)",
-    // N2: slight cool tint (very light blue)
-    N2: "rgba(228, 238, 255, 0.11)",
+    // N2: slight cool tint (was 0.11)
+    N2: "rgba(228, 238, 255, 0.075)",
     N2_OUT: "rgba(228, 238, 255, 0)",
-    // N3: slight warm tint (very light peach)
-    N3: "rgba(255, 240, 225, 0.09)",
+    // N3: slight warm tint (was 0.09)
+    N3: "rgba(255, 240, 225, 0.065)",
     N3_OUT: "rgba(255, 240, 225, 0)",
-    // N4: soft neutral gray to anchor contrast when blended
-    N4: "rgba(215, 215, 215, 0.12)",
+    // N4: soft neutral gray anchor (was 0.12)
+    N4: "rgba(215, 215, 215, 0.08)",
     N4_OUT: "rgba(215, 215, 215, 0)",
   },
   PLAYER: {
@@ -299,18 +300,20 @@ export const CONFIG = deepFreeze({
     SEED_PARAM: "seed",
   },
   NEBULA: {
-    COUNT_DESKTOP: 6,
-    COUNT_MOBILE: 4,
-    RADIUS_MAX_DESKTOP: 250,
-    RADIUS_MAX_MOBILE: 125,
-    RADIUS_MIN_DESKTOP: 100,
-    RADIUS_MIN_MOBILE: 50,
-    BLOB_COUNT_BASE_DESKTOP: 5,
-    BLOB_COUNT_VAR_DESKTOP: 3,
-    BLOB_COUNT_BASE_MOBILE: 3,
-    BLOB_COUNT_VAR_MOBILE: 2,
-    BLOB_MIN_FACTOR: 0.35,
-    BLOB_VAR_FACTOR: 0.6,
+    // Reduced overall density (2025-09-14): fewer nebula, slightly smaller,
+    // and fewer internal blobs so background feels lighter.
+    COUNT_DESKTOP: 4, // was 6
+    COUNT_MOBILE: 3, // was 4
+    RADIUS_MAX_DESKTOP: 220, // was 250
+    RADIUS_MAX_MOBILE: 110, // was 125
+    RADIUS_MIN_DESKTOP: 90, // was 100
+    RADIUS_MIN_MOBILE: 45, // was 50
+    BLOB_COUNT_BASE_DESKTOP: 4, // was 5
+    BLOB_COUNT_VAR_DESKTOP: 2, // was 3
+    BLOB_COUNT_BASE_MOBILE: 2, // was 3
+    BLOB_COUNT_VAR_MOBILE: 2, // unchanged (still allows some variation)
+    BLOB_MIN_FACTOR: 0.35, // unchanged (shape variety baseline)
+    BLOB_VAR_FACTOR: 0.55, // was 0.6 (slightly reduce largest blob sizes)
     WOBBLE_AMP_MIN: 4,
     WOBBLE_AMP_VAR: 8,
     WOBBLE_RATE_BASE: 0.002,
