@@ -61,7 +61,7 @@ export class BackgroundManager {
 
   /**
    * Draw the background using a GameContext-like object.
-   * @param {{ ctx: CanvasRenderingContext2D, view: {width:number,height:number}, running:boolean, paused:boolean, animTime:number, timeSec?:number, dtSec?:number, background:{nebulaConfigs?:any, starField:any}, rng?: RNGLike, timerRemaining?:number, timerSeconds?:number }} ctxObj
+   * @param {{ ctx: CanvasRenderingContext2D, view: {width:number,height:number}, running:boolean, paused:boolean, gameOver?: boolean, animTime:number, timeSec?:number, dtSec?:number, background:{nebulaConfigs?:any, starField:any}, rng?: RNGLike, timerRemaining?:number, timerSeconds?:number }} ctxObj
    */
   static draw(ctxObj) {
     const {

@@ -171,17 +171,23 @@ export class StarField {
     }
     if (starField && /** @type {any} */ (starField).layers) {
       return {
-        layers: /** @type {any} */ (starField).layers.map((layer /** @type {any} */) => ({
-          name: layer.name,
-          config: layer.config,
-          stars: layer.stars.map((s /** @type {any} */) => ({
-            x: s.x * sx,
-            y: s.y * sy,
-            size: Math.max(1, s.size * sAvg),
-            speed: s.speed * sAvg,
-            brightness: s.brightness,
-          })),
-        })),
+        layers: /** @type {any} */ (starField).layers.map(
+          /** @param {{name:string,config:any,stars:any[]}} layer */ (layer) => ({
+            name: layer.name,
+            config: layer.config,
+            stars: layer.stars.map(
+              /** @param {{x:number,y:number,size:number,speed:number,brightness:number}} s */ (
+                s
+              ) => ({
+                x: s.x * sx,
+                y: s.y * sy,
+                size: Math.max(1, s.size * sAvg),
+                speed: s.speed * sAvg,
+                brightness: s.brightness,
+              })
+            ),
+          })
+        ),
       };
     }
     return starField;
