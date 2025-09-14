@@ -95,19 +95,22 @@ const COLORS = deepFreeze({
     GRAD_OUT: "rgba(255, 50, 0, 0)",
   },
   NEBULA: {
-    // Re-themed to a cohesive "dangerous red" palette (was mixed cool/warm hues).
-    // Variants keep subtle shifts in hue/brightness for visual depth while
-    // staying within a hostile red family. Inner alpha kept low to avoid
-    // overpowering gameplay silhouettes.
-    // Palette sources: derived from STAR_RED + deep crimsons.
-    N1: "rgba(156, 58, 58, 0.11)", // mid red
-    N1_OUT: "rgba(156, 58, 58, 0)",
-    N2: "rgba(130, 40, 40, 0.12)", // darker core variant
-    N2_OUT: "rgba(130, 40, 40, 0)",
-    N3: "rgba(185, 90, 90, 0.10)", // warmer / slightly brighter
-    N3_OUT: "rgba(185, 90, 90, 0)",
-    N4: "rgba(100, 28, 28, 0.13)", // deepest crimson (gives contrast in blend)
-    N4_OUT: "rgba(100, 28, 28, 0)",
+    // Re-themed (2025-09-13) to a soft "white / faint mist" palette per request.
+    // Subtle warm/cool shifts keep depth without pulling strong hue attention
+    // away from gameplay objects. Alphas are kept low so overlapping blobs
+    // gently build brightness instead of washing the scene.
+    // N1: neutral white core
+    N1: "rgba(255, 255, 255, 0.10)",
+    N1_OUT: "rgba(255, 255, 255, 0)",
+    // N2: slight cool tint (very light blue)
+    N2: "rgba(228, 238, 255, 0.11)",
+    N2_OUT: "rgba(228, 238, 255, 0)",
+    // N3: slight warm tint (very light peach)
+    N3: "rgba(255, 240, 225, 0.09)",
+    N3_OUT: "rgba(255, 240, 225, 0)",
+    // N4: soft neutral gray to anchor contrast when blended
+    N4: "rgba(215, 215, 215, 0.12)",
+    N4_OUT: "rgba(215, 215, 215, 0)",
   },
   PLAYER: {
     COCKPIT: "#b20000",

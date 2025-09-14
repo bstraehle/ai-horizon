@@ -61,7 +61,7 @@ export class BackgroundManager {
 
   /**
    * Draw the background using a GameContext-like object.
-   * @param {{ ctx: CanvasRenderingContext2D, view: {width:number,height:number}, running:boolean, paused:boolean, animTime:number, timeSec?:number, dtSec?:number, background:{nebulaConfigs?:any, starField:any}, rng?: RNGLike }} ctxObj
+   * @param {{ ctx: CanvasRenderingContext2D, view: {width:number,height:number}, running:boolean, paused:boolean, animTime:number, timeSec?:number, dtSec?:number, background:{nebulaConfigs?:any, starField:any}, rng?: RNGLike, timerRemaining?:number, timerSeconds?:number }} ctxObj
    */
   static draw(ctxObj) {
     const {
@@ -70,11 +70,22 @@ export class BackgroundManager {
       paused,
       animTime,
       background: { nebulaConfigs, starField },
+      timerRemaining,
+      timerSeconds,
     } = ctxObj;
     Background.draw(ctx, width, height);
     // Draw nebula only during active gameplay
     if (nebulaConfigs && ctxObj.running) {
-      Nebula.draw(ctx, nebulaConfigs);
+      let themeProgress = 0;
+      if (
+        typeof timerRemaining === "number" &&
+        typeof timerSeconds === "number" &&
+        timerSeconds > 0
+      ) {
+        const elapsed = timerSeconds - Math.max(0, timerRemaining);
+        themeProgress = Math.min(1, Math.max(0, elapsed / timerSeconds));
+      }
+      Nebula.draw(ctx, nebulaConfigs, themeProgress);
     }
     const timeSec = typeof ctxObj.timeSec === "number" ? ctxObj.timeSec : (animTime || 0) / 1000;
     const dtSec = typeof ctxObj.dtSec === "number" ? ctxObj.dtSec : CONFIG.TIME.DEFAULT_DT;

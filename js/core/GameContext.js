@@ -16,6 +16,8 @@ import { CONFIG } from "../constants.js";
  * @property {number} animTime - milliseconds
  * @property {number} timeSec - seconds
  * @property {number} dtSec - seconds
+ * @property {number} [timerRemaining]
+ * @property {number} [timerSeconds]
  * @property {boolean} isMobile
  * @property {import('../types.js').RNGLike} rng
  * @property {{ nebulaConfigs?: any, starField: any }} background
@@ -40,6 +42,8 @@ export function getGameContext(game) {
     animTime: game.timeMs,
     timeSec: game.timeSec,
     dtSec: game._lastDtSec || CONFIG.TIME.DEFAULT_DT,
+    timerRemaining: typeof game.timerRemaining === "number" ? game.timerRemaining : undefined,
+    timerSeconds: typeof game.timerSeconds === "number" ? game.timerSeconds : undefined,
 
     // Platform
     isMobile: game._isMobile,

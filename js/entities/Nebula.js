@@ -29,6 +29,7 @@ export class Nebula {
    * @property {number} r
    * @property {string} color0
    * @property {string} color1
+   * @property {number} [_variantIndex] - internal palette variant index for theme blending
    * @property {number} dx
    * @property {number} dy
    * @property {number} dr
@@ -106,6 +107,8 @@ export class Nebula {
         r: baseR,
         color0: colorSet.color0,
         color1: colorSet.color1,
+        // Track which palette index we chose so we can map to the target (red) theme for blending.
+        _variantIndex: nebulaColors.indexOf(colorSet),
         dx: (rand.nextFloat() - 0.5) * CONFIG.NEBULA.SPEED_JITTER * CONFIG.NEBULA.SPEED_SCALE,
         dy: (rand.nextFloat() - 0.5) * CONFIG.NEBULA.SPEED_JITTER * CONFIG.NEBULA.SPEED_SCALE,
         dr:
@@ -168,6 +171,57 @@ export class Nebula {
    * @param {NebulaConfig[]} nebulaConfigs - Array of nebula configuration objects from Nebula.init().
    */
   static draw(ctx, nebulaConfigs) {
+    // Optional third argument allows callers to pass a 0..1 progress value for theme blending.
+    // Preserve backwards compatibility by reading arguments instead of changing signature.
+    const themeProgress =
+      typeof arguments[2] === "number" ? Math.min(1, Math.max(0, arguments[2])) : 0;
+
+    // Lazily define (once) the target "dangerous red" palette for transition.
+    // We intentionally keep these values local to avoid re-introducing the red theme
+    // globally; they only serve as blend targets.
+    if (!this._targetRedPalette) {
+      this._targetRedPalette = [
+        { color0: "rgba(156, 58, 58, 0.11)", color1: "rgba(156, 58, 58, 0)" },
+        { color0: "rgba(130, 40, 40, 0.12)", color1: "rgba(130, 40, 40, 0)" },
+        { color0: "rgba(185, 90, 90, 0.10)", color1: "rgba(185, 90, 90, 0)" },
+        { color0: "rgba(100, 28, 28, 0.13)", color1: "rgba(100, 28, 28, 0)" },
+      ];
+    }
+
+    // Simple rgba() parser (numbers + float alpha) with caching for performance.
+    const cache = (this._parseCache = this._parseCache || new Map());
+    /**
+     * Lightweight rgba() string parser with memoization.
+     * @param {string} str
+     * @returns {{r:number,g:number,b:number,a:number}}
+     */
+    const parse = (str) => {
+      let v = cache.get(str);
+      if (v) return v;
+      const m = /rgba\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9]*\.?[0-9]+)\s*\)/.exec(str);
+      if (!m) return { r: 255, g: 255, b: 255, a: 0 };
+      v = { r: +m[1], g: +m[2], b: +m[3], a: +m[4] };
+      cache.set(str, v);
+      return v;
+    };
+    /**
+     * Blend two rgba() strings.
+     * @param {string} c0
+     * @param {string} c1
+     * @param {number} t 0..1
+     * @returns {string}
+     */
+    const blend = (c0, c1, t) => {
+      if (t <= 0) return c0;
+      if (t >= 1) return c1;
+      const a = parse(c0);
+      const b = parse(c1);
+      const r = Math.round(a.r + (b.r - a.r) * t);
+      const g = Math.round(a.g + (b.g - a.g) * t);
+      const bl = Math.round(a.b + (b.b - a.b) * t);
+      const al = a.a + (b.a - a.a) * t;
+      return `rgba(${r}, ${g}, ${bl}, ${al.toFixed(3)})`;
+    };
     ctx.save();
     for (const nebula of nebulaConfigs) {
       const blobs = nebula.blobs || [
@@ -180,14 +234,20 @@ export class Nebula {
           sy: 1,
         },
       ];
+      // Determine variant index (fallback 0) and resolve target red colors.
+      const vi = typeof nebula._variantIndex === "number" ? nebula._variantIndex : 0;
+      const target = this._targetRedPalette[vi % this._targetRedPalette.length];
+      // Compute blended colors for this nebula instance.
+      const blendedColor0 = blend(nebula.color0, target.color0, themeProgress);
+      const blendedColor1 = blend(nebula.color1, target.color1, themeProgress);
       for (const b of blobs) {
         ctx.save();
         ctx.translate(nebula.x + (b.ox || 0), nebula.y + (b.oy || 0));
         ctx.rotate(b.rot || 0);
         ctx.scale(b.sx || 1, b.sy || 1);
         const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, b.r || nebula.r);
-        grad.addColorStop(0, nebula.color0);
-        grad.addColorStop(1, nebula.color1);
+        grad.addColorStop(0, blendedColor0);
+        grad.addColorStop(1, blendedColor1);
         ctx.fillStyle = grad;
         ctx.globalCompositeOperation = "lighter";
         ctx.beginPath();
@@ -228,6 +288,7 @@ export class Nebula {
         x: (n.x || 0) * sx,
         y: (n.y || 0) * sy,
         r: (n.r || 0) * sAvg,
+        _variantIndex: n._variantIndex,
         blobs,
       };
     });
