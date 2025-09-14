@@ -68,4 +68,4 @@ export class LeaderboardRepository {
   }
 }
 
-export default LeaderboardRepository;
+// (Removed default export – use named import { LeaderboardRepository })

@@ -4,6 +4,7 @@
   "private": true,
   "description": "AI Horizon browser game",
   "type": "module",
+  "sideEffects": false,
   "scripts": {
     "build": "esbuild js/game.js --bundle --minify --sourcemap --target=es2018 --outfile=dist/bundle.js",
     "postbuild": "powershell -NoProfile -Command \"New-Item -ItemType Directory -Force -Path dist > $null; Copy-Item -Force .\\favicon.png, .\\style.css .\\dist\\; (Get-Content .\\index.prod.html) -replace 'dist/bundle.js','bundle.js' | Set-Content .\\dist\\index.html\"",

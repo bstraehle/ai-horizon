@@ -66,9 +66,4 @@ export function formatRows(entries) {
   return entries.slice(0, 100).map((e, idx) => formatRow(e, idx).text);
 }
 
-export default {
-  normalize,
-  qualifiesForInitials,
-  formatRow,
-  formatRows,
-};
+// (Removed default export aggregate – tree-shakers can drop unused named exports.)

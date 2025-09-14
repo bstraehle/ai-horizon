@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import LeaderboardManager from "../js/managers/LeaderboardManager.js";
+import { LeaderboardManager } from "../js/managers/LeaderboardManager.js";
 
 // The helper logic (documented in code):
 //  - score must be > 0

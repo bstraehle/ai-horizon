@@ -261,4 +261,4 @@ export class LeaderboardManager {
   }
 }
 
-export default LeaderboardManager;
+// (Removed default export – use named import { LeaderboardManager })

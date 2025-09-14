@@ -67,5 +67,3 @@ export class RemoteAdapter {
     }
   }
 }
-
-export default RemoteAdapter;

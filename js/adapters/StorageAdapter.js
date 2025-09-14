@@ -61,5 +61,3 @@ export class StorageAdapter {
     }
   }
 }
-
-export default StorageAdapter;

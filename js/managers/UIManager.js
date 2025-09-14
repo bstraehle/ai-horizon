@@ -1,7 +1,7 @@
 /**
  * UIManager centralizes DOM updates and focus management for overlays and scores.
  */
-import LeaderboardManager from "./LeaderboardManager.js";
+import { LeaderboardManager } from "./LeaderboardManager.js";
 export class UIManager {
   // When true prefer scroll-preserving focus calls while overlays are visible.
   static _preserveFocus = false;

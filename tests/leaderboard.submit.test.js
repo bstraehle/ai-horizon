@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { JSDOM } from "jsdom";
-import LeaderboardManager from "../js/managers/LeaderboardManager.js";
+import { LeaderboardManager } from "../js/managers/LeaderboardManager.js";
 
 describe("LeaderboardManager submit + render", () => {
   beforeEach(() => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import LeaderboardManager from "../js/managers/LeaderboardManager.js";
+import { LeaderboardManager } from "../js/managers/LeaderboardManager.js";
 
 describe("LeaderboardManager.formatRow / formatRows", () => {
   it("formats top three with medals and no thumbs", () => {

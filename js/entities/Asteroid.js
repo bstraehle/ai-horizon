@@ -71,7 +71,7 @@ export class Asteroid {
             ? Math.floor(this._rng.nextFloat() * planets.length)
             : Math.floor(Math.random() * planets.length);
           this._palette = planets[idx];
-        } else this._palette = CONFIG.COLORS.ASTEROID_DARK || CONFIG.COLORS.ASTEROID;
+        } else this._palette = CONFIG.COLORS.ASTEROID;
       }
     }
     const speedFactor =
@@ -85,8 +85,6 @@ export class Asteroid {
 
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
     this.y += this.speed * dtSec;
-    if (CONFIG.ASTEROID.SHIELD_ENABLE && this.isIndestructible && this._shieldFlash > 0)
-      this._shieldFlash = Math.max(0, this._shieldFlash - dtSec);
     const cfg = CONFIG.ASTEROID.CRATER_EMBOSS;
     if (cfg && cfg.ENABLE && cfg.REVEAL_TIME > 0 && this._craters.length) {
       const rt = cfg.REVEAL_TIME;
@@ -107,10 +105,6 @@ export class Asteroid {
     const centerY = this.y + this.height / 2;
     const radius = this.width / 2;
     const palette = this._palette || CONFIG.COLORS.ASTEROID;
-    const shieldColor =
-      (palette && palette.SHIELD) ||
-      (CONFIG.COLORS.ASTEROID_HARD && CONFIG.COLORS.ASTEROID_HARD.SHIELD) ||
-      "#7fc3ff";
     const asteroidGradient = ctx.createRadialGradient(
       centerX - radius * 0.3,
       centerY - radius * 0.3,
@@ -190,20 +184,6 @@ export class Asteroid {
     ctx.strokeStyle = palette.OUTLINE;
     ctx.lineWidth = this.isIndestructible ? 3 : 2;
     ctx.stroke();
-    if (CONFIG.ASTEROID.SHIELD_ENABLE && this.isIndestructible && this._shieldFlash > 0) {
-      const t = Math.max(0, Math.min(1, this._shieldFlash / CONFIG.ASTEROID.SHIELD_FLASH_TIME));
-      ctx.save();
-      ctx.strokeStyle = shieldColor;
-      ctx.lineWidth = 2 + 2 * t;
-      ctx.shadowColor = shieldColor;
-      ctx.shadowBlur = 10 + 10 * t;
-      ctx.globalAlpha = 0.6 + 0.6 * t;
-      const ringR = radius * (1.05 + 0.05 * t);
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, ringR, 0, PI2);
-      ctx.stroke();
-      ctx.restore();
-    }
     if (this.isIndestructible && this._hits > 0) {
       ctx.save();
       const severity = Math.min(1, this._hits / (CONFIG.ASTEROID.INDESTRUCTIBLE_HITS || 10));
@@ -323,7 +303,7 @@ export class Asteroid {
             ? Math.floor(this._rng.nextFloat() * planets.length)
             : Math.floor(Math.random() * planets.length);
           this._palette = planets[idx];
-        } else this._palette = CONFIG.COLORS.ASTEROID_DARK || CONFIG.COLORS.ASTEROID;
+        } else this._palette = CONFIG.COLORS.ASTEROID;
       }
     }
     const speedFactor =
@@ -333,17 +313,10 @@ export class Asteroid {
     this.speed = speedFactor ? speed * speedFactor : speed;
   }
 
-  onShieldHit() {
-    if (!this.isIndestructible) return;
-    if (!CONFIG.ASTEROID.SHIELD_ENABLE) return;
-    this._shieldFlash = CONFIG.ASTEROID.SHIELD_FLASH_TIME;
-  }
-
   /** @param {any} [game] */
   onBulletHit(game) {
     if (!this.isIndestructible) return true;
     this._hits = (this._hits || 0) + 1;
-    this.onShieldHit();
     try {
       const rand =
         this._rng && typeof this._rng.nextFloat === "function"

@@ -20,24 +20,6 @@ const COLORS = deepFreeze({
     OUTLINE: "#242424",
     RING: "#8e8e8e",
   },
-  ASTEROID_HARD: {
-    CRATER: "#333",
-    GRAD_IN: "#333",
-    GRAD_MID: "#222",
-    GRAD_OUT: "#111",
-    OUTLINE: "#777",
-    RING: "#999",
-    SHIELD: "#1a1a1a",
-  },
-  ASTEROID_DARK: {
-    CRATER: "#6B3926",
-    GRAD_IN: "#FF8C42",
-    GRAD_MID: "#C1440E",
-    GRAD_OUT: "#3C1A0E",
-    OUTLINE: "#8B3E2F",
-    SHIELD: "#FFBF8A",
-    RING: "#6B3926",
-  },
   ASTEROID_PLANETS: [
     {
       NAME: "MONO_DARK",
@@ -115,7 +97,6 @@ export const CONFIG = deepFreeze({
     MIN_SIZE: 25,
     SIZE_VARIATION: 50,
     SPAWN_Y: -40,
-    SHIELD_ENABLE: false,
     REGULAR_SIZE_FACTOR: 0.85,
     INDESTRUCTIBLE_SIZE_FACTOR: 1.6,
     INDESTRUCTIBLE_SPEED_FACTOR: 0.55,

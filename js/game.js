@@ -44,7 +44,7 @@ import { RenderManager } from "./managers/RenderManager.js";
 import { SpawnManager } from "./managers/SpawnManager.js";
 import { SpriteManager } from "./managers/SpriteManager.js";
 import { UIManager } from "./managers/UIManager.js";
-import LeaderboardManager from "./managers/LeaderboardManager.js";
+import { LeaderboardManager } from "./managers/LeaderboardManager.js";
 import { ViewManager } from "./managers/ViewManager.js";
 
 // Utils
@@ -207,27 +207,32 @@ class AIHorizon {
     /** @type {Star[]} */
     this.stars = [];
 
-    this.bulletPool = new ObjectPool(
+    // @__PURE__ object pool factories (side-effect free constructors)
+    this.bulletPool = /* @__PURE__ */ new ObjectPool(
       (x, y, w, h, speed) => new Bullet(x, y, w, h, speed),
       undefined,
       { maxSize: 512 }
     );
-    this.particlePool = new ObjectPool(
+    this.particlePool = /* @__PURE__ */ new ObjectPool(
       (x, y, vx, vy, life, maxLife, size, color) =>
         new Particle(x, y, vx, vy, life, maxLife, size, color),
       undefined,
       { maxSize: 4096 }
     );
-    this.asteroidPool = new ObjectPool(
+    this.asteroidPool = /* @__PURE__ */ new ObjectPool(
       (x, y, w, h, speed, rng, isIndestructible = false, paletteOverride = null) =>
         new Asteroid(x, y, w, h, speed, rng, isIndestructible, paletteOverride),
       undefined,
       { maxSize: 256 }
     );
-    this.starPool = new ObjectPool((x, y, w, h, speed) => new Star(x, y, w, h, speed), undefined, {
-      maxSize: 256,
-    });
-    this.explosionPool = new ObjectPool(
+    this.starPool = /* @__PURE__ */ new ObjectPool(
+      (x, y, w, h, speed) => new Star(x, y, w, h, speed),
+      undefined,
+      {
+        maxSize: 256,
+      }
+    );
+    this.explosionPool = /* @__PURE__ */ new ObjectPool(
       (x, y, w, h, life, maxLife) => new Explosion(x, y, w, h, life, maxLife),
       undefined,
       { maxSize: 256 }

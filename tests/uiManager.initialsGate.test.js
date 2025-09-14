@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { JSDOM } from "jsdom";
-import LeaderboardManager from "../js/managers/LeaderboardManager.js";
+import { LeaderboardManager } from "../js/managers/LeaderboardManager.js";
 import { UIManager } from "../js/managers/UIManager.js";
 
 // Helper to build the Game Over overlay DOM structure used by UIManager.showGameOver
