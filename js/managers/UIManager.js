@@ -161,16 +161,8 @@ export class UIManager {
           const max = LeaderboardManager.MAX_ENTRIES || 0;
           // Use cached entries when available to avoid async flash.
           if (Array.isArray(LeaderboardManager._cacheEntries)) {
-            const entries = LeaderboardManager._cacheEntries.slice().sort(
-              /** @param {{id:string,score:number}} a @param {{id:string,score:number}} b */
-              (a, b) => b.score - a.score
-            );
-            const qualifies =
-              entries.length < max ||
-              entries.some(
-                /** @param {{id:string,score:number}} e @param {number} idx */
-                (e, idx) => idx < max && score > e.score
-              );
+            const entries = LeaderboardManager._cacheEntries.slice();
+            const qualifies = LeaderboardManager.qualifiesForInitials(score, entries, max);
             toggleInitialsUI(qualifies);
           } else if (LeaderboardManager._pendingLoadPromise) {
             // Hide until load completes to avoid flicker, then decide.
@@ -184,16 +176,7 @@ export class UIManager {
                       toggleInitialsUI(true);
                       return;
                     }
-                    const sorted = entries.slice().sort(
-                      /** @param {{id:string,score:number}} a @param {{id:string,score:number}} b */
-                      (a, b) => b.score - a.score
-                    );
-                    const qualifies =
-                      sorted.length < max ||
-                      sorted.some(
-                        /** @param {{id:string,score:number}} e @param {number} idx */
-                        (e, idx) => idx < max && score > e.score
-                      );
+                    const qualifies = LeaderboardManager.qualifiesForInitials(score, entries, max);
                     toggleInitialsUI(qualifies);
                   } catch (_) {
                     /* ignore - qualification check best effort */
@@ -205,16 +188,7 @@ export class UIManager {
             // Trigger a load (respect remote flag) and decide afterwards.
             const maybe = LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
             if (Array.isArray(maybe)) {
-              const sorted = maybe.slice().sort(
-                /** @param {{id:string,score:number}} a @param {{id:string,score:number}} b */
-                (a, b) => b.score - a.score
-              );
-              const qualifies =
-                sorted.length < max ||
-                sorted.some(
-                  /** @param {{id:string,score:number}} e @param {number} idx */
-                  (e, idx) => idx < max && score > e.score
-                );
+              const qualifies = LeaderboardManager.qualifiesForInitials(score, maybe, max);
               toggleInitialsUI(qualifies);
             } else if (maybe && typeof maybe.then === "function") {
               toggleInitialsUI(false); // hide while loading
@@ -227,16 +201,11 @@ export class UIManager {
                         toggleInitialsUI(true);
                         return;
                       }
-                      const sorted = entries.slice().sort(
-                        /** @param {{id:string,score:number}} a @param {{id:string,score:number}} b */
-                        (a, b) => b.score - a.score
+                      const qualifies = LeaderboardManager.qualifiesForInitials(
+                        score,
+                        entries,
+                        max
                       );
-                      const qualifies =
-                        sorted.length < max ||
-                        sorted.some(
-                          /** @param {{id:string,score:number}} e @param {number} idx */
-                          (e, idx) => idx < max && score > e.score
-                        );
                       toggleInitialsUI(qualifies);
                     } catch (_) {
                       /* ignore - async qualification check best effort */

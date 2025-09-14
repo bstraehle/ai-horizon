@@ -745,40 +745,6 @@ class AIHorizon {
     SpawnManager.reset(this);
     // Force nebula regeneration on next init so each new game gets a fresh background.
     this.nebulaConfigs = undefined;
-    // If no RNG seed was provided via URL, create a fresh RNG for nebula generation
-    // so each Play Again produces a different nebula. If a seed was provided,
-    // preserve reproducibility by not reseeding.
-    try {
-      const url = new URL(window.location.href);
-      if (!url.searchParams.has(CONFIG.RNG.SEED_PARAM)) {
-        // Use a time-derived seed to ensure nebula differs between Play Again runs.
-        // Combine Date.now() and performance.now() when available for extra entropy.
-        let seed = (Date.now() >>> 0) ^ 0;
-        try {
-          if (typeof performance !== "undefined" && typeof performance.now === "function") {
-            seed = (seed ^ (Math.floor(performance.now()) & 0xffffffff)) >>> 0;
-          }
-        } catch (_e) {
-          /* ignore */
-        }
-        // Mix in a small Math.random salt to avoid same-ms collisions across tabs.
-        seed = (seed ^ ((Math.random() * 0xffffffff) >>> 0)) >>> 0;
-        this._nebulaRng = new RNG(seed);
-      } else {
-        this._nebulaRng = undefined;
-      }
-    } catch (_e) {
-      // Non-browser/test envs: use a time-derived seed where possible
-      const seed =
-        ((Date.now() >>> 0) ^
-          (typeof performance !== "undefined" && performance.now
-            ? Math.floor(performance.now()) & 0xffffffff
-            : 0)) >>>
-        0;
-      this._nebulaRng = new RNG((seed ^ ((Math.random() * 0xffffffff) >>> 0)) >>> 0);
-    }
-    // Force nebula regeneration on next init so each new game gets a fresh background.
-    this.nebulaConfigs = undefined;
 
     // Re-warm pools for likely smaller/larger entities (cheap, optional)
     try {
@@ -1010,32 +976,7 @@ class AIHorizon {
     // initial "Launch Mission" so the background stays the same as on page load.
     if (forceNebula) {
       this.nebulaConfigs = undefined;
-      try {
-        const url = new URL(window.location.href);
-        if (!url.searchParams.has(CONFIG.RNG.SEED_PARAM)) {
-          // time-derived seed to reduce chance of identical nebula between rapid restarts
-          let seed = (Date.now() >>> 0) ^ 0;
-          try {
-            if (typeof performance !== "undefined" && typeof performance.now === "function") {
-              seed = (seed ^ (Math.floor(performance.now()) & 0xffffffff)) >>> 0;
-            }
-          } catch (_e) {
-            /* ignore */
-          }
-          seed = (seed ^ ((Math.random() * 0xffffffff) >>> 0)) >>> 0;
-          this._nebulaRng = new RNG(seed);
-        } else {
-          this._nebulaRng = undefined;
-        }
-      } catch (_e) {
-        const seed =
-          ((Date.now() >>> 0) ^
-            (typeof performance !== "undefined" && performance.now
-              ? Math.floor(performance.now()) & 0xffffffff
-              : 0)) >>>
-          0;
-        this._nebulaRng = new RNG((seed ^ ((Math.random() * 0xffffffff) >>> 0)) >>> 0);
-      }
+      // Fresh nebula RNG seeding previously occurred here but was unused; assignments removed as dead code.
     }
   }
 
@@ -1690,10 +1631,7 @@ class AIHorizon {
     RenderManager.draw(this);
   }
 
-  /** Draw the pause message above everything else. */
-  drawPauseOverlayText() {
-    // Deprecated: pause is shown using DOM overlay to avoid blurry canvas text
-  }
+  // Removed unused drawPauseOverlayText() (legacy canvas-based pause overlay)
 
   /**
    * Init the background.

@@ -1,18 +1,97 @@
 /**
- * LeaderboardManager: simple top-N leaderboard using localStorage or a remote server.
- * Stores entries as [{id, score}] sorted by score desc. No PII collected.
+ * Simple top-N leaderboard using localStorage or a remote server.
+ * Public static API (relied upon by UI + tests):
+ *   - IS_REMOTE (boolean flag)
+ *   - MAX_ENTRIES, KEY_LEADERBOARD
+ *   - setHighScore(score, prevHigh?, highScoreEl?) -> number
+ *   - load({remote?}) -> entries[] | Promise<entries[]>
+ *   - save(entries, {remote?}) -> boolean | Promise<boolean>
+ *   - submit(score, userId, {remote?}) -> boolean | Promise<boolean>
+ *   - render(listEl, entries?) -> void (mutates DOM)
+ * Implementation details (_cacheEntries, _pendingLoadPromise) are accessed in tests/UI; keep stable.
  */
 export class LeaderboardManager {
   static IS_REMOTE = true;
   static REMOTE_ENDPOINT =
     "https://0p6x6bw6c2.execute-api.us-west-2.amazonaws.com/dev/leaderboard?id=1";
   // Server-side leaderboard identifier used when posting scores
-  static MAX_ENTRIES = 10;
+  static MAX_ENTRIES = 3;
   static KEY_LEADERBOARD = "aiHorizonLeaderboard";
   /** @type {{id:string,score:number}[]|null} */
   static _cacheEntries = null;
   /** @type {Promise<{id:string,score:number}[]>|null} */
   static _pendingLoadPromise = null;
+
+  // --- Internal helpers --------------------------------------------------
+  /** Normalize raw entries into canonical shape (non-mutating). */
+  /** @param {{id:any,score:any}[]|any} arr */
+  static _normalize(arr) {
+    return Array.isArray(arr)
+      ? arr.map(
+          /** @param {{id:any,score:any}} e */ (e) => ({
+            id: String(e?.id || ""),
+            score: Number(e?.score || 0),
+          })
+        )
+      : [];
+  }
+
+  /**
+   * Determine if a score qualifies for initials entry given current entries.
+   * Rules (reflected in tests):
+   *   - Score must be > 0.
+   *   - If fewer than 3 existing entries, any positive score qualifies (bootstrap behavior).
+   *   - Otherwise require the score to exceed at least one of the current top MAX_ENTRIES scores.
+   * NOTE: `entries` may be unsorted; we do not mutate the input.
+   * @param {number} score
+   * @param {{id:string,score:number}[]|null|undefined} entries
+   * @param {number} [max=LeaderboardManager.MAX_ENTRIES]
+   */
+  static qualifiesForInitials(score, entries, max = LeaderboardManager.MAX_ENTRIES) {
+    if (typeof score !== "number" || !Number.isFinite(score) || score <= 0) return false;
+    if (!Array.isArray(entries) || entries.length === 0) return true;
+    if (entries.length < 3) return true; // bootstrap threshold
+    // Check if score beats at least one of the existing top max scores.
+    // We don't need full sort to know if it beats one; however, sorting keeps logic explicit.
+    try {
+      const sorted = entries
+        .slice()
+        .sort((a, b) => b.score - a.score)
+        .slice(0, max);
+      return sorted.some((e) => score > e.score);
+    } catch (_) {
+      return true; // fail open (best effort UI behavior)
+    }
+  }
+
+  /**
+   * Produce display label components for an entry.
+   * Pure: does not touch DOM; safe for snapshot/unit tests.
+   * @param {{id:string,score:number}} entry
+   * @param {number} index Zero-based rank index
+   * @returns {{rank:number,badge:string,medal:string,thumb:boolean,text:string}}
+   */
+  static formatRow(entry, index) {
+    const rank = index + 1;
+    const medals = ["🥇", "🥈", "🥉"];
+    const medal = index < 3 ? medals[index] : "";
+    const thumb = index >= 3; // matches previous visual design
+    const badge = /^[A-Z]{1,3}$/.test(entry.id) ? entry.id : "???";
+    const medalPrefix = medal ? medal + " " : "";
+    const thumbPrefix = thumb ? "👍 " : "";
+    const text = `${medalPrefix}${thumbPrefix}${rank} — ${badge} — ${entry.score}`;
+    return { rank, badge, medal, thumb, text };
+  }
+
+  /**
+   * Format multiple entries in one pass (pure helper).
+   * @param {{id:string,score:number}[]} entries
+   * @returns {string[]} text rows limited to 100 items (UI safeguard)
+   */
+  static formatRows(entries) {
+    if (!Array.isArray(entries) || entries.length === 0) return [];
+    return entries.slice(0, 100).map((e, idx) => LeaderboardManager.formatRow(e, idx).text);
+  }
 
   /**
    * Update the high score display and return the current high.
@@ -42,10 +121,6 @@ export class LeaderboardManager {
    * @returns {{id:string,score:number}[]|Promise<{id:string,score:number}[]>}
    */
   static load({ remote = this.IS_REMOTE } = {}) {
-    //if (typeof console !== "undefined" && console && typeof console.log === "function") {
-    //  console.log("LeaderboardManager: load", { remote });
-    //}
-
     if (!remote) {
       try {
         if (Array.isArray(LeaderboardManager._cacheEntries))
@@ -60,10 +135,7 @@ export class LeaderboardManager {
           LeaderboardManager._cacheEntries = [];
           return [];
         }
-        const normalized = parsed.map(
-          /** @param {{id:any,score:any}} e */
-          (e) => ({ id: String(e.id || ""), score: Number(e.score || 0) })
-        );
+        const normalized = LeaderboardManager._normalize(parsed);
         LeaderboardManager._cacheEntries = normalized;
         return normalized.slice();
       } catch (_) {
@@ -74,7 +146,6 @@ export class LeaderboardManager {
 
     if (remote) {
       if (LeaderboardManager._pendingLoadPromise) return LeaderboardManager._pendingLoadPromise;
-
       LeaderboardManager._pendingLoadPromise = fetch(LeaderboardManager.REMOTE_ENDPOINT, {
         method: "GET",
       })
@@ -90,10 +161,7 @@ export class LeaderboardManager {
             LeaderboardManager._cacheEntries = [];
             return [];
           }
-          const normalized = arr.map(
-            /** @param {{id:any,score:any}} e */
-            (e) => ({ id: String(e.id || ""), score: Number(e.score || 0) })
-          );
+          const normalized = LeaderboardManager._normalize(arr);
           LeaderboardManager._cacheEntries = normalized;
           return normalized.slice();
         })
@@ -116,10 +184,6 @@ export class LeaderboardManager {
    * @returns {boolean|Promise<boolean>}
    */
   static save(entries, { remote = this.IS_REMOTE } = {}) {
-    //if (typeof console !== "undefined" && console && typeof console.log === "function") {
-    //  console.log("LeaderboardManager: save", { remote });
-    //}
-
     const payload = entries.slice(0, LeaderboardManager.MAX_ENTRIES);
 
     if (!remote) {
@@ -163,12 +227,10 @@ export class LeaderboardManager {
           // (requirement). We only update in-memory cache and emit the event. Local storage is
           // reserved for purely local leaderboards or remote failures (fallback in catch).
           try {
-            const normalized = /** @type {{id:any,score:any}[]} */ (arr)
-              .map(
-                /** @param {{id:any,score:any}} e */
-                (e) => ({ id: String(e.id || ""), score: Number(e.score || 0) })
-              )
-              .slice(0, LeaderboardManager.MAX_ENTRIES);
+            const normalized = LeaderboardManager._normalize(arr).slice(
+              0,
+              LeaderboardManager.MAX_ENTRIES
+            );
             LeaderboardManager._cacheEntries = normalized.slice();
             // Dispatch a DOM event so any UI can update immediately without requiring a full reload.
             try {
@@ -267,12 +329,7 @@ export class LeaderboardManager {
 
   /**
    * Render leaderboard into an ordered list element.
-   * @param {HTMLElement|null} listEl
-   */
-  /**
-   * Render leaderboard into an ordered list element.
-   * If `entries` is provided, use it directly instead of calling `load()`
-   * which avoids double-loading when the caller already fetched the data.
+   * If `entries` provided, uses them directly; otherwise resolves via `load()`.
    * @param {HTMLElement|null} listEl
    * @param {{id:string,score:number}[]=} entries
    */
@@ -290,24 +347,11 @@ export class LeaderboardManager {
         listEl.appendChild(li);
         return;
       }
-      entriesToRender.slice(0, 100).forEach(
-        /** @param {{id:string,score:number}} e */
-        (e, idx) => {
-          const li = document.createElement("li");
-          const rank = `${idx + 1}`;
-          let badge;
-          if (/^[A-Z]{1,3}$/.test(e.id)) {
-            badge = e.id;
-          } else {
-            badge = "???";
-          }
-          const medals = ["🥇", "🥈", "🥉"];
-          const medalPrefix = idx >= 0 && idx < 3 ? medals[idx] + " " : "";
-          const outsideTopThreePrefix = idx >= 3 ? "👍 " : "";
-          li.textContent = `${medalPrefix}${outsideTopThreePrefix}${rank} — ${badge} — ${e.score}`;
-          listEl.appendChild(li);
-        }
-      );
+      LeaderboardManager.formatRows(entriesToRender).forEach((row) => {
+        const li = document.createElement("li");
+        li.textContent = row;
+        listEl.appendChild(li);
+      });
     };
 
     // 1. If entries were provided by the caller, render them and return.
