@@ -110,18 +110,32 @@ const COLORS = deepFreeze({
     SHADOW: "#000",
   },
   STAR: {
-    BASE: "#ffd700",
-    GRAD_IN: "#ffffff",
-    GRAD_MID: "#ffd700",
-    GRAD_OUT: "#ffa500",
+    // Grayer variant (requested: closer to asteroid monochrome):
+    //  - Inner highlight: slightly dimmed neutral (#dcdcdc) instead of near-white.
+    //  - Mid: moderate gray (#b0b0b0) for body.
+    //  - Outer: darker neutral (#505050) to anchor shape (more contrast than prior #8c8c8c vs new mid).
+    //  - BASE (glow) sits between inner and mid to avoid washed halos (#c4c4c4).
+    //  - Keeps readability over background (#222-#444) while removing bright “white” pop.
+    BASE: "#c4c4c4",
+    GRAD_IN: "#dcdcdc",
+    GRAD_MID: "#b0b0b0",
+    GRAD_OUT: "#505050",
   },
   // Red bonus star palette
   STAR_RED: {
-    // Match the STAR shading (white inner, bright base/mid, darker outer) but in red
-    BASE: "#ff3333", // bright red base (analogous to #ffd700 for yellow)
-    GRAD_IN: "#ffffff", // white inner glow (same as regular stars)
-    GRAD_MID: "#ff3333", // mid tone matches base for strong glow
-    GRAD_OUT: "#b20000", // deep red for outer edge
+    // Desaturated "danger red" aligned to gray star luminance steps:
+    //  Luminance mapping (approx):
+    //   Gray star   : IN #dcdcdc | BASE #c4c4c4 | MID #b0b0b0 | OUT #505050
+    //   Target reds : IN #d8b4b4 | BASE #b87878 | MID #9c4a4a | OUT #4a1f1f
+    //  - Inner: #d8b4b4 keeps a pale warm highlight (not pure pink, slightly browned).
+    //  - Base (glow): #b87878 sits between inner and mid for halo.
+    //  - Mid: #9c4a4a provides central body (muted, not candy red).
+    //  - Outer: #4a1f1f anchors silhouette with a deep dangerous rim.
+    //  This preserves relative contrast pattern of gray stars while signaling threat via hue.
+    BASE: "#b87878",
+    GRAD_IN: "#d8b4b4",
+    GRAD_MID: "#9c4a4a",
+    GRAD_OUT: "#4a1f1f",
   },
   UI: {
     OVERLAY_BACKDROP: "rgba(0,0,0,0.5)",

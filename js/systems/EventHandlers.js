@@ -32,7 +32,8 @@ export const EventHandlers = {
           // Dramatic +100 popup: use asteroid's palette color when available (keeps theme consistent),
           // otherwise fall back to gold. Prefer a mid gradient color for good contrast.
           const pal = asteroid && asteroid._palette ? asteroid._palette : null;
-          const baseColor = (pal && (pal.GRAD_MID || pal.GRAD_IN || pal.CRATER)) || "#ffd700";
+          const baseColor =
+            (pal && (pal.GRAD_MID || pal.GRAD_IN || pal.CRATER)) || CONFIG.COLORS.STAR.BASE;
           const opts = {
             color: baseColor,
             fontSize: 20,
