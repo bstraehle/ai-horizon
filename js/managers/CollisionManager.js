@@ -169,7 +169,7 @@ export class CollisionManager {
               if (a && a.isIndestructible) {
                 // Indestructible asteroids should manage their own destruction via onBulletHit.
                 if (typeof a.onBulletHit === "function") {
-                  const shouldDestroy = a.onBulletHit();
+                  const shouldDestroy = a.onBulletHit(game);
                   if (shouldDestroy) {
                     toRemoveAsteroids.add(a);
                     if (game.events)

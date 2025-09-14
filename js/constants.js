@@ -202,6 +202,19 @@ export const CONFIG = deepFreeze({
       EXTRA_MAX: 4, // maximum number of extra craters to activate over full damage range
       SHADOW_DARKEN_SCALE: 0.5, // additional multiplier up to +50% darkness at max severity
       HIGHLIGHT_FADE_SCALE: 0.4, // reduce highlight alpha by up to 40% at max severity
+      REVEAL_TIME: 0.25, // seconds for a newly activated crater to reach full size
+      REVEAL_EASE: "outQuad", // easing function key (currently only outQuad supported)
+      // Dust puff emitted when a new crater activates (fresh impact flair)
+      PUFF_ENABLE: true,
+      // Visibility-tuned dust puff (slightly more particles & lifespan)
+      PUFF_COUNT: 9, // was 6
+      PUFF_LIFE: 0.55, // was 0.4
+      PUFF_LIFE_VAR: 0.2, // was 0.15
+      PUFF_SPEED: 170, // was 140
+      PUFF_SPEED_VAR: 110, // was 60
+      PUFF_SIZE_MIN: 1.2, // was 0.8
+      PUFF_SIZE_VAR: 1.6, // was 1.2
+      PUFF_COLOR: "rgba(210,200,190,0.9)", // lighter & slightly more opaque
     },
   },
   BULLET: {
