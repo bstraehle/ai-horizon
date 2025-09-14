@@ -26,17 +26,55 @@ export class StarField {
    */
   static init(width, height, rng, isMobile = false) {
     const rand = rng || { nextFloat: Math.random.bind(Math) };
-    const count = isMobile
+    const baseCount = isMobile
       ? CONFIG.GAME.STARFIELD_COUNT_MOBILE || CONFIG.GAME.STARFIELD_COUNT
       : CONFIG.GAME.STARFIELD_COUNT;
-    return Array.from({ length: count }, () => ({
-      x: rand.nextFloat() * width,
-      y: rand.nextFloat() * height,
-      size: rand.nextFloat() * CONFIG.STARFIELD.SIZE_VAR + CONFIG.STARFIELD.SIZE_MIN,
-      speed: rand.nextFloat() * CONFIG.STARFIELD.SPEED_VAR + CONFIG.STARFIELD.SPEED_MIN,
-      brightness:
-        rand.nextFloat() * CONFIG.STARFIELD.BRIGHTNESS_VAR + CONFIG.STARFIELD.BRIGHTNESS_MIN,
-    }));
+
+    /**
+     * @typedef {{ name?:string, countFactor?:number, sizeMult?:number, speedMult?:number, brightnessMult?:number, twinkleRate?:number, twinkleXFactor?:number }} LayerDef
+     */
+    /** @type {LayerDef[] | null} */
+    const layerDefs = Array.isArray(CONFIG.STARFIELD.LAYERS) ? CONFIG.STARFIELD.LAYERS : null;
+    if (!layerDefs || layerDefs.length === 0) {
+      // Legacy single-layer behavior: return flat array
+      return Array.from({ length: baseCount }, () => ({
+        x: rand.nextFloat() * width,
+        y: rand.nextFloat() * height,
+        size: rand.nextFloat() * CONFIG.STARFIELD.SIZE_VAR + CONFIG.STARFIELD.SIZE_MIN,
+        speed: rand.nextFloat() * CONFIG.STARFIELD.SPEED_VAR + CONFIG.STARFIELD.SPEED_MIN,
+        brightness:
+          rand.nextFloat() * CONFIG.STARFIELD.BRIGHTNESS_VAR + CONFIG.STARFIELD.BRIGHTNESS_MIN,
+      }));
+    }
+
+    // Layered behavior: return an object with ordered layers
+    /** @typedef {{name:string, stars:StarData[], config:{twinkleRate:number, twinkleXFactor:number}}} LayerRuntime */
+    /** @type {LayerRuntime[]} */
+    const layers = layerDefs.map((ld /** @type {LayerDef} */) => {
+      const layerCount = Math.max(1, Math.round(baseCount * (ld.countFactor || 1)));
+      const stars = Array.from({ length: layerCount }, () => ({
+        x: rand.nextFloat() * width,
+        y: rand.nextFloat() * height,
+        size:
+          (rand.nextFloat() * CONFIG.STARFIELD.SIZE_VAR + CONFIG.STARFIELD.SIZE_MIN) *
+          (ld.sizeMult || 1),
+        speed:
+          (rand.nextFloat() * CONFIG.STARFIELD.SPEED_VAR + CONFIG.STARFIELD.SPEED_MIN) *
+          (ld.speedMult || 1),
+        brightness:
+          (rand.nextFloat() * CONFIG.STARFIELD.BRIGHTNESS_VAR + CONFIG.STARFIELD.BRIGHTNESS_MIN) *
+          (ld.brightnessMult || 1),
+      }));
+      return {
+        name: ld.name || "layer",
+        stars,
+        config: {
+          twinkleRate: ld.twinkleRate || CONFIG.STARFIELD.TWINKLE_RATE,
+          twinkleXFactor: ld.twinkleXFactor || CONFIG.STARFIELD.TWINKLE_X_FACTOR,
+        },
+      };
+    });
+    return { layers };
   }
 
   /**
@@ -60,29 +98,49 @@ export class StarField {
     dtSec = CONFIG.TIME.DEFAULT_DT,
     rng = undefined
   ) {
+    if (!starField) return;
     ctx.save();
     ctx.fillStyle = CONFIG.COLORS.STAR.GRAD_IN;
-    starField.forEach((star) => {
-      if (!paused) {
-        star.y += star.speed * dtSec;
-        if (star.y > height) {
-          star.y = CONFIG.STARFIELD.RESET_Y;
-          star.x = (rng ? rng.nextFloat() : Math.random()) * width;
+
+    /**
+     * @param {StarData[]} stars
+     * @param {number} twinkleRate
+     * @param {number} twinkleXFactor
+     */
+    const drawStars = (stars, twinkleRate, twinkleXFactor) => {
+      for (let i = 0; i < stars.length; i++) {
+        const star = stars[i];
+        if (!paused) {
+          star.y += star.speed * dtSec;
+          if (star.y > height) {
+            star.y = CONFIG.STARFIELD.RESET_Y;
+            star.x = (rng ? rng.nextFloat() : Math.random()) * width;
+          }
         }
+        const twinkle = Math.sin(timeSec * twinkleRate + star.x * twinkleXFactor) * 0.3 + 0.7;
+        ctx.save();
+        ctx.globalAlpha = star.brightness * twinkle;
+        ctx.shadowColor = CONFIG.COLORS.STAR.GRAD_IN;
+        ctx.shadowBlur = star.size * CONFIG.STARFIELD.SHADOW_BLUR_MULT;
+        ctx.fillRect(star.x, star.y, star.size, star.size);
+        ctx.restore();
       }
-      const twinkle =
-        Math.sin(
-          timeSec * CONFIG.STARFIELD.TWINKLE_RATE + star.x * CONFIG.STARFIELD.TWINKLE_X_FACTOR
-        ) *
-          0.3 +
-        0.7;
-      ctx.save();
-      ctx.globalAlpha = star.brightness * twinkle;
-      ctx.shadowColor = CONFIG.COLORS.STAR.GRAD_IN;
-      ctx.shadowBlur = star.size * CONFIG.STARFIELD.SHADOW_BLUR_MULT;
-      ctx.fillRect(star.x, star.y, star.size, star.size);
-      ctx.restore();
-    });
+    };
+
+    if (Array.isArray(starField)) {
+      // Legacy flat array
+      drawStars(starField, CONFIG.STARFIELD.TWINKLE_RATE, CONFIG.STARFIELD.TWINKLE_X_FACTOR);
+    } else if (starField && /** @type {any} */ (starField).layers) {
+      // Draw in order: assume earlier layers are farther (already ordered in config)
+      for (let i = 0; i < /** @type {any} */ (starField).layers.length; i++) {
+        const layer = /** @type {any} */ (starField).layers[i];
+        drawStars(
+          layer.stars,
+          (layer.config && layer.config.twinkleRate) || CONFIG.STARFIELD.TWINKLE_RATE,
+          (layer.config && layer.config.twinkleXFactor) || CONFIG.STARFIELD.TWINKLE_X_FACTOR
+        );
+      }
+    }
     ctx.restore();
   }
 
@@ -101,12 +159,31 @@ export class StarField {
     const sx = newW / prevW;
     const sy = newH / prevH;
     const sAvg = (sx + sy) / 2;
-    return starField.map((s) => ({
-      x: s.x * sx,
-      y: s.y * sy,
-      size: Math.max(1, s.size * sAvg),
-      speed: s.speed * sAvg,
-      brightness: s.brightness,
-    }));
+    // Legacy flat array
+    if (Array.isArray(starField)) {
+      return starField.map((s) => ({
+        x: s.x * sx,
+        y: s.y * sy,
+        size: Math.max(1, s.size * sAvg),
+        speed: s.speed * sAvg,
+        brightness: s.brightness,
+      }));
+    }
+    if (starField && /** @type {any} */ (starField).layers) {
+      return {
+        layers: /** @type {any} */ (starField).layers.map((layer /** @type {any} */) => ({
+          name: layer.name,
+          config: layer.config,
+          stars: layer.stars.map((s /** @type {any} */) => ({
+            x: s.x * sx,
+            y: s.y * sy,
+            size: Math.max(1, s.size * sAvg),
+            speed: s.speed * sAvg,
+            brightness: s.brightness,
+          })),
+        })),
+      };
+    }
+    return starField;
   }
 }

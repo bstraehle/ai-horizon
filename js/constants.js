@@ -324,6 +324,38 @@ export const CONFIG = deepFreeze({
     TWINKLE_RATE: 4, // radians per second
     TWINKLE_X_FACTOR: 0.01,
     SHADOW_BLUR_MULT: 2,
+    // Optional layered starfield configuration. When LAYERS is defined the
+    // StarField entity will generate multiple parallax layers instead of a
+    // single flat array. Each layer may override base starfield properties
+    // via multipliers or absolute values. Counts fall back to GAME.STARFIELD_COUNT
+    // (or MOBILE variant) when omitted.
+    // Order matters: layers are drawn from far -> near (array order).
+    LAYERS: [
+      {
+        name: "far",
+        countFactor: 0.4, // 40% of base count
+        sizeMult: 0.6,
+        speedMult: 0.35,
+        brightnessMult: 0.7,
+        twinkleRate: 2.5,
+      },
+      {
+        name: "mid",
+        countFactor: 0.35,
+        sizeMult: 0.9,
+        speedMult: 0.6,
+        brightnessMult: 0.85,
+        twinkleRate: 4,
+      },
+      {
+        name: "near",
+        countFactor: 0.25,
+        sizeMult: 1.2,
+        speedMult: 1.1,
+        brightnessMult: 1.1,
+        twinkleRate: 6,
+      },
+    ],
   },
   STAR: {
     HORIZONTAL_MARGIN: 20,
