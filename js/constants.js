@@ -20,13 +20,17 @@
  */
 const COLORS = deepFreeze({
   ASTEROID: {
-    // More realistic rocky asteroid tones: dusty light center, mid gray-brown, dark outer rim
-    CRATER: "#6b6b6b", // crater - cool gray
-    GRAD_IN: "#cfc9c0", // dusty, slightly warm center
-    GRAD_MID: "#8f8579", // stony gray-brown midtone
-    GRAD_OUT: "#3f3a36", // dark outer rim
-    OUTLINE: "#2f2b28", // deep outline for contrast
-    RING: "#7a7570", // subtle ring tone matching mid/crater
+    // Neutral gray palette (2025-09-13) adjusted to feel closer to gray star set
+    // while remaining a bit darker overall to keep player/FX pop.
+    // Luminance ordering retained: IN > MID > CRATER > OUT > OUTLINE.
+    // Previous (warm rocky) values commented for quick revert:
+    //  OLD_GRAD_IN #cfc9c0 | OLD_GRAD_MID #8f8579 | OLD_CRATER #6b6b6b→#757575 | OLD_GRAD_OUT #3f3a36 | OLD_OUTLINE #2f2b28
+    GRAD_IN: "#d4d4d4", // lighter inner highlight (near star inner #dcdcdc but slightly dimmer)
+    GRAD_MID: "#b2b2b2", // mid body tone (between star mid #b0b0b0 and base #c4c4c4)
+    CRATER: "#9a9a9a", // crater fill: lighter than prior, still below mid for emboss visibility
+    GRAD_OUT: "#4a4a4a", // outer rim (close to star outer #505050)
+    OUTLINE: "#242424", // outline slightly lighter than previous deep brown to fit neutral set
+    RING: "#8e8e8e", // subtle ring accent harmonizing with crater/mid
   },
   // Hard/indestructible asteroid variant (darker, higher contrast outline)
   ASTEROID_HARD: {
@@ -122,25 +126,28 @@ const COLORS = deepFreeze({
     //  - BASE (glow) sits between inner and mid to avoid washed halos (#c4c4c4).
     //  - Keeps readability over background (#222-#444) while removing bright “white” pop.
     BASE: "#c4c4c4",
-    GRAD_IN: "#dcdcdc",
+    GRAD_IN: "#b0b0b0",
     GRAD_MID: "#b0b0b0",
     GRAD_OUT: "#505050",
   },
   // Red bonus star palette
   STAR_RED: {
-    // Desaturated "danger red" aligned to gray star luminance steps:
-    //  Luminance mapping (approx):
-    //   Gray star   : IN #dcdcdc | BASE #c4c4c4 | MID #b0b0b0 | OUT #505050
-    //   Target reds : IN #d8b4b4 | BASE #b87878 | MID #9c4a4a | OUT #4a1f1f
-    //  - Inner: #d8b4b4 keeps a pale warm highlight (not pure pink, slightly browned).
-    //  - Base (glow): #b87878 sits between inner and mid for halo.
-    //  - Mid: #9c4a4a provides central body (muted, not candy red).
-    //  - Outer: #4a1f1f anchors silhouette with a deep dangerous rim.
-    //  This preserves relative contrast pattern of gray stars while signaling threat via hue.
-    BASE: "#b87878",
-    GRAD_IN: "#d8b4b4",
-    GRAD_MID: "#9c4a4a",
-    GRAD_OUT: "#4a1f1f",
+    // Monochrome variant (2025-09-13) — requested: make red bonus stars use a
+    // grayscale palette similar to indestructible asteroid MONO_DARK while
+    // remaining visually distinct from regular neutral stars.
+    // Regular STAR (for reference): IN #dcdcdc | BASE #c4c4c4 | MID #b0b0b0 | OUT #505050
+    // Indestructible asteroid MONO_DARK: IN #a2a2a2 | MID #555555 | OUT #161616 | OUTLINE #080808
+    // Target STAR_RED (mono):
+    //   IN  #e0e0e0  (slightly brighter than gray star inner to preserve reward readability)
+    //   BASE#b8b8b8  (glow; between gray star BASE #c4c4c4 and asteroid IN #a2a2a2)
+    //   MID #6a6a6a  (echoes prior MONO_DARK mid #555555 but a touch lighter for separation)
+    //   OUT #1a1a1a  (deeper rim approaching asteroid outer #161616 for silhouette)
+    // Result: A higher-contrast grayscale bonus star; hue removed, distinction relies on
+    // slightly brighter core + deeper rim compared to standard stars.
+    BASE: "#b8b8b8",
+    GRAD_IN: "#6a6a6a",
+    GRAD_MID: "#6a6a6a",
+    GRAD_OUT: "#1a1a1a",
   },
   UI: {
     OVERLAY_BACKDROP: "rgba(0,0,0,0.5)",

@@ -130,3 +130,16 @@ Guidelines going forward:
 - Run `npm run lint:ci` before PRs to catch warnings promoted to errors in CI.
 
 Happy hacking!
+
+### Visual tweak (September 2025)
+
+Red bonus star palette darkened ("blackened crimson") to better match the near-black contrast of indestructible asteroid rims while remaining hue-distinct from the neutral gray stars. New values (`STAR_RED`):
+
+- IN `#c9a2a2`
+- BASE `#9f5d5d`
+- MID `#6b2c2c`
+- OUT `#1a0b0b`
+
+The shift lowers saturation/brightness to avoid candy red glow and improves silhouette legibility over dark backgrounds. Previous palette kept inline in `constants.js` comment for quick A/B if needed.
+
+Update (later September 2025): Red bonus stars converted to a monochrome palette (no hue) to fully match the indestructible asteroid aesthetic while still differentiating from normal stars via slightly brighter core and deeper outer rim. New monochrome values: IN #e0e0e0 | BASE #b8b8b8 | MID #6a6a6a | OUT #1a1a1a.
