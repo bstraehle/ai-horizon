@@ -74,8 +74,8 @@ export class BackgroundManager {
       timerSeconds,
     } = ctxObj;
     Background.draw(ctx, width, height);
-    // Draw nebula only during active gameplay
-    if (nebulaConfigs && ctxObj.running) {
+    // Draw nebula during gameplay, pause, and game over screens (hide only on initial menu)
+    if (nebulaConfigs && (ctxObj.running || ctxObj.paused || ctxObj.gameOver)) {
       let themeProgress = 0;
       if (
         typeof timerRemaining === "number" &&

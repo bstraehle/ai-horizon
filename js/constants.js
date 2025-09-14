@@ -299,7 +299,7 @@ export const CONFIG = deepFreeze({
     SEED_PARAM: "seed",
   },
   NEBULA: {
-    COUNT_DESKTOP: 8,
+    COUNT_DESKTOP: 6,
     COUNT_MOBILE: 4,
     RADIUS_MAX_DESKTOP: 250,
     RADIUS_MAX_MOBILE: 125,

@@ -13,6 +13,7 @@ import { CONFIG } from "../constants.js";
  * @property {ViewRect} view
  * @property {boolean} running
  * @property {boolean} paused
+ * @property {boolean} gameOver
  * @property {number} animTime - milliseconds
  * @property {number} timeSec - seconds
  * @property {number} dtSec - seconds
@@ -39,6 +40,7 @@ export function getGameContext(game) {
     // State & time
     running: game.state.isRunning(),
     paused: game.state.isPaused(),
+    gameOver: typeof game.state.isGameOver === "function" && game.state.isGameOver(),
     animTime: game.timeMs,
     timeSec: game.timeSec,
     dtSec: game._lastDtSec || CONFIG.TIME.DEFAULT_DT,
