@@ -85,7 +85,7 @@ export class Asteroid {
 
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
     this.y += this.speed * dtSec;
-    if (this.isIndestructible && this._shieldFlash > 0)
+    if (CONFIG.ASTEROID.SHIELD_ENABLE && this.isIndestructible && this._shieldFlash > 0)
       this._shieldFlash = Math.max(0, this._shieldFlash - dtSec);
     const cfg = CONFIG.ASTEROID.CRATER_EMBOSS;
     if (cfg && cfg.ENABLE && cfg.REVEAL_TIME > 0 && this._craters.length) {
@@ -190,7 +190,7 @@ export class Asteroid {
     ctx.strokeStyle = palette.OUTLINE;
     ctx.lineWidth = this.isIndestructible ? 3 : 2;
     ctx.stroke();
-    if (this.isIndestructible && this._shieldFlash > 0) {
+    if (CONFIG.ASTEROID.SHIELD_ENABLE && this.isIndestructible && this._shieldFlash > 0) {
       const t = Math.max(0, Math.min(1, this._shieldFlash / CONFIG.ASTEROID.SHIELD_FLASH_TIME));
       ctx.save();
       ctx.strokeStyle = shieldColor;
@@ -335,6 +335,7 @@ export class Asteroid {
 
   onShieldHit() {
     if (!this.isIndestructible) return;
+    if (!CONFIG.ASTEROID.SHIELD_ENABLE) return;
     this._shieldFlash = CONFIG.ASTEROID.SHIELD_FLASH_TIME;
   }
 
