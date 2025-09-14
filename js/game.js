@@ -88,6 +88,10 @@ class AIHorizon {
       this.canvas.getContext("2d", { alpha: false })
     );
     this.view = { width: 0, height: 0, dpr: 1 };
+    // Track current orientation (portrait|landscape) so we can suppress expensive
+    // resize handling on mobile for transient viewport changes (e.g. soft keyboard,
+    // URL bar show/hide). We compute after first resize below; initialize neutral.
+    this._lastOrientation = null;
     this.gameInfo = /** @type {HTMLElement} */ (document.getElementById("gameInfo"));
     this.gameOverScreen = /** @type {HTMLElement} */ (document.getElementById("gameOverScreen"));
     this.pauseScreen = /** @type {HTMLElement} */ (document.getElementById("pauseScreen"));
@@ -169,6 +173,12 @@ class AIHorizon {
     this.engineTrail = new EngineTrail();
 
     this.resizeCanvas();
+    // Establish initial orientation after first canvas measurement
+    try {
+      this._lastOrientation = window.innerWidth > window.innerHeight ? "landscape" : "portrait";
+    } catch {
+      /* non-browser/test env */
+    }
     this.initBackground();
     this.drawBackground();
 
@@ -660,6 +670,23 @@ class AIHorizon {
     this._resizeScheduled = true;
     requestAnimationFrame(() => {
       this._resizeScheduled = false;
+      // If on a mobile device, ignore resizes that do not correspond to an
+      // orientation change (portrait <-> landscape). This avoids triggering
+      // background regeneration or full resets when the soft keyboard appears,
+      // URL bar hides, PWA chrome animates, etc.
+      if (this._isMobile) {
+        let currentOrientation = this._lastOrientation;
+        try {
+          const now = window.innerWidth > window.innerHeight ? "landscape" : "portrait";
+          currentOrientation = now;
+        } catch {
+          /* non-browser env */
+        }
+        if (this._lastOrientation && currentOrientation === this._lastOrientation) {
+          return; // skip non-orientation resize on mobile
+        }
+        this._lastOrientation = currentOrientation;
+      }
       // Recompute size first
       const prevWidth = this.view.width || 0;
       const prevHeight = this.view.height || 0;
