@@ -71,14 +71,23 @@ export const EventHandlers = {
         const add = star && star.isRed ? CONFIG.GAME.STAR_SCORE_RED : CONFIG.GAME.STAR_SCORE;
         game.score += add;
         game.updateScore();
-        // Show a red +50 popup for red bonus stars (styled like indestructible asteroid popup but red)
+        // Show a +50 popup for red bonus stars using the SAME styling logic as +100 (indestructible asteroid)
+        // for visual consistency. We reuse the dynamic palette extraction, falling back to neutral star base.
         if (star && star.isRed && typeof game.createScorePopup === "function") {
+          // Use the same visual tone as +100: prefer mid tone from MONO_DARK asteroid palette for consistency.
+          // Fallback chain mirrors +100 logic (mid -> in -> crater -> neutral star base).
+          const monoDark =
+            (CONFIG.COLORS.ASTEROID_PLANETS && CONFIG.COLORS.ASTEROID_PLANETS[0]) || null;
+          const baseColor =
+            (monoDark && (monoDark.GRAD_MID || monoDark.GRAD_IN || monoDark.CRATER)) ||
+            CONFIG.COLORS.STAR.GRAD_MID ||
+            CONFIG.COLORS.STAR.BASE;
           const opts = {
-            color: CONFIG.COLORS.STAR_RED.BASE,
+            color: baseColor,
             fontSize: 20,
             fontWeight: "700",
             glow: true,
-            glowColor: CONFIG.COLORS.STAR_RED.BASE,
+            glowColor: baseColor,
             glowBlur: 12,
             stroke: "rgba(0,0,0,0.85)",
             maxLife: 1.2,

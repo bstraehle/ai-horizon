@@ -135,22 +135,24 @@ const COLORS = deepFreeze({
   },
   // Red bonus star palette
   STAR_RED: {
-    // Monochrome variant (2025-09-13) — requested: make red bonus stars use a
-    // grayscale palette similar to indestructible asteroid MONO_DARK while
-    // remaining visually distinct from regular neutral stars.
-    // Regular STAR (for reference): IN #dcdcdc | BASE #c4c4c4 | MID #b0b0b0 | OUT #505050
-    // Indestructible asteroid MONO_DARK: IN #a2a2a2 | MID #555555 | OUT #161616 | OUTLINE #080808
-    // Target STAR_RED (mono):
-    //   IN  #e0e0e0  (slightly brighter than gray star inner to preserve reward readability)
-    //   BASE#b8b8b8  (glow; between gray star BASE #c4c4c4 and asteroid IN #a2a2a2)
-    //   MID #6a6a6a  (echoes prior MONO_DARK mid #555555 but a touch lighter for separation)
-    //   OUT #1a1a1a  (deeper rim approaching asteroid outer #161616 for silhouette)
-    // Result: A higher-contrast grayscale bonus star; hue removed, distinction relies on
-    // slightly brighter core + deeper rim compared to standard stars.
-    BASE: "#b8b8b8",
-    GRAD_IN: "#6a6a6a",
-    GRAD_MID: "#6a6a6a",
-    GRAD_OUT: "#1a1a1a",
+    // Further darkened monochrome variant (2025-09-13 rev2) — make bonus stars
+    // feel almost as "black-core" as indestructible asteroids while still
+    // reading as a reward pickup (slightly brighter inner + subtle base glow).
+    // Reference palettes:
+    //   Regular STAR:      IN ~#dcdcdc | BASE #c4c4c4 | MID #b0b0b0 | OUT #505050
+    //   MONO_DARK asteroid IN #a2a2a2 | MID #555555 | OUT #161616 | OUTLINE #080808
+    // New STAR_RED target (rev2):
+    //   BASE #9c9c9c  (reduced from #b8b8b8; still lighter than asteroid mid to create faint aura)
+    //   IN   #b4b4b4  (inner highlight; just above base, lower than neutral star inner)
+    //   MID  #4a4a4a  (closer to asteroid rim; darker than prior #6a6a6a)
+    //   OUT  #121212  (nearly matches asteroid shield/outer darkness for silhouette)
+    // NOTE: Order differs from regular star: we intentionally keep BASE slightly
+    // lighter than MID so the sprite's additive glow retains a soft halo while
+    // the body collapses toward black — mimicking a "collapsed star" aesthetic.
+    BASE: "#9c9c9c",
+    GRAD_IN: "#b4b4b4",
+    GRAD_MID: "#4a4a4a",
+    GRAD_OUT: "#121212",
   },
   UI: {
     OVERLAY_BACKDROP: "rgba(0,0,0,0.5)",

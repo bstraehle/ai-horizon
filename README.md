@@ -133,13 +133,23 @@ Happy hacking!
 
 ### Visual tweak (September 2025)
 
-Red bonus star palette darkened ("blackened crimson") to better match the near-black contrast of indestructible asteroid rims while remaining hue-distinct from the neutral gray stars. New values (`STAR_RED`):
+Red bonus star palette evolution:
 
-- IN `#c9a2a2`
-- BASE `#9f5d5d`
-- MID `#6b2c2c`
-- OUT `#1a0b0b`
+1. Initial darkened red ("blackened crimson") variant (early Sept 2025) moved away from saturated candy red toward near-black rims.
+2. Monochrome conversion (mid Sept 2025) removed hue entirely to align with indestructible asteroid styling.
+3. Rev2 (this update) deepens contrast further so the bonus star feels like a collapsed/unstable object: inner still slightly brighter than asteroid core, body collapses quickly toward near-black outer edge.
 
-The shift lowers saturation/brightness to avoid candy red glow and improves silhouette legibility over dark backgrounds. Previous palette kept inline in `constants.js` comment for quick A/B if needed.
+Current `STAR_RED` monochrome (rev2) values:
 
-Update (later September 2025): Red bonus stars converted to a monochrome palette (no hue) to fully match the indestructible asteroid aesthetic while still differentiating from normal stars via slightly brighter core and deeper outer rim. New monochrome values: IN #e0e0e0 | BASE #b8b8b8 | MID #6a6a6a | OUT #1a1a1a.
+- IN `#b4b4b4`
+- BASE `#9c9c9c`
+- MID `#4a4a4a`
+- OUT `#121212`
+
+Design notes:
+
+- BASE kept a touch lighter than MID to preserve a faint halo via additive blend.
+- MID + OUT converge toward asteroid MONO_DARK outer values for a harsher silhouette.
+- IN is dimmer than neutral star inner (#dcdcdc) to avoid upstaging regular stars, but brighter than asteroid mid for pickup readability.
+
+Prior palette values remain documented in `js/constants.js` for quick A/B if rollback desired.
