@@ -1,18 +1,8 @@
 import { CONFIG } from "../constants.js";
 
-/**
- * Models a single star in the background, including its animation and rendering.
- */
+/** Background collectible/pulsing star. */
 export class Star {
-  /**
-   * Creates an instance of Star.
-   * @param {number} x - The x position of the star.
-   * @param {number} y - The y position of the star.
-   * @param {number} width - The width of the star.
-   * @param {number} height - The height of the star.
-   * @param {number} speed - The speed of the star.
-   * @param {boolean} [isRed=false] - Whether this is a red bonus star.
-   */
+  /** @param {number} x @param {number} y @param {number} width @param {number} height @param {number} speed @param {boolean} [isRed=false] */
   constructor(x, y, width, height, speed, isRed = false) {
     this.x = x;
     this.y = y;
@@ -23,18 +13,13 @@ export class Star {
     this.isRed = !!isRed;
   }
 
-  /**
-   * Updates the star's position.
-   * @param {number} dtSec - Delta time in seconds.
-   */
+  /** Move downward. */
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
     this.y += this.speed * dtSec;
   }
 
-  /**
-   * Draws the star on the canvas.
-   * @param {CanvasRenderingContext2D} ctx - The canvas rendering context.
-   * @param {number} timeSec - Elapsed time in seconds for pulsing.
+  /** Draw star (with optional pulse).
+   * @param {CanvasRenderingContext2D} ctx @param {number} timeSec
    */
   draw(ctx, timeSec) {
     ctx.save();
@@ -94,12 +79,11 @@ export class Star {
     this.isRed = !!isRed;
   }
 
-  /**
-   * Draws a star shape.
-   * @param {CanvasRenderingContext2D} ctx - The canvas rendering context.
-   * @param {number} x - The x position of the star.
-   * @param {number} y - The y position of the star.
-   * @param {number} size - The size of the star.
+  /** Draw raw star polygon.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {number} x
+   * @param {number} y
+   * @param {number} size
    */
   static drawStar(ctx, x, y, size) {
     ctx.beginPath();

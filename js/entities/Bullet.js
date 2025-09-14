@@ -1,17 +1,8 @@
 import { CONFIG } from "../constants.js";
 
-/**
- * Models a projectile fired by the player, including its movement and rendering.
- */
+/** Player projectile. */
 export class Bullet {
-  /**
-   * Creates an instance of Bullet.
-   * @param {number} x - The x position of the bullet.
-   * @param {number} y - The y position of the bullet.
-   * @param {number} width - The width of the bullet.
-   * @param {number} height - The height of the bullet.
-   * @param {number} speed - The speed of the bullet.
-   */
+  /** @param {number} x @param {number} y @param {number} width @param {number} height @param {number} speed */
   constructor(x, y, width, height, speed) {
     this.x = x;
     this.y = y;
@@ -20,17 +11,13 @@ export class Bullet {
     this.speed = speed;
   }
 
-  /**
-   * Updates the bullet's position.
-   * @param {number} dtSec - Delta time in seconds.
-   */
+  /** Move upward. */
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
     this.y -= this.speed * dtSec;
   }
 
-  /**
-   * Draws the bullet on the canvas.
-   * @param {CanvasRenderingContext2D} ctx - The canvas rendering context.
+  /** Draw bullet.
+   * @param {CanvasRenderingContext2D} ctx
    */
   draw(ctx) {
     ctx.save();

@@ -1,18 +1,8 @@
 import { CONFIG, PI2 } from "../constants.js";
 
-/**
- * Handles the visual representation and animation of explosion effects for collisions and object destruction.
- */
+/** Animated explosion effect. */
 export class Explosion {
-  /**
-   * Creates an instance of Explosion.
-   * @param {number} x - The x position of the explosion.
-   * @param {number} y - The y position of the explosion.
-   * @param {number} width - The width of the explosion.
-   * @param {number} height - The height of the explosion.
-   * @param {number} life - The current life of the explosion.
-   * @param {number} maxLife - The maximum life of the explosion.
-   */
+  /** @param {number} x @param {number} y @param {number} width @param {number} height @param {number} life @param {number} maxLife */
   constructor(x, y, width, height, life, maxLife) {
     this.x = x;
     this.y = y;
@@ -22,17 +12,13 @@ export class Explosion {
     this.maxLife = maxLife;
   }
 
-  /**
-   * Updates the explosion's remaining life.
-   * @param {number} dtSec - Delta time in seconds.
-   */
+  /** Decrement remaining life. */
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
     this.life -= dtSec;
   }
 
-  /**
-   * Draws the explosion on the canvas.
-   * @param {CanvasRenderingContext2D} ctx - The canvas rendering context.
+  /** Draw explosion.
+   * @param {CanvasRenderingContext2D} ctx
    */
   draw(ctx) {
     ctx.save();

@@ -108,3 +108,25 @@ If you'd like, I can also:
 - or run the formatter on the repo now.
 
 Completion: README synchronized with current scripts and tooling.
+
+## Refactor summary (September 2025)
+
+Recent cleanup focused on maintainability and consistency:
+
+- Removed overly verbose / redundant JSDoc prose while preserving type info.
+- Standardized short, action‑oriented comments; eliminated stale notes.
+- Simplified core systems (`EventBus`, `GameLoop`, state machine, input) and ensured safe handler iteration.
+- Tightened manager/entity modules (rendering, collisions, background) without changing behavior.
+- Added lightweight parameter JSDoc where implicit `any` surfaced after comment reduction.
+- Ensured unsubscribe-during-emit semantics preserved via handler snapshot in `EventBus.emit`.
+- Ran ESLint + Prettier to enforce style; all tests pass (`npm test`).
+
+Guidelines going forward:
+
+- Prefer concise comments that explain why, not what; rely on clear naming.
+- Keep entities self‑contained (state + draw + reset) for pooling.
+- When adding events, register side-effects in `systems/EventHandlers.js` to centralize logic.
+- For new utility modules, include minimal JSDoc on public surface; skip narration.
+- Run `npm run lint:ci` before PRs to catch warnings promoted to errors in CI.
+
+Happy hacking!

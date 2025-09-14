@@ -1,18 +1,14 @@
 import { CONFIG, PI2 } from "../constants.js";
 
-/**
- * Manages and renders the glowing engine trail particles emitted by the player ship.
- */
+/** Engine exhaust trail particles. */
 export class EngineTrail {
   constructor() {
     /** @type {Array<{x:number,y:number,life:number,maxLife:number,size:number}>} */
     this.particles = [];
   }
 
-  /**
-   * Adds a new particle to the engine trail.
-   * @param {{x:number,y:number,width:number,height:number}} player - Player-like object.
-   * @param {import('../types.js').RNGLike} [rng]
+  /** Add a particle.
+   * @param {{x:number,y:number,width:number,height:number}} player @param {import('../types.js').RNGLike} [rng]
    */
   add(player, rng) {
     const centerX = player.x + player.width / 2;
@@ -33,9 +29,7 @@ export class EngineTrail {
     });
   }
 
-  /**
-   * Updates all engine trail particles.
-   */
+  /** Update particles. */
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const particle = this.particles[i];
@@ -47,9 +41,8 @@ export class EngineTrail {
     }
   }
 
-  /**
-   * Draws all engine trail particles.
-   * @param {CanvasRenderingContext2D} ctx - The canvas rendering context.
+  /** Draw particles.
+   * @param {CanvasRenderingContext2D} ctx
    */
   draw(ctx) {
     ctx.save();

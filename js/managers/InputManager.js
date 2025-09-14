@@ -1,6 +1,4 @@
-/**
- * InputManager sets up keyboard, mouse, touch, and button event listeners.
- */
+/** Sets up keyboard, mouse, touch, and button event listeners. */
 export class InputManager {
   /**
    * Setup all event listeners.
@@ -17,7 +15,7 @@ export class InputManager {
     window.addEventListener("keyup", handlers.handleKeyUp);
     // Global keydown for pause/resume
     window.addEventListener("keydown", handlers.handlePauseKeyDown);
-    // Window resize (debounced via rAF)
+    // Window resize (debounced via rAF in handler)
     window.addEventListener("resize", handlers.handleResize);
     // Mouse events
     canvas.addEventListener("mousemove", handlers.handleMouseMove);
@@ -43,7 +41,7 @@ export class InputManager {
     });
     restartBtn.addEventListener("blur", handlers.handleGameOverFocusGuard, true);
     gameOverScreen.addEventListener("mousedown", handlers.handleGameOverFocusGuard, true);
-    // Allow touchstart to be passive so users can scroll the leaderboard on mobile
+    // Allow passive touchstart so leaderboard scroll works on mobile
     gameOverScreen.addEventListener("touchstart", handlers.handleGameOverFocusGuard, {
       passive: true,
     });

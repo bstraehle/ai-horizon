@@ -3,18 +3,9 @@ import { clamp, CONFIG, PI2 } from "../constants.js";
 /** @typedef {{ x:number, y:number }} Point */
 /** @typedef {{ width:number, height:number }} ViewSize */
 
-/**
- * Represents the player-controlled spaceship, including movement, input handling, and rendering.
- */
+/** Player-controlled spaceship with movement and rendering. */
 export class Player {
-  /**
-   * Creates an instance of Player.
-   * @param {number} x - The x position of the player ship.
-   * @param {number} y - The y position of the player ship.
-   * @param {number} width - The width of the player ship.
-   * @param {number} height - The height of the player ship.
-   * @param {number} speed - The speed of the player ship.
-   */
+  /** @param {number} x @param {number} y @param {number} width @param {number} height @param {number} speed */
   constructor(x, y, width, height, speed) {
     this.x = x;
     this.y = y;
@@ -23,12 +14,8 @@ export class Player {
     this.speed = speed;
   }
 
-  /**
-   * Updates the player's position based on input or mouse position.
-   * @param {KeyMap} input - Keyboard map keyed by KeyboardEvent.code.
-   * @param {Point} mousePos - Mouse position in CSS pixels (0 disables mouse follow).
-   * @param {ViewSize} view - Logical viewport dimensions.
-   * @param {number} [dtSec=CONFIG.TIME.DEFAULT_DT] - Delta time in seconds.
+  /** Update position from keyboard or mouse.
+   * @param {KeyMap} input @param {Point} mousePos @param {ViewSize} view @param {number} [dtSec]
    */
   update(input, mousePos, view, dtSec = CONFIG.TIME.DEFAULT_DT) {
     const keyboardPressed =
@@ -57,9 +44,8 @@ export class Player {
     this.y = clamp(this.y, 0, view.height - this.height);
   }
 
-  /**
-   * Draws the player ship on the canvas.
-   * @param {CanvasRenderingContext2D} ctx - The canvas rendering context.
+  /** Draw the player ship.
+   * @param {CanvasRenderingContext2D} ctx
    */
   draw(ctx) {
     // Draw a rounded rocket that resembles the 🚀 emoji:

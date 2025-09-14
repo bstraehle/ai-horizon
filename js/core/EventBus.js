@@ -1,8 +1,5 @@
-/**
- * Tiny event bus for decoupling game systems.
- */
+/** Tiny event bus for decoupling game systems. */
 export class EventBus {
-  /** Create a new EventBus. */
   constructor() {
     /** @type {Map<import('../types.js').GameEvent, Set<Function>>} */
     this._map = new Map();
@@ -46,11 +43,13 @@ export class EventBus {
   emit(type, payload) {
     const set = this._map.get(type);
     if (!set || set.size === 0) return;
-    for (const fn of Array.from(set)) {
+    // Snapshot to ensure all handlers at emit start run even if some unsubscribe
+    const handlers = Array.from(set);
+    for (const fn of handlers) {
       try {
         fn(payload);
       } catch (_) {
-        /* ignore handler errors */
+        // Swallow handler errors so one bad listener doesn't break the loop
       }
     }
   }
@@ -61,10 +60,7 @@ export class EventBus {
    * @returns {void}
    */
   clear(type) {
-    if (typeof type === "string") {
-      this._map.delete(type);
-      return;
-    }
-    this._map.clear();
+    if (type) this._map.delete(type);
+    else this._map.clear();
   }
 }

@@ -15,7 +15,7 @@ export class LeaderboardManager {
   static REMOTE_ENDPOINT =
     "https://0p6x6bw6c2.execute-api.us-west-2.amazonaws.com/dev/leaderboard?id=1";
   // Server-side leaderboard identifier used when posting scores
-  static MAX_ENTRIES = 3;
+  static MAX_ENTRIES = 10;
   static KEY_LEADERBOARD = "aiHorizonLeaderboard";
   /** @type {{id:string,score:number}[]|null} */
   static _cacheEntries = null;

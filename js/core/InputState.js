@@ -1,6 +1,4 @@
-/**
- * Centralized input state container for keys, mouse/touch, and fire-held toggles.
- */
+/** Centralized input state for keys, pointer, and firing. */
 export class InputState {
   constructor() {
     /** @type {Record<string, boolean>} */
@@ -20,7 +18,7 @@ export class InputState {
     this.keys[code] = !!down;
   }
 
-  /** Clear stored mouse position. */
+  /** Reset mouse position. */
   clearMouse() {
     this.mouse.x = 0;
     this.mouse.y = 0;

@@ -1,6 +1,6 @@
 /** @typedef {import('../types.js').Rect} Rect */
 
-// Module-scoped array pool to reduce GC churn for spatial grid buckets
+// Module-scoped array pool for spatial grid buckets
 /** @type {any[][]} */
 const ARR_POOL = [];
 const ARR_POOL_MAX = 256;
@@ -35,7 +35,7 @@ export class CollisionManager {
     return arr !== undefined ? arr : [];
   }
 
-  /** Return an array to the pool after clearing it, up to ARR_POOL_MAX.
+  /** Return an array to the pool after clearing it.
    * @param {any[]} arr
    * @returns {void}
    * @private
@@ -45,7 +45,6 @@ export class CollisionManager {
     if (ARR_POOL.length < ARR_POOL_MAX) {
       ARR_POOL.push(arr);
     }
-    // else drop the array for GC
   }
   /**
    * Axis-aligned bounding box collision detection (strict AABB).
@@ -148,7 +147,7 @@ export class CollisionManager {
       return res;
     };
 
-    // Bullet vs Asteroid collisions via grid
+    // Bullet vs Asteroid
     for (let i = 0; i < game.bullets.length; i++) {
       const b = game.bullets[i];
       if (!b) continue;
@@ -160,7 +159,7 @@ export class CollisionManager {
           const a = group[k];
           if (toRemoveAsteroids.has(a)) continue;
           if (CollisionManager.intersects(b, a)) {
-            // Bullets always get removed on impact
+            // Bullet removed on impact
             toRemoveBullets.add(b);
             // For regular asteroids, remove immediately. For indestructible asteroids,
             // allow the asteroid to track hits and only remove when its internal
@@ -199,7 +198,7 @@ export class CollisionManager {
           }
         }
       }
-      // release temporary neighbors array container
+      // Release neighbors container
       CollisionManager._releaseArr(groups);
     }
 
@@ -222,7 +221,7 @@ export class CollisionManager {
       }
     }
 
-    // Player vs Asteroid collisions
+    // Player vs Asteroid
     for (let i = game.asteroids.length - 1; i >= 0; i--) {
       const asteroid = game.asteroids[i];
       if (CollisionManager.intersects(game.player, asteroid)) {
@@ -231,7 +230,7 @@ export class CollisionManager {
       }
     }
 
-    // Player vs Star collisions
+    // Player vs Star
     for (let i = game.stars.length - 1; i >= 0; i--) {
       const star = game.stars[i];
       if (CollisionManager.intersects(game.player, star)) {
@@ -241,7 +240,7 @@ export class CollisionManager {
       }
     }
 
-    // Score UI updates are handled by EventBus subscribers
+    // Score UI handled by EventBus subscribers
 
     // Release all grid arrays back into the pool
     if (grid.size > 0) {

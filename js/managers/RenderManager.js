@@ -94,24 +94,24 @@ export class RenderManager {
    * @param {any} game
    */
   static draw(game) {
-    // Draw background
+    // Background
     if (typeof game.drawBackground === "function") {
       game.drawBackground();
     }
-    // Draw entities
+    // Entities
     RenderManager.drawAsteroids(game.ctx, game.asteroids);
     RenderManager.drawBullets(game.ctx, game.bullets, game.sprites);
     RenderManager.drawCollectibleStars(game.ctx, game.stars, game.sprites, game.timeSec);
     RenderManager.drawExplosions(game.ctx, game.explosions);
     RenderManager.drawParticles(game.ctx, game.particles);
-    // Draw player and engine trail
+    // Player + engine trail
     if (game.player && typeof game.player.draw === "function") {
       game.player.draw(game.ctx);
     }
     if (game.engineTrail && typeof game.engineTrail.draw === "function") {
       game.engineTrail.draw(game.ctx);
     }
-    // Draw score popups (transient text)
+    // Score popups (transient text)
     if (game.scorePopups && game.scorePopups.length > 0) {
       const ctx = game.ctx;
       for (let i = game.scorePopups.length - 1; i >= 0; i--) {

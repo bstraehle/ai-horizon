@@ -1,7 +1,4 @@
-/**
- * Finite state machine for high-level game flow.
- * States: 'menu' | 'running' | 'paused' | 'gameover'
- */
+/** Finite state machine for high-level game flow. */
 export class GameStateMachine {
   constructor() {
     /** @type {'menu' | 'running' | 'paused' | 'gameover'} */
@@ -21,24 +18,24 @@ export class GameStateMachine {
     return this.state === "gameover";
   }
 
-  /** Transition to running from menu/gameover. */
+  /** Transition to running from menu/gameover/paused. */
   start() {
     if (this.state === "menu" || this.state === "gameover" || this.state === "paused") {
       this.state = "running";
     }
   }
 
-  /** Transition to paused from running. */
+  /** Pause only when running. */
   pause() {
     if (this.state === "running") this.state = "paused";
   }
 
-  /** Transition to running from paused. */
+  /** Resume only when paused. */
   resume() {
     if (this.state === "paused") this.state = "running";
   }
 
-  /** Transition to gameover from running/paused. */
+  /** Move to gameover from running or paused. */
   end() {
     if (this.state === "running" || this.state === "paused") this.state = "gameover";
   }

@@ -1,9 +1,6 @@
-// @ts-nocheck
 import { CONFIG } from "../constants.js";
 
-/**
- * Centralizes EventBus subscriptions and their gameplay side-effects.
- */
+/** Centralized EventBus subscriptions and side-effects. */
 export const EventHandlers = {
   /**
    * Wire up event handlers for the given game instance.
@@ -16,11 +13,11 @@ export const EventHandlers = {
     /** @type {Array<() => void>} */
     const unsubs = [];
 
-    // Bullet hits asteroid → score, explosion, score UI
+    // bulletHitAsteroid → score, explosion, optional popup
     unsubs.push(
       // @ts-ignore
       /** @param {any} payload */
-      events.on("bulletHitAsteroid", function (payload) {
+      events.on("bulletHitAsteroid", function (/** @type {{ asteroid:any }} */ payload) {
         const { asteroid } = payload;
         // Award points (special-case indestructible asteroids)
         const add =
@@ -57,18 +54,18 @@ export const EventHandlers = {
       })
     );
 
-    // Player collides with asteroid → game over
+    // playerHitAsteroid → game over
     unsubs.push(
       events.on("playerHitAsteroid", () => {
         game.gameOver();
       })
     );
 
-    // Player collects star → score, score UI
+    // collectedStar → score + optional popup
     unsubs.push(
       // @ts-ignore
       /** @param {any} payload */
-      events.on("collectedStar", function (payload) {
+      events.on("collectedStar", function (/** @type {{ star:any }} */ payload) {
         const { star } = payload;
         const add = star && star.isRed ? CONFIG.GAME.STAR_SCORE_RED : CONFIG.GAME.STAR_SCORE;
         game.score += add;
@@ -90,11 +87,11 @@ export const EventHandlers = {
       })
     );
 
-    // Visual burst for star collection (moved from CollisionManager)
+    // collectedStar → particle burst
     unsubs.push(
       // @ts-ignore
       /** @param {any} payload */
-      events.on("collectedStar", function (payload) {
+      events.on("collectedStar", function (/** @type {{ star:any }} */ payload) {
         const { star } = payload;
         const rng = game.rng;
         for (let p = 0; p < CONFIG.STAR.PARTICLE_BURST; p++) {

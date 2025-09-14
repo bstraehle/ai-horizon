@@ -1,19 +1,8 @@
 import { CONFIG, PI2 } from "../constants.js";
 
-/**
- * Represents an asteroid obstacle in the game world, managing its position, movement, and visual appearance.
- */
+/** Game obstacle with movement, palette, and damage/shield visuals. */
 export class Asteroid {
-  /**
-   * Creates an instance of Asteroid.
-   * @param {number} x - The x position of the asteroid.
-   * @param {number} y - The y position of the asteroid.
-   * @param {number} width - The width of the asteroid.
-   * @param {number} height - The height of the asteroid.
-   * @param {number} speed - The speed of the asteroid.
-   * @param {import('../types.js').RNGLike} [rng] - Optional RNG for crater placement.
-   * @param {boolean} [isIndestructible=false] - If true, this asteroid cannot be destroyed by bullets.
-   */
+  /** @param {number} x @param {number} y @param {number} width @param {number} height @param {number} speed @param {import('../types.js').RNGLike} [rng] @param {boolean} [isIndestructible=false] */
   constructor(x, y, width, height, speed, rng, isIndestructible = false, paletteOverride = null) {
     this.x = x;
     this.y = y;
@@ -28,14 +17,14 @@ export class Asteroid {
     const craterCount = 3;
     const rand =
       rng && typeof rng.nextFloat === "function" ? rng : { nextFloat: Math.random.bind(Math) };
-    // Keep a reference to the provided RNG (if any) so drawing can deterministically pick planet palettes
+    // Keep RNG reference for deterministic planet palette selection
     this._rng = rng && typeof rng.nextFloat === "function" ? rng : null;
     this._craters = Array.from({ length: craterCount }, () => ({
       dx: (rand.nextFloat() - 0.5) * radius * 0.8,
       dy: (rand.nextFloat() - 0.5) * radius * 0.8,
       r: rand.nextFloat() * radius * 0.3 + 2,
     }));
-    // Choose and store a visual palette once so the asteroid doesn't flicker between draws
+    // Choose and store a palette once to avoid flicker
     this._palette = CONFIG.COLORS.ASTEROID;
     if (this.isIndestructible) {
       // If a palette override was provided (from SpawnManager), prefer it.
@@ -53,7 +42,7 @@ export class Asteroid {
         }
       }
     }
-    // Apply palette-specific speed factor if present, otherwise default to provided speed
+    // Apply optional palette speed factor
     const paletteSpeedFactor =
       this._palette && typeof this._palette.SPEED_FACTOR === "number"
         ? this._palette.SPEED_FACTOR
@@ -61,15 +50,12 @@ export class Asteroid {
     this.speed = paletteSpeedFactor ? speed * paletteSpeedFactor : speed;
     // Track bullet hits for indestructible asteroids
     this._hits = 0;
-    // Stored damage line descriptors so cracks are stable across frames
+    // Stable damage line descriptors
     /** @type {{angle:number,len:number}[]} */
     this._damageLines = [];
   }
 
-  /**
-   * Updates the asteroid's position.
-   * @param {number} dtSec - Delta time in seconds.
-   */
+  /** Update position and shield flash timer. */
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
     this.y += this.speed * dtSec;
     if (this.isIndestructible && this._shieldFlash > 0) {
@@ -77,16 +63,15 @@ export class Asteroid {
     }
   }
 
-  /**
-   * Draws the asteroid on the canvas.
-   * @param {CanvasRenderingContext2D} ctx - The canvas rendering context.
+  /** Draw asteroid with craters, shield flash, and damage lines.
+   * @param {CanvasRenderingContext2D} ctx
    */
   draw(ctx) {
     ctx.save();
     const centerX = this.x + this.width / 2;
     const centerY = this.y + this.height / 2;
     const radius = this.width / 2;
-    // Use the stored palette (chosen at creation/reset) to keep consistent look per asteroid
+    // Stored palette chosen at creation/reset
     const palette = this._palette || CONFIG.COLORS.ASTEROID;
     const shieldColor =
       (palette && palette.SHIELD) ||
@@ -117,7 +102,7 @@ export class Asteroid {
     ctx.lineWidth = this.isIndestructible ? 3 : 2;
     ctx.stroke();
 
-    // Indestructible asteroid impact effect: show blue ring only on bullet impact
+    // Shield flash ring when hit
     if (this.isIndestructible && this._shieldFlash > 0) {
       const t = Math.max(0, Math.min(1, this._shieldFlash / CONFIG.ASTEROID.SHIELD_FLASH_TIME));
       ctx.save();
@@ -133,15 +118,14 @@ export class Asteroid {
       ctx.restore();
     }
 
-    // Visual damage stages for indestructible asteroids based on hit count.
-    // Subtle scratches -> deeper cracks as hits increase.
+    // Damage scratches scale with hit count
     if (this.isIndestructible && this._hits > 0) {
       ctx.save();
       const severity = Math.max(
         0,
         Math.min(1, this._hits / (CONFIG.ASTEROID.INDESTRUCTIBLE_HITS || 10))
       );
-      // number of scratch lines scales with severity
+      // Scratch line count scales with severity
       const lines = 1 + Math.floor(severity * 4);
       // Choose a damage color based on palette. ICE gets light/white scratches;
       // otherwise prefer SHIELD, then RING, then OUTLINE.
@@ -157,7 +141,7 @@ export class Asteroid {
       } else {
         damageColor = "rgba(255,255,255,0.6)";
       }
-      // Slightly different width/alpha for icy palettes (so scratches look delicate)
+      // Adjust style for icy palettes
       if (palette && palette.NAME === "ICE") {
         ctx.strokeStyle = damageColor;
         ctx.lineWidth = 0.8 + severity * 1.2;
@@ -167,14 +151,14 @@ export class Asteroid {
         ctx.lineWidth = 1 + severity * 2;
         ctx.globalAlpha = 0.4 + 0.6 * severity;
       }
-      // Use stored damage lines when available to avoid flicker
+      // Use stored damage lines to avoid flicker
       for (let i = 0; i < lines; i++) {
         const desc = this._damageLines && this._damageLines[i];
         const angle = desc ? desc.angle : (i / lines) * Math.PI * 2;
         const lenFactor = desc
           ? desc.len
           : 0.6 + (this._rng ? this._rng.nextFloat() : Math.random()) * 0.5;
-        // compute end factor but clamp it so cracks don't protrude outside the asteroid circle
+        // Clamp so cracks stay inside circle
         const endFactorRaw = lenFactor + severity * 0.3;
         const endFactor = Math.min(endFactorRaw, 0.95);
         const sx = centerX + Math.cos(angle) * radius * 0.3;
@@ -186,11 +170,11 @@ export class Asteroid {
         ctx.quadraticCurveTo(centerX, centerY, ex, ey);
         ctx.stroke();
       }
-      // If nearly destroyed, draw a pronounced crack
+      // Final pronounced crack near destruction
       if (severity > 0.7) {
         ctx.lineWidth = 2 + severity * 3;
         ctx.globalAlpha = 0.9;
-        // Prefer a palette-aware damage color for the final pronounced crack instead of pure black
+        // Use palette-aware crack color
         const finalCrackColor =
           typeof damageColor !== "undefined" && damageColor ? damageColor : "rgba(0,0,0,0.7)";
         ctx.strokeStyle = finalCrackColor;

@@ -4,9 +4,7 @@ import { Nebula } from "../entities/Nebula.js";
 import { StarField } from "../entities/StarField.js";
 /** @typedef {import('../types.js').RNGLike} RNGLike */
 
-/**
- * BackgroundManager handles background initialization and drawing.
- */
+/** Handles background initialization, resizing, and drawing. */
 export class BackgroundManager {
   /**
    * Initialize background components using a GameContext-like object.
@@ -30,7 +28,6 @@ export class BackgroundManager {
 
   /**
    * Resize existing background state to match new canvas dimensions.
-   * If no prior state exists, return null to indicate caller should init.
    * @param {{ view:{width:number,height:number}, running:boolean, isMobile:boolean, rng?: RNGLike, background?:{nebulaConfigs?:any, starField:any} }} ctxObj
    * @param {{width:number,height:number}} prevView
    * @returns {{ nebulaConfigs?: any, starField?: any } | null}
@@ -44,7 +41,7 @@ export class BackgroundManager {
     const newH = view.height || 0;
     if (!background) return null;
     const out = {};
-    // Scale nebula positions and radii proportionally when present
+    // Scale nebula positions/radii
     if (background.nebulaConfigs) {
       try {
         out.nebulaConfigs = Nebula.resize(background.nebulaConfigs, prevW, prevH, newW, newH);
@@ -75,9 +72,7 @@ export class BackgroundManager {
       background: { nebulaConfigs, starField },
     } = ctxObj;
     Background.draw(ctx, width, height);
-    // Do not darken the background here; keep nebula brightness unchanged while paused.
-    // Only draw nebula during active gameplay. This prevents nebula from
-    // appearing on the start/menu screens or when the game is paused/game over.
+    // Draw nebula only during active gameplay
     if (nebulaConfigs && ctxObj.running) {
       Nebula.draw(ctx, nebulaConfigs);
     }
