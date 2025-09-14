@@ -58,12 +58,14 @@ const COLORS = deepFreeze({
     {
       NAME: "MONO_DARK",
       // Keep crater slightly lighter than mid to preserve emboss readability
-      CRATER: "#5a5a5a",
-      GRAD_IN: "#b8b8b8",
-      GRAD_MID: "#6a6a6a",
-      GRAD_OUT: "#1e1e1e",
-      OUTLINE: "#0c0c0c",
-      RING: "#444444",
+      // Slight darkening pass (2025-09-13): reduce overall brightness ~10-15%
+      // while preserving relative contrast for crater emboss + damage lines.
+      CRATER: "#4e4e4e", // was #5a5a5a
+      GRAD_IN: "#a2a2a2", // was #b8b8b8 (inner highlight a bit dimmer)
+      GRAD_MID: "#555555", // was #6a6a6a
+      GRAD_OUT: "#161616", // was #1e1e1e
+      OUTLINE: "#080808", // was #0c0c0c
+      RING: "#383838", // was #444444
       // Shield: switched from subtle blue to charcoal for a menacing feel
       SHIELD: "#121212",
       SPEED_FACTOR: 0.55, // similar heft to prior heavier variants
