@@ -1,8 +1,17 @@
 /**
- * AI Horizon game logic.
+ * AI Horizon - main game module.
  *
- * This file implements the AI Horizon game, a browser-based arcade shooter.
- * The player controls a ship, collects stars, and shoots asteroids for points.
+ * Responsibilities:
+ * - Bootstraps canvas + high-DPR scaling, input, state machine, managers, pools
+ * - Hosts primary entity arrays (asteroids, bullets, particles, stars, explosions)
+ * - Orchestrates update order + render via `GameLoop`
+ * - Central point for seeding RNG, handling pause/resume, full resets
+ * - Registers cross-cutting event handlers (see `systems/EventHandlers.js`)
+ *
+ * Noteworthy design choices:
+ * - Object pools pre-warmed to reduce first interaction frame jank
+ * - Deterministic runs supported with `?seed=NUMBER` (or any string hashed)
+ * - State transitions guarded to prevent duplicate resets during transient mobile resizes
  */
 
 // @ts-nocheck - The file contains extensive JSDoc-driven types that produce

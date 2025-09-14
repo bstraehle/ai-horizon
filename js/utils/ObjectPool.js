@@ -1,5 +1,15 @@
 /**
- * A simple generic object pool for reusing frequently created objects.
+ * ObjectPool - generic pool to recycle frequently created short‑lived objects.
+ *
+ * Design:
+ * - Accepts a factory `createFn` and optional `resetFn` (or instance `reset`).
+ * - `acquire(...args)` either reuses a freed object or creates a new one.
+ * - `release(obj)` returns object to free list (bounded by `maxSize`).
+ * - Optional `dispose(obj)` called when pool over capacity or during `clear(true)`.
+ * - `warmUp(n, ...args)` pre-allocates N to smooth first-frame spikes.
+ *
+ * Preference order for resetting state: instance.reset(...args) > pool.resetFn.
+ *
  * @template T
  */
 export class ObjectPool {

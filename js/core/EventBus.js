@@ -1,4 +1,23 @@
-/** Tiny event bus for decoupling game systems. */
+/**
+ * EventBus – minimal pub/sub used to decouple game systems.
+ *
+ * Design goals:
+ * - Very small: Map<event, Set<handler>> with O(1) add/remove typical cost.
+ * - Safe during emission: handlers snapshot so listeners can unsubscribe or
+ *   subscribe reentrantly without corrupting iteration.
+ * - Failure isolation: individual handler exceptions are swallowed so a
+ *   faulty effect cannot break the frame loop; consider logging if needed.
+ *
+ * @example Basic usage
+ * const bus = new EventBus();
+ * const off = bus.on('PLAYER_DIED', data => console.log('player died', data));
+ * bus.emit('PLAYER_DIED', { lives: 2 });
+ * off(); // later unsubscribe
+ *
+ * Events are defined as string literals in `types.js` (GameEvent union) to
+ * provide IDE completion. Keep high-level side effects centralized inside
+ * `systems/EventHandlers.js` to avoid scattered game flow logic.
+ */
 export class EventBus {
   constructor() {
     /** @type {Map<import('../types.js').GameEvent, Set<Function>>} */

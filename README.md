@@ -1,155 +1,178 @@
-## AI HORIZON — updated
+## AI HORIZON
 
-Fast, responsive space shooter built with HTML5 Canvas and vanilla JavaScript (ES modules). Collect stars, destroy asteroids, and chase a new high score — some asteroids are indestructible.
+Fast, responsive HTML5 Canvas space shooter written in modern (ESM) vanilla JavaScript. Collect stars, survive waves of asteroids (some indestructible), and push the global / local high score.
 
-See `about.html` for controls, scoring, and gameplay tips.
+See `about.html` for controls, scoring, and gameplay tips. This README focuses on development, architecture, and extension guidance.
 
 ## Quick start
 
-This project uses native ES modules, so the game must be served from an HTTP server (file:// won’t work).
+Native ES modules mean you MUST use an HTTP server (no `file://`).
 
-Recommended local flows:
+Development (recommended):
 
-- Using Node.js (recommended for development):
-  - Install dependencies: `npm install`
-  - Start a dev server (esbuild + serve): `npm run serve` (serves from project root on port 8000)
-  - Rebuild on file changes: `npm run watch`
-- Simple static preview (no Node.js required):
-  - From PowerShell: `py -m http.server 8000` then open http://localhost:8000
-  - Or use any static file server (e.g. `npx serve`)
+1. Install deps: `npm install`
+2. Start dev server (esbuild + live serve, port 8000): `npm run serve`
+3. Iterate. Tests: `npm test`.
 
-Build for production:
+Low‑friction static preview (no Node required):
 
-- Run: `npm run build` — bundles `js/game.js` with esbuild into `dist/bundle.js` and runs a `postbuild` step that prepares `dist/index.html` and copies static assets.
-- Preview the `dist/` output by serving the folder (e.g. `py -m http.server 8000` and open http://localhost:8000/dist/).
+PowerShell: `py -m http.server 8000` then browse to http://localhost:8000
 
-## Scripts and tooling
+Production build:
 
-Key npm scripts (see `package.json`):
+1. `npm run build` → bundles `js/game.js` to `dist/bundle.js` (minified + sourcemap) and runs `postbuild` (copies assets + crafts `dist/index.html`).
+2. Serve the `dist/` directory (e.g. `py -m http.server 8000` and visit http://localhost:8000/dist/).
 
-- `npm run build` — bundle and minify with esbuild
-- `npm run postbuild` — copies assets and prepares `dist/index.html`
-- `npm run watch` — esbuild in watch mode (writes to `dist/`)
-- `npm run serve` — esbuild bundle with a built-in dev server on port 8000
-- `npm run lint` / `npm run lint:fix` — eslint checks and autofix
-- `npm run format` — formats files with Prettier
-- `npm run typecheck` — runs TypeScript type checks (project uses JSDoc + checkJs)
-- `npm test` — runs unit tests with Vitest
+## Tooling & scripts
 
-Dev dependencies include: esbuild, eslint, prettier, vitest, jsdom, husky, and TypeScript.
+Core scripts (see `package.json`):
+
+| Script                      | Purpose                                    |
+| --------------------------- | ------------------------------------------ |
+| `npm run serve`             | Dev server (esbuild + static) on port 8000 |
+| `npm run watch`             | Rebuild on change (writes to `dist/`)      |
+| `npm run build`             | Production bundle + minify + sourcemap     |
+| `npm run postbuild`         | Copy assets + generate `dist/index.html`   |
+| `npm run lint` / `lint:fix` | ESLint (with jsdoc + prettier rules)       |
+| `npm run format`            | Prettier write                             |
+| `npm run typecheck`         | TypeScript checker over JSDoc types        |
+| `npm test` / `test:watch`   | Vitest unit + edge tests                   |
+
+Other dev dependencies: esbuild, vitest, jsdom, eslint (flat config), prettier, husky, lint-staged, typescript.
 
 ## Troubleshooting
 
-- Blank page or “Failed to load module script/CORS” → you opened via file://. Start a server (see above).
-- `python` not recognized on Windows → use `py -m http.server 8000`.
-- Port already in use → try another port, e.g. `py -m http.server 5500`.
-- High score not saving → Private/Incognito may block `localStorage`.
+| Symptom                           | Likely cause                | Fix                                                               |
+| --------------------------------- | --------------------------- | ----------------------------------------------------------------- |
+| Blank page / CORS module errors   | Using `file://`             | Run any HTTP server (see Quick start)                             |
+| `python` not recognized (Windows) | Python launcher only        | Use `py -m http.server 8000`                                      |
+| Port 8000 busy                    | Another process             | Pick another port (e.g. 5500)                                     |
+| High score not persisting         | Incognito / storage blocked | Use normal window; check console for storage errors               |
+| Leaderboard remote empty          | Remote disabled / network   | See `LeaderboardManager.IS_REMOTE`; check network tab             |
+| JSDoc types ignored in editor     | Type checking off           | Ensure editor uses workspace TypeScript & run `npm run typecheck` |
 
 ## Features
 
-- Desktop and mobile friendly (keyboard, mouse, and touch)
-- Smooth animations with requestAnimationFrame
-- Starfield, nebulae, engine glow, explosions, and particle FX
-- High score persisted with `localStorage` (leaderboard entries stored under `aiHorizonLeaderboard`)
-- Accessibility touches: focus guards for overlays, ARIA labels, and restored focus on tab return
-- Indestructible asteroids appear periodically to increase challenge
+Gameplay / visuals:
 
-## Project structure (high-level)
+- Layered starfield & nebula fog with parallax cues
+- Indestructible (planetary) asteroid variant introducing pacing & scoring spikes
+- Compact particle FX: explosions, engine trail, crater puffs, score popups
 
-- `index.html` — App shell and canvas
-- `index.prod.html` — Production HTML used to create `dist/index.html` in `postbuild`
-- `style.css` — Layout and responsive styles
-- `js/` — game logic and modules
-  - `js/constants.js` — tunable settings
-  - `js/game.js` — game loop, state, and orchestration (entry point used by esbuild)
-  - `js/entities/` — entity classes (Player, Asteroid, Bullet, etc.)
-  - `js/managers/` — managers for input, rendering, spawning, UI, collisions, view
-- `server/lambda/` — an example AWS Lambda for leaderboard (optional server-side)
-- `tests/` — Vitest unit tests and edge tests
+Systems / architecture:
 
-## Types and developer notes
+- Deterministic RNG (seed via `?seed=NUMBER` or string hashed) for reproducible runs
+- Object pools for bullets, particles, asteroids, stars, explosions (reduced GC churn)
+- Central `EventBus` decoupling systems & UI
+- Finite `GameStateMachine` governing menu, playing, paused, game over
+- Rate limiter for fire cadence (prevents burst spam)
 
-The project uses JSDoc typedefs (see `js/types.js`) together with TypeScript's checker for stronger editor tooling without converting runtime files to TypeScript.
+UX & accessibility:
 
-Where helpful, modules reference shared typedefs via JSDoc imports (e.g. `import('../types.js').TypeName`).
+- Keyboard, mouse, and touch input abstraction
+- Focus management across overlays; ARIA labels on prominent interactive elements
+- Responsive canvas scaling with DPR caps for mobile
 
-## Testing and CI
+Dev ergonomics:
 
-- Unit tests: `npm test` (Vitest)
-- Lint: `npm run lint`; CI enforces `npm run lint:ci` (no warnings)
-- Pre-commit hooks: husky + lint-staged are configured in `package.json` to run eslint and prettier on changed files
+- Pure JS with rich JSDoc typedefs + TypeScript checking (no build step for types)
+- Fast esbuild bundling; <100ms cold builds on modern hardware
+- Extensive Vitest coverage for core logic & edge cases
 
-## Deploy
+## Project layout (high level)
 
-This is a static site. Options:
+```
+js/
+  constants.js        Core tunables & palettes (deep-frozen)
+  game.js             Entry point: orchestrates managers, systems, state
+  core/               Event bus, loop, context, state machine, input snapshot
+  entities/           Render/update units (Player, Asteroid, Bullet, Star, ...)
+  managers/           Higher-order orchestration (Render, Spawn, Collision, UI, View, Leaderboard)
+  systems/            Pure update & event reaction helpers (UpdateSystems, EventHandlers)
+  utils/              ObjectPool, RNG, RateLimiter, etc.
+  adapters/           Storage & Remote leaderboard adapter abstractions
+  server/lambda/      Optional AWS Lambda (example remote leaderboard handler)
+tests/                Vitest specs (unit + stress + edge)
+```
 
-- GitHub Pages: push the repo and enable Pages for the repository root or deploy the `dist/` folder to your Pages site.
-- Netlify / Vercel: connect the repo, or drag-and-drop the `dist/` folder for static hosting.
+Key separation: entities are data + draw/update; managers coordinate groups & policies; systems hold pure functions; core supplies infrastructure primitives.
 
-If you use the production build, point your hosting publish directory to `dist/`.
+## Architecture overview
 
-## Contributing
+### Core loop
 
-Contributions are welcome. Run the test suite and linters locally before opening a PR:
+`GameLoop` drives a `tick(deltaMs)` using `requestAnimationFrame`. `game.js` maintains accumulated time, converts to seconds for timers, and updates systems in a deterministic order: input → spawning → movement → collisions → scoring → effects → render.
 
-- Install deps: `npm install`
-- Format: `npm run format`
-- Lint: `npm run lint` (or `npm run lint:fix`)
-- Test: `npm test`
+### State machine
 
-Please follow existing code style (JSDoc types, small focused modules) and keep changes small and focused.
+`GameStateMachine` implements a minimal finite set: START, PLAYING, PAUSED, GAME_OVER (exact enum in `types.js`). Transitions emit events consumed by `EventHandlers` (e.g. to reset pools, show overlays, stop timers).
 
----
+### Events
 
-If you'd like, I can also:
+`EventBus` offers `on/off/emit/clear`. Emission snapshots handlers to allow safe unsubscribe during iteration. Events include gameplay transitions, scoring, entity lifecycle notifications. Central registration lives in `systems/EventHandlers.js` to avoid scattered side-effects.
 
-- add a tiny example `npm start` script that runs a static server,
-- add a short CONTRIBUTING.md,
-- or run the formatter on the repo now.
+### Entities & pooling
 
-Completion: README synchronized with current scripts and tooling.
+Entities (asteroids, bullets, explosions, particles, stars, nebula blobs, engine trail segments) are lightweight objects with `reset()` for reuse. `ObjectPool` prefers instance-level `reset` when present, otherwise uses a provided `resetFn`. Pools are pre‑warmed in `game.js` for smooth first engagement.
 
-## Refactor summary (September 2025)
+### Rendering
 
-Recent cleanup focused on maintainability and consistency:
+`RenderManager` clears / draws background layers, entities, FX, and UI overlays. Sprites are precomputed by `SpriteManager` from palette constants to minimize per-frame gradient creation.
 
-- Removed overly verbose / redundant JSDoc prose while preserving type info.
-- Standardized short, action‑oriented comments; eliminated stale notes.
-- Simplified core systems (`EventBus`, `GameLoop`, state machine, input) and ensured safe handler iteration.
-- Tightened manager/entity modules (rendering, collisions, background) without changing behavior.
-- Added lightweight parameter JSDoc where implicit `any` surfaced after comment reduction.
-- Ensured unsubscribe-during-emit semantics preserved via handler snapshot in `EventBus.emit`.
-- Ran ESLint + Prettier to enforce style; all tests pass (`npm test`).
+### Spawning & pacing
 
-Guidelines going forward:
+`SpawnManager` schedules asteroid & star spawn cadence based on dynamic difficulty ramps and RNG. Indestructible asteroids spawn at configured intervals and carry higher point value / visual distinctness.
 
-- Prefer concise comments that explain why, not what; rely on clear naming.
-- Keep entities self‑contained (state + draw + reset) for pooling.
-- When adding events, register side-effects in `systems/EventHandlers.js` to centralize logic.
-- For new utility modules, include minimal JSDoc on public surface; skip narration.
-- Run `npm run lint:ci` before PRs to catch warnings promoted to errors in CI.
+### Collision & scoring
 
-Happy hacking!
+`CollisionManager` partitions space (simple grid) & resolves bullet–asteroid and player–asteroid intersections. Score popups & explosions are emitted via events; `LeaderboardManager` tracks high score and (optionally) remote persistence.
 
-### Visual tweak (September 2025)
+### Input
 
-Red bonus star palette evolution:
+`InputManager` normalizes keyboard, mouse, and touch into an `InputState` consumed each frame. Pausing uses a whitelist of key codes to avoid accidental triggers.
 
-1. Initial darkened red ("blackened crimson") variant (early Sept 2025) moved away from saturated candy red toward near-black rims.
-2. Monochrome conversion (mid Sept 2025) removed hue entirely to align with indestructible asteroid styling.
-3. Rev2 (this update) deepens contrast further so the bonus star feels like a collapsed/unstable object: inner still slightly brighter than asteroid core, body collapses quickly toward near-black outer edge.
+### Determinism & RNG
 
-Current `STAR_RED` monochrome (rev2) values:
+`RNG` provides seeded pseudorandom values. Accepts numeric seed via query param or string hashed to seed. Great for reproducing bugs / speedrun seeds.
 
-- IN `#b4b4b4`
-- BASE `#9c9c9c`
-- MID `#4a4a4a`
-- OUT `#121212`
+### Rate limiting
 
-Design notes:
+`RateLimiter` enforces fire cooldown, sourced from `CONFIG.GAME.SHOT_COOLDOWN` and supplied current time provider.
 
-- BASE kept a touch lighter than MID to preserve a faint halo via additive blend.
-- MID + OUT converge toward asteroid MONO_DARK outer values for a harsher silhouette.
-- IN is dimmer than neutral star inner (#dcdcdc) to avoid upstaging regular stars, but brighter than asteroid mid for pickup readability.
+### Constants & balancing
 
-Prior palette values remain documented in `js/constants.js` for quick A/B if rollback desired.
+`constants.js` exports a deeply frozen `CONFIG`. Palettes include dated commentary for art direction audit trail. When adjusting numbers, favor adding short rationale comments to assist future balancing.
+
+### Leaderboard
+
+`LeaderboardManager` composes adapters: local storage by default; optional remote via `RemoteAdapter` (fetch) and example AWS Lambda (`server/lambda/ai-horizon-leaderboard.js`). Repository + formatter modules handle persistence normalization and display formatting.
+
+## Types & JSDoc
+
+`js/types.js` defines shared typedefs (events, states, shapes). Runtime code remains plain JS for minimal friction while still enjoying IDE intellisense through `// @ts-check` (selectively disabled in a few high-churn files). Prefer referencing shared types via `import('./types.js').TypeName` to avoid circular imports.
+
+## Testing
+
+Vitest is configured (see `tests/`). Categories:
+
+- Core correctness (event bus, state machine, RNG, rate limiter)
+- Collision accuracy & edge conditions
+- ObjectPool stress & warmup behavior
+- Visual logic proxies (palette rotation, star layers) via deterministic assertions
+- Leaderboard formatting & qualification rules
+
+Run: `npm test` (single run) or `npm run test:watch`.
+
+Lint before commit: `npm run lint` (CI uses `lint:ci`). Formatting enforced via pre-commit (husky + lint-staged).
+
+## Deployment
+
+Pure static output. Any static host works:
+
+- GitHub Pages: enable Pages (root) or publish only `dist/`.
+- Netlify / Vercel: connect repo (build command: `npm run build`; publish dir: `dist`) or drag‑drop the built folder.
+- S3 + CloudFront (or similar): upload contents of `dist/` with correct `Content-Type` headers.
+
+Cache hint: you can add a simple query param bust (`?v=TIMESTAMP`) to script tag if doing manual CDN uploads.
+
+Happy hacking ✦

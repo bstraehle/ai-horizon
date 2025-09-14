@@ -1,38 +1,13 @@
-/**
- * AI Horizon game configuration constants.
- * The exported object is deeply frozen to prevent accidental mutation at runtime.
- *
- * @constant
- * @type {Readonly<{
- *  COLORS: any,
- *  ASTEROID: any,
- *  BULLET: any,
- *  EXPLOSION: any,
- *  GAME: any,
- *  INPUT: any,
- *  NEBULA: any,
- *  PLAYER: any,
- *  SIZES: any,
- *  SPEEDS: any,
- *  STAR: any,
- *  UI: any,
- * }>} CONFIG
- */
+// Core color palettes & visual design tokens. Frozen via deepFreeze to avoid runtime mutation.
 const COLORS = deepFreeze({
   ASTEROID: {
-    // Neutral gray palette (2025-09-13) adjusted to feel closer to gray star set
-    // while remaining a bit darker overall to keep player/FX pop.
-    // Luminance ordering retained: IN > MID > CRATER > OUT > OUTLINE.
-    // Previous (warm rocky) values commented for quick revert:
-    //  OLD_GRAD_IN #cfc9c0 | OLD_GRAD_MID #8f8579 | OLD_CRATER #6b6b6b→#757575 | OLD_GRAD_OUT #3f3a36 | OLD_OUTLINE #2f2b28
-    GRAD_IN: "#d4d4d4", // lighter inner highlight (near star inner #dcdcdc but slightly dimmer)
-    GRAD_MID: "#b2b2b2", // mid body tone (between star mid #b0b0b0 and base #c4c4c4)
-    CRATER: "#9a9a9a", // crater fill: lighter than prior, still below mid for emboss visibility
-    GRAD_OUT: "#4a4a4a", // outer rim (close to star outer #505050)
-    OUTLINE: "#242424", // outline slightly lighter than previous deep brown to fit neutral set
-    RING: "#8e8e8e", // subtle ring accent harmonizing with crater/mid
+    GRAD_IN: "#d4d4d4",
+    GRAD_MID: "#b2b2b2",
+    CRATER: "#9a9a9a",
+    GRAD_OUT: "#4a4a4a",
+    OUTLINE: "#242424",
+    RING: "#8e8e8e",
   },
-  // Hard/indestructible asteroid variant (darker, higher contrast outline)
   ASTEROID_HARD: {
     CRATER: "#333",
     GRAD_IN: "#333",
@@ -40,39 +15,28 @@ const COLORS = deepFreeze({
     GRAD_OUT: "#111",
     OUTLINE: "#777",
     RING: "#999",
-    // Shield: shifted from blue to near-black for a harsher impact flash
     SHIELD: "#1a1a1a",
   },
-  // Slightly darker than regular asteroid, used when shielded to keep core natural
   ASTEROID_DARK: {
-    // Mars-like palette: rusty orange and brown tones
-    CRATER: "#6B3926", // dark brown (crater)
-    GRAD_IN: "#FF8C42", // bright rusty orange (center)
-    GRAD_MID: "#C1440E", // burnt orange / Mars red
-    GRAD_OUT: "#3C1A0E", // deep brown (outer)
-    OUTLINE: "#8B3E2F", // muted reddish-brown outline
-    SHIELD: "#FFBF8A", // warm orange glow for impacts
-    RING: "#6B3926", // match crater color for unified look
+    CRATER: "#6B3926",
+    GRAD_IN: "#FF8C42",
+    GRAD_MID: "#C1440E",
+    GRAD_OUT: "#3C1A0E",
+    OUTLINE: "#8B3E2F",
+    SHIELD: "#FFBF8A",
+    RING: "#6B3926",
   },
-  // Monochrome "mean" indestructible asteroid palette.
-  // Replaces former multi-planet color variants with a darker, high-contrast
-  // look that still uses radial shading but stays within grayscale values.
-  // If additional variants are desired later they can be added as an array again.
   ASTEROID_PLANETS: [
     {
       NAME: "MONO_DARK",
-      // Keep crater slightly lighter than mid to preserve emboss readability
-      // Slight darkening pass (2025-09-13): reduce overall brightness ~10-15%
-      // while preserving relative contrast for crater emboss + damage lines.
-      CRATER: "#4e4e4e", // was #5a5a5a
-      GRAD_IN: "#a2a2a2", // was #b8b8b8 (inner highlight a bit dimmer)
-      GRAD_MID: "#555555", // was #6a6a6a
-      GRAD_OUT: "#161616", // was #1e1e1e
-      OUTLINE: "#080808", // was #0c0c0c
-      RING: "#383838", // was #444444
-      // Shield: switched from subtle blue to charcoal for a menacing feel
+      CRATER: "#4e4e4e",
+      GRAD_IN: "#a2a2a2",
+      GRAD_MID: "#555555",
+      GRAD_OUT: "#161616",
+      OUTLINE: "#080808",
+      RING: "#383838",
       SHIELD: "#121212",
-      SPEED_FACTOR: 0.55, // similar heft to prior heavier variants
+      SPEED_FACTOR: 0.55,
     },
   ],
   BACKGROUND: {
@@ -95,22 +59,12 @@ const COLORS = deepFreeze({
     GRAD_OUT: "rgba(255, 50, 0, 0)",
   },
   NEBULA: {
-    // Danger red palette (2025-09-14): shifted from soft white mist to a
-    // subdued deep red haze to communicate heightened danger without
-    // overwhelming the scene. Base target color requested: #7a0c0c.
-    // Strategy: introduce minor hue/brightness variation across four sets
-    // while keeping alpha low so overlapping blobs build glow organically.
-    // Alphas chosen to be slightly staggered so core variants differ.
-    // N1: base danger red (core)
     N1: "rgba(122, 12, 12, 0.11)",
     N1_OUT: "rgba(122, 12, 12, 0)",
-    // N2: slightly darker / cooler red
     N2: "rgba(105, 10, 10, 0.10)",
     N2_OUT: "rgba(105, 10, 10, 0)",
-    // N3: warmer accent (adds subtle orange warmth)
     N3: "rgba(140, 28, 20, 0.095)",
     N3_OUT: "rgba(140, 28, 20, 0)",
-    // N4: deepest shadowed red (anchors gradient stack)
     N4: "rgba(90, 8, 8, 0.12)",
     N4_OUT: "rgba(90, 8, 8, 0)",
   },
@@ -123,34 +77,8 @@ const COLORS = deepFreeze({
     OUTLINE: "#bbb",
     SHADOW: "#000",
   },
-  STAR: {
-    // Grayer variant (requested: closer to asteroid monochrome):
-    //  - Inner highlight: slightly dimmed neutral (#dcdcdc) instead of near-white.
-    //  - Mid: moderate gray (#b0b0b0) for body.
-    //  - Outer: darker neutral (#505050) to anchor shape (more contrast than prior #8c8c8c vs new mid).
-    //  - BASE (glow) sits between inner and mid to avoid washed halos (#c4c4c4).
-    //  - Keeps readability over background (#222-#444) while removing bright “white” pop.
-    BASE: "#c4c4c4",
-    GRAD_IN: "#b0b0b0",
-    GRAD_MID: "#b0b0b0",
-    GRAD_OUT: "#505050",
-  },
-  // Red bonus star palette
+  STAR: { BASE: "#c4c4c4", GRAD_IN: "#b0b0b0", GRAD_MID: "#b0b0b0", GRAD_OUT: "#505050" },
   STAR_RED: {
-    // Further darkened monochrome variant (2025-09-13 rev2) — make bonus stars
-    // feel almost as "black-core" as indestructible asteroids while still
-    // reading as a reward pickup (slightly brighter inner + subtle base glow).
-    // Reference palettes:
-    //   Regular STAR:      IN ~#dcdcdc | BASE #c4c4c4 | MID #b0b0b0 | OUT #505050
-    //   MONO_DARK asteroid IN #a2a2a2 | MID #555555 | OUT #161616 | OUTLINE #080808
-    // New STAR_RED target (rev2):
-    //   BASE #9c9c9c  (reduced from #b8b8b8; still lighter than asteroid mid to create faint aura)
-    //   IN   #b4b4b4  (inner highlight; just above base, lower than neutral star inner)
-    //   MID  #4a4a4a  (closer to asteroid rim; darker than prior #6a6a6a)
-    //   OUT  #121212  (nearly matches asteroid shield/outer darkness for silhouette)
-    // NOTE: Order differs from regular star: we intentionally keep BASE slightly
-    // lighter than MID so the sprite's additive glow retains a soft halo while
-    // the body collapses toward black — mimicking a "collapsed star" aesthetic.
     BASE: "#9c9c9c",
     GRAD_IN: "#b4b4b4",
     GRAD_MID: "#7a0c0c",
@@ -160,10 +88,7 @@ const COLORS = deepFreeze({
     OVERLAY_BACKDROP: "rgba(0,0,0,0.5)",
     OVERLAY_TEXT: "#fff",
   },
-  // Score popup / UI accent colors
-  SCORE: {
-    DANGER_RED: "#7a0c0c",
-  },
+  SCORE: { DANGER_RED: "#7a0c0c" },
 });
 
 export const CONFIG = deepFreeze({
@@ -171,7 +96,6 @@ export const CONFIG = deepFreeze({
   VIEW: {
     DPR_MIN: 1,
     DPR_MAX: 3,
-    // Maximum DPR to use on mobile devices to limit canvas pixel size and improve performance
     DPR_MOBILE_MAX: 1.5,
   },
   ASTEROID: {
@@ -179,49 +103,38 @@ export const CONFIG = deepFreeze({
     MIN_SIZE: 25,
     SIZE_VARIATION: 50,
     SPAWN_Y: -40,
-    // SHIELD_ENABLE: when false, indestructible asteroids do NOT render the
-    // temporary impact energy ring/flash. Visual feedback relies solely on
-    // craters, cracks, outline changes. Set true to re-enable the effect.
     SHIELD_ENABLE: false,
-    // Size multipliers applied to regular and indestructible asteroids.
-    // Regular asteroids are slightly smaller; indestructible asteroids are larger like planets.
     REGULAR_SIZE_FACTOR: 0.85,
     INDESTRUCTIBLE_SIZE_FACTOR: 1.6,
-    // Indestructible asteroids move more slowly to feel massive
     INDESTRUCTIBLE_SPEED_FACTOR: 0.55,
     SPEED_VARIATION: 120,
     SHIELD_FLASH_TIME: 0.15,
-    // Number of bullet hits required to destroy an indestructible asteroid
     INDESTRUCTIBLE_HITS: 10,
     SHIELD_FLASH_EXTRA_ALPHA: 0.4,
-    // Crater emboss tuning (visual polish). Set ENABLE to false to skip per-frame crater shading.
     CRATER_EMBOSS: {
       ENABLE: true,
       COUNT_BASE: 3,
-      COUNT_VAR: 2, // up to +2 more craters
+      COUNT_VAR: 2,
       SIZE_MIN: 2,
-      SIZE_FACTOR: 0.3, // fraction of asteroid radius for max crater radius
-      LIGHT_DIR: { x: -0.7, y: -0.7 }, // normalized-ish light vector (top-left)
+      SIZE_FACTOR: 0.3,
+      LIGHT_DIR: { x: -0.7, y: -0.7 },
       HIGHLIGHT_ALPHA: 0.35,
       SHADOW_ALPHA_INNER: 0.45,
       SHADOW_ALPHA_MID: 0.25,
-      // Damage layering: as indestructible asteroid takes hits, optionally add more craters
-      EXTRA_MAX: 4, // maximum number of extra craters to activate over full damage range
-      SHADOW_DARKEN_SCALE: 0.5, // additional multiplier up to +50% darkness at max severity
-      HIGHLIGHT_FADE_SCALE: 0.4, // reduce highlight alpha by up to 40% at max severity
-      REVEAL_TIME: 0.25, // seconds for a newly activated crater to reach full size
-      REVEAL_EASE: "outQuad", // easing function key (currently only outQuad supported)
-      // Dust puff emitted when a new crater activates (fresh impact flair)
+      EXTRA_MAX: 4,
+      SHADOW_DARKEN_SCALE: 0.5,
+      HIGHLIGHT_FADE_SCALE: 0.4,
+      REVEAL_TIME: 0.25,
+      REVEAL_EASE: "outQuad",
       PUFF_ENABLE: true,
-      // Visibility-tuned dust puff (slightly more particles & lifespan)
-      PUFF_COUNT: 9, // was 6
-      PUFF_LIFE: 0.55, // was 0.4
-      PUFF_LIFE_VAR: 0.2, // was 0.15
-      PUFF_SPEED: 170, // was 140
-      PUFF_SPEED_VAR: 110, // was 60
-      PUFF_SIZE_MIN: 1.2, // was 0.8
-      PUFF_SIZE_VAR: 1.6, // was 1.2
-      PUFF_COLOR: "rgba(210,200,190,0.9)", // lighter & slightly more opaque
+      PUFF_COUNT: 9,
+      PUFF_LIFE: 0.55,
+      PUFF_LIFE_VAR: 0.2,
+      PUFF_SPEED: 170,
+      PUFF_SPEED_VAR: 110,
+      PUFF_SIZE_MIN: 1.2,
+      PUFF_SIZE_VAR: 1.6,
+      PUFF_COLOR: "rgba(210,200,190,0.9)",
     },
   },
   BULLET: {
@@ -256,33 +169,20 @@ export const CONFIG = deepFreeze({
   },
   GAME: {
     ASTEROID_SCORE: 10,
-    // Points awarded for destroying an indestructible asteroid
     ASTEROID_SCORE_INDESTRUCTIBLE: 100,
-    // Global fallback spawn rates (kept for compatibility). Prefer the
-    // platform-specific keys below when the game provides a platform hint.
     ASTEROID_SPAWN_RATE: 2.0,
     SHOT_COOLDOWN: 200,
     STARFIELD_COUNT: 150,
-    // Lower starfield density on mobile to reduce per-frame work
     STARFIELD_COUNT_MOBILE: 80,
     STAR_SCORE: 20,
     STAR_SCORE_RED: 50,
     STAR_SPAWN_RATE: 1.0,
-    // Platform-specific spawn rates. These increase desktop density while
-    // keeping mobile rates conservative to reduce per-frame work.
-    // Adjust these numbers to tune difficulty/density on each platform.
-    // Slightly increased desktop spawn rates per request
     ASTEROID_SPAWN_RATE_DESKTOP: 4.0,
     ASTEROID_SPAWN_RATE_MOBILE: 1.5,
     STAR_SPAWN_RATE_DESKTOP: 2.0,
     STAR_SPAWN_RATE_MOBILE: 1.0,
-    // How many yellow stars are spawned before a red bonus star appears.
-    // Original behavior used 10 (so the 11th was red). Lower this to increase red star frequency.
     STAR_YELLOW_BEFORE_RED: 4,
-    // How many normal asteroids are spawned before an indestructible one appears.
-    // Original behavior used 10 (so the 11th was indestructible). Lower this to increase frequency.
     ASTEROID_NORMAL_BEFORE_INDESTRUCTIBLE: 4,
-    // Countdown timer in seconds for time-limited runs
     TIMER_SECONDS: 60,
   },
   INPUT: {
@@ -305,20 +205,18 @@ export const CONFIG = deepFreeze({
     SEED_PARAM: "seed",
   },
   NEBULA: {
-    // Reduced overall density (2025-09-14): fewer nebula, slightly smaller,
-    // and fewer internal blobs so background feels lighter.
-    COUNT_DESKTOP: 6, // was 6
-    COUNT_MOBILE: 3, // was 4
-    RADIUS_MAX_DESKTOP: 220, // was 250
-    RADIUS_MAX_MOBILE: 110, // was 125
-    RADIUS_MIN_DESKTOP: 90, // was 100
-    RADIUS_MIN_MOBILE: 45, // was 50
-    BLOB_COUNT_BASE_DESKTOP: 4, // was 5
-    BLOB_COUNT_VAR_DESKTOP: 2, // was 3
-    BLOB_COUNT_BASE_MOBILE: 2, // was 3
-    BLOB_COUNT_VAR_MOBILE: 2, // unchanged (still allows some variation)
-    BLOB_MIN_FACTOR: 0.35, // unchanged (shape variety baseline)
-    BLOB_VAR_FACTOR: 0.55, // was 0.6 (slightly reduce largest blob sizes)
+    COUNT_DESKTOP: 6,
+    COUNT_MOBILE: 3,
+    RADIUS_MAX_DESKTOP: 220,
+    RADIUS_MAX_MOBILE: 110,
+    RADIUS_MIN_DESKTOP: 90,
+    RADIUS_MIN_MOBILE: 45,
+    BLOB_COUNT_BASE_DESKTOP: 4,
+    BLOB_COUNT_VAR_DESKTOP: 2,
+    BLOB_COUNT_BASE_MOBILE: 2,
+    BLOB_COUNT_VAR_MOBILE: 2,
+    BLOB_MIN_FACTOR: 0.35,
+    BLOB_VAR_FACTOR: 0.55,
     WOBBLE_AMP_MIN: 4,
     WOBBLE_AMP_VAR: 8,
     WOBBLE_RATE_BASE: 0.002,
@@ -359,19 +257,13 @@ export const CONFIG = deepFreeze({
     BRIGHTNESS_MIN: 0.5,
     BRIGHTNESS_VAR: 0.5,
     RESET_Y: -5,
-    TWINKLE_RATE: 4, // radians per second
+    TWINKLE_RATE: 4,
     TWINKLE_X_FACTOR: 0.01,
     SHADOW_BLUR_MULT: 2,
-    // Optional layered starfield configuration. When LAYERS is defined the
-    // StarField entity will generate multiple parallax layers instead of a
-    // single flat array. Each layer may override base starfield properties
-    // via multipliers or absolute values. Counts fall back to GAME.STARFIELD_COUNT
-    // (or MOBILE variant) when omitted.
-    // Order matters: layers are drawn from far -> near (array order).
     LAYERS: [
       {
         name: "far",
-        countFactor: 0.4, // 40% of base count
+        countFactor: 0.4,
         sizeMult: 0.6,
         speedMult: 0.35,
         brightnessMult: 0.7,
@@ -399,7 +291,6 @@ export const CONFIG = deepFreeze({
     HORIZONTAL_MARGIN: 20,
     MIN_SIZE: 15,
     SHADOW_BLUR: 15,
-    // Variation in spawned star speed (used as rng.range(0, SPEED_VARIATION))
     SPEED_VARIATION: 30,
     PARTICLE_BURST: 12,
     PARTICLE_LIFE: 0.33,
@@ -430,15 +321,13 @@ export const CONFIG = deepFreeze({
   },
 });
 
-/** Tau-like constant: 2π */
+/** Tau-like constant (2π). */
 export const PI2 = Math.PI * 2;
 /** Clamp a number between (min, max). */
 /**
- * Clamp a number between (min, max).
  * @param {number} n
  * @param {number} min
  * @param {number} max
- * @returns {number}
  */
 export const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 

@@ -1,6 +1,15 @@
 /**
- * Seedable pseudo-random number generator (mulberry32) with small helpers.
- * Deterministic across the same seed; fast and simple for games.
+ * RNG - fast, seedable pseudo-random generator (mulberry32 variant).
+ *
+ * Goals:
+ * - Deterministic given the same seed (great for replay / testing)
+ * - Tiny + allocation free after construction
+ * - Provide a few ergonomic helpers (int range, pick, sign)
+ *
+ * Seeding:
+ * - Numeric seed: new RNG(123)
+ * - String seed: RNG.fromString('my-seed') (FNV-1a hash -> u32)
+ * - Omitted: non-deterministic (crypto or timestamp hash)
  */
 export class RNG {
   /**
