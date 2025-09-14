@@ -1,16 +1,25 @@
 /**
- * ObjectPool - generic pool to recycle frequently created short‑lived objects.
+ * ObjectPool – generic recyclable object pool for short‑lived entities (bullets, particles, etc.).
  *
- * Design:
- * - Accepts a factory `createFn` and optional `resetFn` (or instance `reset`).
- * - `acquire(...args)` either reuses a freed object or creates a new one.
- * - `release(obj)` returns object to free list (bounded by `maxSize`).
- * - Optional `dispose(obj)` called when pool over capacity or during `clear(true)`.
- * - `warmUp(n, ...args)` pre-allocates N to smooth first-frame spikes.
+ * Responsibilities:
+ * - Reuse objects to reduce GC pressure & frame spikes.
+ * - Provide optional warm up to avoid first interaction jank.
+ * - Respect an upper bound (`maxSize`) to cap memory while allowing reuse bursts.
  *
- * Preference order for resetting state: instance.reset(...args) > pool.resetFn.
+ * Reset precedence (highest first):
+ * 1. Instance method `obj.reset(...args)` if present.
+ * 2. Pool-level `resetFn(obj, ...args)` if provided.
  *
  * @template T
+ * @example
+ * const bulletPool = new ObjectPool(
+ *   (x, y) => new Bullet(x, y),
+ *   (b, x, y) => { b.x = x; b.y = y; b.alive = true; },
+ *   { maxSize: 512 }
+ * );
+ * const b = bulletPool.acquire(10, 20);
+ * // ...use bullet
+ * bulletPool.release(b);
  */
 export class ObjectPool {
   /**
@@ -30,10 +39,11 @@ export class ObjectPool {
   }
 
   /**
-   * Acquire an object from the pool, creating one if necessary.
-   * @returns {T}
+   * Acquire an object; creates new when free list empty.
+   * Forwards `...args` to factory on creation and to reset logic.
+   * @param {...any} args Init arguments (shape defined by caller / factory).
+   * @returns {T} Recycled or newly created instance.
    */
-  /** @param {...any} args */
   acquire(...args) {
     let obj;
     if (this._free.length > 0) {
@@ -89,11 +99,11 @@ export class ObjectPool {
   }
 
   /**
-   * Pre-allocate and cache N objects in the pool for smoother first-use.
-   * Objects are created using the provided args but kept in the free list.
-   * @param {number} n
+   * Pre-allocate up to N instances (subject to remaining capacity).
+   * Created objects are placed on the free list already reset.
+   * @param {number} n Target number to add (may allocate fewer due to maxSize).
+   * @param {...any} args Arguments passed to factory for initial construction.
    */
-  /** @param {number} n @param {...any} args */
   warmUp(n, ...args) {
     const count = Math.max(0, n | 0);
     // Respect maxSize: only create up to available capacity
@@ -109,8 +119,9 @@ export class ObjectPool {
   }
 
   /**
-   * Clear all cached objects. If disposeAll is true and a disposer exists, dispose each.
-   * @param {boolean} [disposeAll]
+   * Clear pooled (free) objects. When `disposeAll` and a disposer is set, invokes it on each.
+   * Does NOT affect objects currently in use by callers.
+   * @param {boolean} [disposeAll=false] Also dispose each free object.
    */
   clear(disposeAll = false) {
     if (disposeAll && this._dispose) {

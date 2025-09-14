@@ -3,9 +3,23 @@ import { clamp, CONFIG, PI2 } from "../constants.js";
 /** @typedef {{ x:number, y:number }} Point */
 /** @typedef {{ width:number, height:number }} ViewSize */
 
-/** Player-controlled spaceship with movement and rendering. */
+/**
+ * Player – user controlled ship handling input-driven movement and rendering.
+ *
+ * Movement:
+ * - Keyboard: WASD / Arrow cluster with fixed speed per axis.
+ * - Mouse: Smoothly lerps toward cursor (centered) when no movement keys pressed.
+ *
+ * Rendering draws an emoji‑inspired rocket (body, fins, cockpit, flame) using canvas primitives.
+ */
 export class Player {
-  /** @param {number} x @param {number} y @param {number} width @param {number} height @param {number} speed */
+  /**
+   * @param {number} x Spawn x (top-left)
+   * @param {number} y Spawn y (top-left)
+   * @param {number} width Ship width in logical pixels
+   * @param {number} height Ship height in logical pixels
+   * @param {number} speed Base movement speed (pixels / second)
+   */
   constructor(x, y, width, height, speed) {
     this.x = x;
     this.y = y;
@@ -44,7 +58,14 @@ export class Player {
     this.y = clamp(this.y, 0, view.height - this.height);
   }
 
-  /** Draw the player ship.
+  /**
+   * Draw the player rocket.
+   * Layers (in order):
+   * 1. Body with vertical gradient + outline
+   * 2. Side fins (mirrored) sharing stroke for coherence
+   * 3. Cockpit window radial-ish gradient
+   * 4. Gun/nozzle rectangle
+   * 5. Engine flame with radial gradient + triangle mask
    * @param {CanvasRenderingContext2D} ctx
    */
   draw(ctx) {

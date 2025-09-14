@@ -1,6 +1,18 @@
 import { CONFIG } from "../constants.js";
 
-/** Fixed-timestep game loop with accumulator. */
+/**
+ * GameLoop – fixed timestep accumulator loop.
+ *
+ * Rationale:
+ * - Deterministic physics / updates independent of display refresh.
+ * - Uses an accumulator to run N fixed-size update steps per frame (clamped by `maxSubSteps`).
+ * - Excess accumulated time beyond the clamp is discarded to avoid spiral of death under stalls.
+ *
+ * Flow per RAF tick:
+ * 1. Accumulate elapsed time (capped by `stepMs * maxSubSteps`).
+ * 2. While accumulator >= step -> run update(dtMs, dtSec), subtract step.
+ * 3. Call draw(frameDtMs) exactly once with the real frame delta (for interpolation / FX if desired).
+ */
 export class GameLoop {
   /**
    * @param {{
@@ -24,6 +36,7 @@ export class GameLoop {
     this._tick = this._tick.bind(this);
   }
 
+  /** Start the loop (idempotent). */
   start() {
     if (this._running) return;
     this._running = true;
@@ -32,6 +45,7 @@ export class GameLoop {
     this._rafId = requestAnimationFrame(this._tick);
   }
 
+  /** Stop the loop (idempotent). */
   stop() {
     if (!this._running) return;
     this._running = false;
@@ -40,7 +54,9 @@ export class GameLoop {
   }
 
   /**
-   * @param {number} now
+   * Internal RAF callback.
+   * @param {number} now High-resolution timestamp from requestAnimationFrame.
+   * @private
    */
   _tick(now) {
     const frameDt = now - this._last;

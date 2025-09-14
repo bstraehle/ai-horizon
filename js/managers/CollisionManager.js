@@ -1,3 +1,17 @@
+/**
+ * CollisionManager – broad & narrow phase collision handling.
+ *
+ * Responsibilities:
+ * - Spatial hash (uniform grid) for asteroid queries (reduces O(N^2)).
+ * - Bullet ↔ Asteroid, Player ↔ Asteroid, Player ↔ Star detection.
+ * - Emits typed events through EventBus (if provided) instead of hard coupling systems.
+ * - Uses lightweight array pooling to avoid per-frame allocation churn.
+ *
+ * Design notes:
+ * - Grid cell size matches asteroid spawn size range to balance bucket fill.
+ * - `intersects` accepts raw rects or objects with `getBounds()` for flexibility.
+ * - Arrays allocated for grid buckets & neighbor queries are recycled (ARR_POOL) for GC stability.
+ */
 /** @typedef {import('../types.js').Rect} Rect */
 
 // Module-scoped array pool for spatial grid buckets
