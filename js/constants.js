@@ -95,23 +95,24 @@ const COLORS = deepFreeze({
     GRAD_OUT: "rgba(255, 50, 0, 0)",
   },
   NEBULA: {
-    // Re-themed (2025-09-13) to a soft "white / faint mist" palette.
-    // (2025-09-14 tweak) Further reduced alphas to intentionally make the
-    // nebula appear less dense / intrusive. Lower opacity per blob means
-    // overlapping areas still build glow but overall scene stays darker.
-    // Previous stronger values kept in comments for quick revert.
-    // N1: neutral white core (was 0.10)
-    N1: "rgba(255, 255, 255, 0.07)",
-    N1_OUT: "rgba(255, 255, 255, 0)",
-    // N2: slight cool tint (was 0.11)
-    N2: "rgba(228, 238, 255, 0.075)",
-    N2_OUT: "rgba(228, 238, 255, 0)",
-    // N3: slight warm tint (was 0.09)
-    N3: "rgba(255, 240, 225, 0.065)",
-    N3_OUT: "rgba(255, 240, 225, 0)",
-    // N4: soft neutral gray anchor (was 0.12)
-    N4: "rgba(215, 215, 215, 0.08)",
-    N4_OUT: "rgba(215, 215, 215, 0)",
+    // Danger red palette (2025-09-14): shifted from soft white mist to a
+    // subdued deep red haze to communicate heightened danger without
+    // overwhelming the scene. Base target color requested: #7a0c0c.
+    // Strategy: introduce minor hue/brightness variation across four sets
+    // while keeping alpha low so overlapping blobs build glow organically.
+    // Alphas chosen to be slightly staggered so core variants differ.
+    // N1: base danger red (core)
+    N1: "rgba(122, 12, 12, 0.11)",
+    N1_OUT: "rgba(122, 12, 12, 0)",
+    // N2: slightly darker / cooler red
+    N2: "rgba(105, 10, 10, 0.10)",
+    N2_OUT: "rgba(105, 10, 10, 0)",
+    // N3: warmer accent (adds subtle orange warmth)
+    N3: "rgba(140, 28, 20, 0.095)",
+    N3_OUT: "rgba(140, 28, 20, 0)",
+    // N4: deepest shadowed red (anchors gradient stack)
+    N4: "rgba(90, 8, 8, 0.12)",
+    N4_OUT: "rgba(90, 8, 8, 0)",
   },
   PLAYER: {
     COCKPIT: "#b20000",
@@ -152,12 +153,16 @@ const COLORS = deepFreeze({
     // the body collapses toward black — mimicking a "collapsed star" aesthetic.
     BASE: "#9c9c9c",
     GRAD_IN: "#b4b4b4",
-    GRAD_MID: "#4a4a4a",
+    GRAD_MID: "#7a0c0c",
     GRAD_OUT: "#121212",
   },
   UI: {
     OVERLAY_BACKDROP: "rgba(0,0,0,0.5)",
     OVERLAY_TEXT: "#fff",
+  },
+  // Score popup / UI accent colors
+  SCORE: {
+    DANGER_RED: "#7a0c0c",
   },
 });
 
@@ -302,7 +307,7 @@ export const CONFIG = deepFreeze({
   NEBULA: {
     // Reduced overall density (2025-09-14): fewer nebula, slightly smaller,
     // and fewer internal blobs so background feels lighter.
-    COUNT_DESKTOP: 4, // was 6
+    COUNT_DESKTOP: 6, // was 6
     COUNT_MOBILE: 3, // was 4
     RADIUS_MAX_DESKTOP: 220, // was 250
     RADIUS_MAX_MOBILE: 110, // was 125
