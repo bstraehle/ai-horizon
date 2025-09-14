@@ -160,8 +160,9 @@ export class UIManager {
           // Determine if score qualifies for top MAX_ENTRIES.
           const max = LeaderboardManager.MAX_ENTRIES || 0;
           // Use cached entries when available to avoid async flash.
-          if (Array.isArray(LeaderboardManager._cacheEntries)) {
-            const entries = LeaderboardManager._cacheEntries.slice();
+          const cachedEntries = LeaderboardManager.getCached && LeaderboardManager.getCached();
+          if (Array.isArray(cachedEntries)) {
+            const entries = cachedEntries.slice();
             const qualifies = LeaderboardManager.qualifiesForInitials(score, entries, max);
             toggleInitialsUI(qualifies);
           } else if (LeaderboardManager._pendingLoadPromise) {
