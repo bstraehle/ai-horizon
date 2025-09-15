@@ -851,6 +851,7 @@ class AIHorizon {
     this.explosions = [];
     this.particles = [];
     this.stars = [];
+    this.scorePopups = [];
 
     // Reset scores and timers
     this.score = 0;
@@ -1005,6 +1006,7 @@ class AIHorizon {
     this.explosions = [];
     this.particles = [];
     this.stars = [];
+    this.scorePopups = [];
     this.fireLimiter.reset();
     // Clear input state (mouse/touch and keys) so a lingering touch doesn't
     // cause the player to immediately move away from the spawn position on restart.

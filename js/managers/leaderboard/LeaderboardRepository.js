@@ -62,6 +62,7 @@ export class LeaderboardRepository {
   async saveRemote(entries) {
     if (!this.endpoint) return { ok: false, conflict: false, entries };
     const payload = entries.slice(0, this.maxEntries);
+    /** @type {{scores:{id:string,score:number}[], version?:number}} */
     const body = { scores: payload };
     if (typeof this._version === "number") body.version = this._version; // send optimistic version if known
     const parsed = await this._remoteAdapter.putJSON(this.endpoint, body);
