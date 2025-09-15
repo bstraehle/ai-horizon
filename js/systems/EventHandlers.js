@@ -1,5 +1,17 @@
 import { CONFIG } from "../constants.js";
 
+/**
+ * EventHandlers – centralized registration of EventBus side effects.
+ *
+ * Purpose:
+ * - Isolate cross‑cutting reactions (scoring, particle spawning, explosions, game over) from core logic.
+ * - Keep `game.js` lean while maintaining a single file to audit gameplay side effects.
+ * - Provide a single unsubscribe function for cleanup in tests or hot reload scenarios.
+ *
+ * Notes:
+ * - Handlers are intentionally small and defer complex logic to game instance helper methods.
+ * - Duplicate event subscriptions are avoided by storing and invoking returned unsubscribe callbacks.
+ */
 /** Centralized EventBus subscriptions and side-effects. */
 export const EventHandlers = {
   /**

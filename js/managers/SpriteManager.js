@@ -1,7 +1,16 @@
 import { CONFIG } from "../constants.js";
 
 /**
- * SpriteManager pre-renders frequently used sprites to offscreen canvases.
+ * SpriteManager – pre-renders frequently used vector effects to offscreen canvases.
+ *
+ * Goals / Benefits:
+ * - Reduce per-frame draw cost by caching complex gradients & paths (bullet + trail, stars, red stars).
+ * - Avoid redundant path construction & gradient setup inside tight render loops.
+ * - Provide a simple atlas object consumed by `RenderManager` for conditional sprite usage.
+ *
+ * Fallback Behavior:
+ * - In non-DOM or test environments where 2D context creation fails, methods silently skip drawing
+ *   and the caller will fall back to entity-level draw routines.
  */
 export class SpriteManager {
   /**

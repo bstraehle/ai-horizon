@@ -39,11 +39,20 @@ import { Star } from "../entities/Star.js";
  */
 
 /**
- * SpawnManager handles probabilistic spawning and entity creation.
+ * SpawnManager – probabilistic entity factory for asteroids & collectible stars.
  *
- * Probability model per tick uses a Poisson process:
- *   p(spawn in dt) = 1 - exp(-lambda * dt)
- * where `lambda` is the per-second spawn rate from CONFIG.
+ * Responsibilities:
+ * - Convert configured per‑second spawn rates into per‑tick Bernoulli trials using a Poisson process approximation:
+ *     p(spawn in dt) = 1 - exp(-lambda * dt)
+ * - Track cadence counters enabling rarer variants:
+ *     - Indestructible (planet) asteroids after N normal spawns.
+ *     - Red bonus stars after M yellow stars.
+ * - Provide deterministic output when supplied a seeded RNG.
+ * - Support object pools seamlessly (acquire vs new) without leaking pool semantics to callers.
+ *
+ * Design notes:
+ * - Per‑game spawn state stored in a WeakMap keyed by the game instance: avoids mutating the game object surface.
+ * - Planet palette selection cycles through available themes non‑repetitively before repeating.
  */
 /**
  * Per-game spawn state:

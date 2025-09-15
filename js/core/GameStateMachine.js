@@ -1,14 +1,17 @@
 /**
- * GameStateMachine – finite state machine for high-level game flow.
+ * GameStateMachine – minimal finite state controller for macro game phases.
+ *
+ * Phases:
+ * - menu → running → paused ↔ running → gameover (restart returns to running via start()).
  *
  * Responsibilities:
- * - Track coarse game phases (menu, running, paused, gameover).
- * - Provide narrow, intention-revealing transition helpers (start, pause, resume, end).
- * - Keep logic deterministic & side-effect free (state only), letting external systems react via events.
+ * - Provide intention‑revealing transitions (start, pause, resume, end) with simple guards.
+ * - Keep surface area tiny to discourage ad‑hoc boolean flags sprinkled across modules.
+ * - Offer predicate helpers (isRunning, isPaused, etc.) for readable conditionals in systems.
  *
- * Key decisions:
- * - Minimal guard clauses instead of complex transition table (states small & stable).
- * - Separate query helpers (isRunning, etc.) for readability in systems.
+ * Design choices:
+ * - No external event emission; higher‑level orchestration handles side effects (UI, audio, etc.).
+ * - Chose explicit methods over a data‑driven table: state count is small & unlikely to explode.
  */
 export class GameStateMachine {
   constructor() {

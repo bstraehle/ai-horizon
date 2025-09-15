@@ -1,5 +1,9 @@
 /**
- * RemoteAdapter centralizes HTTP JSON interactions with basic resilience.
+ * RemoteAdapter – minimal fetch wrapper for JSON endpoints with timeout + graceful failure.
+ *
+ * Goals:
+ * - Encapsulate network concerns (timeouts, JSON parsing, null‑on‑failure contract).
+ * - Remain environment tolerant (returns null when fetch unavailable – e.g., tests / SSR).
  */
 export class RemoteAdapter {
   /**

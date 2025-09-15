@@ -1,4 +1,15 @@
-/** Sets up keyboard, mouse, touch, and button event listeners. */
+/**
+ * InputManager – centralized setup for all user input bindings (keyboard, mouse, touch, focus guards).
+ *
+ * Purpose:
+ * - Attach DOM event listeners once and keep `game.js` lean.
+ * - Provide an easily testable surface that only depends on passed handler callbacks.
+ * - Encapsulate accessibility related listeners (focus management) alongside raw input.
+ *
+ * Notes:
+ * - This module does not perform any game logic; it simply wires browser events to bound handlers.
+ * - All handlers are expected to be pre-bound to the game instance (see Game.bindEventHandlers()).
+ */
 export class InputManager {
   /**
    * Setup all event listeners.

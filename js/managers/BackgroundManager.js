@@ -4,7 +4,19 @@ import { Nebula } from "../entities/Nebula.js";
 import { StarField } from "../entities/StarField.js";
 /** @typedef {import('../types.js').RNGLike} RNGLike */
 
-/** Handles background initialization, resizing, and drawing. */
+/**
+ * BackgroundManager – initializes & renders multi-layer parallax background elements.
+ *
+ * Layers managed:
+ * - Gradient backdrop (delegated to `Background`).
+ * - Procedural nebula blobs (animated wobble + slow drift) – optional on initial menu.
+ * - Star field (single or layered, depending on CONFIG.STARFIELD.LAYERS).
+ *
+ * Key responsibilities:
+ * - Provide pure static functions so callers can feed in a lightweight context snapshot (`getGameContext`).
+ * - Handle proportional resize of previously generated nebula / star data to avoid abrupt visual jumps.
+ * - Keep initialization deterministic when an RNG is supplied (enables seeded replays & stable tests).
+ */
 export class BackgroundManager {
   /**
    * Initialize background components using a GameContext-like object.

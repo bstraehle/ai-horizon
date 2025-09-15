@@ -1,6 +1,9 @@
 /**
- * StorageAdapter provides a thin, safe wrapper over Web Storage (localStorage-like).
- * It tolerates JSON parse errors and missing storage gracefully.
+ * StorageAdapter – defensive JSON wrapper around Web Storage (localStorage style).
+ *
+ * Safety features:
+ * - Silently degrades (returns fallbacks) when storage API unavailable or throws (quota / privacy mode).
+ * - Shields callers from JSON.parse exceptions; returns provided fallback instead.
  */
 export class StorageAdapter {
   /** @param {{storage?: Storage|null}} [opts] */

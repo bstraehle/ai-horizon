@@ -1,14 +1,20 @@
 /**
- * constants.js – central configuration & design tokens.
+ * constants.js – canonical source of configuration & design tokens.
  *
  * Responsibilities:
- * - Visual palettes, sizing, speed & timing constants.
- * - Tunable gameplay parameters (spawn rates, scoring, cooldowns).
- * - Deep-frozen to prevent mutation at runtime (defensive against accidental writes).
+ * - Centralize visual palettes, sizing, physics & timing constants used across subsystems.
+ * - Expose tunable gameplay parameters (spawn rates, scoring, cooldowns) for rapid iteration.
+ * - Provide immutability guarantees (deep freeze) to prevent accidental runtime mutation.
  *
- * Guidance:
- * - Prefer adding here (not magic numbers inline) for balance / tweak iterations.
- * - Keep nested grouping logical: CATEGORY -> specific values.
+ * Conventions:
+ * - Group related values under a high‑level namespace (ASTEROID, PLAYER, STARFIELD, etc.).
+ * - Avoid hard‑coding numbers elsewhere in the codebase—add a named constant here instead.
+ * - Use UPPER_SNAKE_CASE leaf properties; nested objects act as namespacing.
+ *
+ * Rationale:
+ * - A single authoritative module improves discoverability for balancing & theming.
+ * - Deep freezing surfaces mistakes early (attempted mutation throws in strict mode) and
+ *   allows safe sharing of references without defensive cloning.
  */
 // Core color palettes & visual design tokens. Frozen via deepFreeze to avoid runtime mutation.
 const COLORS = deepFreeze({

@@ -25,8 +25,12 @@ import { CONFIG } from "../constants.js";
  */
 
 /**
- * Build a minimal, read-only snapshot of game state for managers.
- * Keeps managers decoupled from the Game class while avoiding broad refactors.
+ * getGameContext – build a read‑only snapshot passed to stateless managers.
+ *
+ * Goals:
+ * - Narrow surface area exposed to background / render logic (prevents tight coupling to full game instance).
+ * - Provide consistent timing + platform flags without exposing mutable collections directly.
+ * - Avoid allocations beyond the shallow object (simple pass‑through of existing references).
  *
  * @param {any} game
  * @returns {GameContext}

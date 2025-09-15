@@ -1,14 +1,18 @@
 /**
- * ObjectPool – generic recyclable object pool for short‑lived entities (bullets, particles, etc.).
+ * ObjectPool – allocation avoidance for short‑lived, homogeneous game objects.
  *
  * Responsibilities:
- * - Reuse objects to reduce GC pressure & frame spikes.
- * - Provide optional warm up to avoid first interaction jank (allocation spikes).
- * - Respect an upper bound (`maxSize`) to cap memory while allowing reuse bursts.
+ * - Recycle objects to minimize garbage collector interruptions during gameplay.
+ * - Support optional warm‑up to preallocate a baseline set (reduces first‑interaction stutter).
+ * - Enforce a soft cap (`maxSize`) so memory growth remains bounded under load bursts.
  *
  * Reset precedence (highest first):
- * 1. Instance method `obj.reset(...args)` if present.
- * 2. Pool-level `resetFn(obj, ...args)` if provided.
+ *   1. Instance method `obj.reset(...args)` if present.
+ *   2. Pool‑level `resetFn(obj, ...args)` fallback.
+ *
+ * Error handling:
+ * - Throws if factory returns a falsy value so misuse is surfaced early.
+ * - Silently swallows dispose errors (best‑effort cleanup path).
  *
  * @template T
  * @example

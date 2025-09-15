@@ -1,4 +1,27 @@
 import { CONFIG } from "../constants.js";
+
+/**
+ * RenderManager – orchestrates draw ordering for all visible game elements.
+ *
+ * Responsibilities:
+ * - Provide stateless static helpers for drawing grouped entity categories (asteroids, bullets, stars, explosions, particles).
+ * - Apply sprite optimizations (use pre-rendered atlas when available, fall back to entity draw methods otherwise).
+ * - Maintain a deterministic layering order so visual composition is predictable and easy to tweak.
+ *
+ * Layer order (back → front):
+ *   1. Background (delegated to game.drawBackground())
+ *   2. Asteroids
+ *   3. Bullets (with trail) / collectible stars
+ *   4. Explosions
+ *   5. Particles / transient effects
+ *   6. Player ship
+ *   7. Engine trail (drawn after player for glow overlap)
+ *   8. Score popups (text overlay, fade + rise)
+ *
+ * Design notes:
+ * - Static methods keep this module side-effect free and easy to unit test.
+ * - Avoids per-frame allocations by using simple for loops (hot paths).
+ */
 export class RenderManager {
   /**
    * @param {CanvasRenderingContext2D} ctx

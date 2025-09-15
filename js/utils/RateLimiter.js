@@ -1,13 +1,13 @@
 /**
- * RateLimiter – simple time-based gate for discrete actions (e.g., firing).
+ * RateLimiter – fixed-interval gate for discrete repeatable actions (e.g. firing, spawning).
  *
  * Responsibilities:
- * - Enforce minimum interval between allowed actions.
- * - Provide a side-effect-free test (`try`) returning success boolean.
+ * - Enforce a minimum elapsed time between successful attempts.
+ * - Provide a side‑effect free probe (`try`) that signals allowance via boolean result.
  *
- * Key decisions:
- * - Caller supplies optional fn to execute inline (avoids branching at call site).
- * - Uses provided time source for test determinism in unit tests.
+ * Design notes:
+ * - Optional injected time source improves determinism in unit tests & replay scenarios.
+ * - `try(fn)` pattern keeps call sites concise (no separate branch when allowed).
  */
 export class RateLimiter {
   /**

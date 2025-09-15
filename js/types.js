@@ -1,6 +1,14 @@
 /**
- * Shared JSDoc types to improve checkJs across the project.
- * These are types only; there is no runtime code here.
+ * types.js – shared JSDoc typedefs for cross‑module IDE support & checkJs validation.
+ *
+ * Purpose:
+ * - Provide a single import target for frequently re-used structural types (Rect, RNGLike, GameState slices).
+ * - Improve editor IntelliSense without migrating entire codebase to TypeScript immediately.
+ * - Enable lightweight refactors by centralizing shape documentation (update here → propagate hints).
+ *
+ * Notes:
+ * - This file intentionally exports no runtime values (aside from an empty module export) to avoid bundle weight.
+ * - Keep unions & event maps narrow and intention‑revealing; broad `any` leakage should be avoided upstream.
  */
 
 /** @typedef {{ x:number, y:number, width:number, height:number }} Rect */

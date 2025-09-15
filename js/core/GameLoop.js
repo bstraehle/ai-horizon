@@ -1,17 +1,21 @@
 import { CONFIG } from "../constants.js";
 
 /**
- * GameLoop – fixed timestep accumulator loop.
+ * GameLoop – fixed timestep accumulator with frame interpolation hook.
  *
- * Rationale:
- * - Deterministic physics / updates independent of display refresh.
- * - Uses an accumulator to run N fixed-size update steps per frame (clamped by `maxSubSteps`).
- * - Excess accumulated time beyond the clamp is discarded to avoid spiral of death under stalls.
+ * Goals:
+ * - Keep simulation deterministic & stable across variable refresh displays.
+ * - Bound catch‑up work to avoid the classic spiral‑of‑death on long frames.
+ * - Expose raw frame delta separately for systems that want render‑time effects.
  *
- * Flow per RAF tick:
- * 1. Accumulate elapsed time (capped by `stepMs * maxSubSteps`).
- * 2. While accumulator >= step -> run update(dtMs, dtSec), subtract step.
- * 3. Call draw(frameDtMs) exactly once with the real frame delta (can optionally interpolate render-only values using remaining accumulator fraction if added later).
+ * Flow (per requestAnimationFrame tick):
+ *   1. Accumulate clamped elapsed time (<= stepMs * maxSubSteps).
+ *   2. While accumulator >= step: invoke update(stepMs) & decrement.
+ *   3. Invoke draw(frameDtMs) exactly once.
+ *
+ * Notes:
+ * - Interpolation of render‑only values can be layered in using remaining accumulator / step ratio if desired.
+ * - `shouldUpdate` gate lets paused states continue rendering without advancing simulation.
  */
 export class GameLoop {
   /**

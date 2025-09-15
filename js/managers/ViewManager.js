@@ -1,7 +1,13 @@
 import { CONFIG, clamp } from "../constants.js";
 
 /**
- * ViewManager centralizes canvas sizing and device pixel ratio transforms.
+ * ViewManager – responsive canvas sizing + DPR transform management.
+ *
+ * Responsibilities:
+ * - Compute logical (CSS) vs backing-store pixel sizes respecting min/max DPR caps and mobile constraints.
+ * - Preserve player relative position during live resizes (center X and bottom offset heuristics) for smoother UX.
+ * - Clamp player back into view when new dimensions shrink beneath previous bounds.
+ * - Expose a single static `resize` entry to keep side effects localized.
  */
 export class ViewManager {
   /**

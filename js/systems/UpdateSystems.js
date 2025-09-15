@@ -1,5 +1,24 @@
 import { CONFIG } from "../constants.js";
 
+/**
+ * UpdateSystems – pure, stateless per‑frame update helpers for entity collections.
+ *
+ * Each exported function mutates the provided slice in place without allocating new arrays
+ * (aside from spliced removals) to keep GC pressure minimal in hot paths.
+ *
+ * Responsibilities by function:
+ * - updateAsteroids: advance position & recycle off‑screen asteroids.
+ * - updateBullets: move upward & recycle when leaving the viewport.
+ * - updateEngineTrail: spawn + age exhaust particles while the game is running.
+ * - updateExplosions: tick lifetime and recycle expired explosions.
+ * - updateParticles: integrate simple physics & gravity then recycle when dead.
+ * - updateStars: descend collectible stars & recycle when leaving the screen.
+ *
+ * Design notes:
+ * - Keeping these small & focused simplifies targeted unit tests and benchmark profiling.
+ * - Caller supplies dtSec so fixed‑timestep or variable‑timestep integration is agnostic here.
+ */
+
 /** Move asteroids and release off-screen ones.
  * @param {import('../types.js').SystemsGame} game
  * @param {number} [dtSec]

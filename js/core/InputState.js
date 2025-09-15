@@ -1,4 +1,10 @@
-/** Centralized input state for keys, pointer, and firing. */
+/**
+ * InputState – mutable snapshot of current user input (keys, pointer, fire hold).
+ *
+ * Design:
+ * - Simple POJO style container mutated by InputManager handlers each frame.
+ * - Queried by gameplay systems to avoid direct DOM event reliance mid‑loop.
+ */
 export class InputState {
   constructor() {
     /** @type {Record<string, boolean>} */

@@ -1,22 +1,22 @@
 /**
- * CollisionManager – broad & narrow phase collision handling.
+ * CollisionManager – spatial hashing + narrow‑phase resolution for arcade entities.
  *
  * Responsibilities:
- * - Spatial hash (uniform grid) for asteroid queries (reduces naive O(N^2) checks).
- * - Bullet ↔ Asteroid, Player ↔ Asteroid, Player ↔ Star detection & side-effect events.
- * - Emits typed events through EventBus (if provided) instead of hard coupling systems.
- * - Recycles arrays for buckets & neighbor lists via a small pool to reduce GC churn.
+ * - Maintain an ephemeral uniform grid (built each tick) to reduce bullet→asteroid checks.
+ * - Perform bullet↔asteroid, player↔asteroid, and player↔star collision tests.
+ * - Emit typed EventBus events instead of performing score / FX side effects inline.
+ * - Recycle small arrays via a capped pool to minimize transient GC pressure.
  *
- * Algorithmic notes:
- * - Broad phase: uniform grid keyed by integer cell coords (cx,cy); insertion cost O(A * coveredCells).
- * - Narrow phase: bullets only test groups overlapping their bounds (expected << total asteroid set).
- * - Worst case degenerates when all asteroids occupy same cell; still correct but slower (approaches O(B*A)).
- * - Early exit on player-asteroid hit ends further work (assumes game-over or damage path dominates).
+ * Performance & algorithmic notes:
+ * - Broad phase complexity: O(A * C) where C is average covered cells (typically 1–4 given asteroid sizes).
+ * - Narrow phase for bullets: only tests buckets intersecting bullet bounds vs naive O(B*A).
+ * - Degenerate case (all asteroids in one cell) collapses to O(B*A) but remains correct.
+ * - Early abort after player–asteroid hit (game over path) avoids wasted work during lethal frames.
  *
- * Design decisions:
- * - Simplicity > dynamic tree; uniform distribution of asteroids acceptable for target scale.
- * - `intersects` supports duck-typed objects to avoid wrapping bounds per frame.
- * - Overflow array pooling capped (ARR_POOL_MAX) to keep memory bounded.
+ * Design trade‑offs:
+ * - Chose a uniform grid over quad/oct trees: simpler implementation, good cache locality at current entity counts.
+ * - Duck typed `intersects` accepts either raw rects or objects exposing `getBounds()` to avoid per-frame boxing.
+ * - Array pooling bounded by ARR_POOL_MAX to prevent unbounded memory growth during stress cases.
  */
 /** @typedef {import('../types.js').Rect} Rect */
 
