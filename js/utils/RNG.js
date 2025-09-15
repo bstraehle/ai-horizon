@@ -30,8 +30,7 @@
  * - nextInt(max): [0, max) integer (floor of float * max).
  * - range(min, max): [min, max) float.
  * - pick(array): Uniform element from array (throws if array empty indirectly via undefined access).
- * - sign(): Returns -1 or 1 with equal 0.5 probability.
- * - reseed(seed): Reset internal state to a new sequence.
+ * (Removed dead API: sign(), reseed() – not used anywhere.)
  *
  * Failure Modes / Notes
  * ---------------------
@@ -100,22 +99,6 @@ export class RNG {
    */
   pick(arr) {
     return arr[this.nextInt(arr.length)];
-  }
-
-  /**
-   * Return -1 or 1 with 50% probability each.
-   * @returns {1|-1}
-   */
-  sign() {
-    return this.nextFloat() < 0.5 ? -1 : 1;
-  }
-
-  /**
-   * Replace the current seed, restarting the sequence.
-   * @param {number} seed New numeric seed.
-   */
-  reseed(seed) {
-    this._s = RNG._seed32(seed);
   }
 
   /**

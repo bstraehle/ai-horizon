@@ -221,9 +221,6 @@ export class LeaderboardManager {
           .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
           .slice(0, LeaderboardManager.MAX_ENTRIES);
         payload.splice(0, payload.length, ...merged);
-        if (typeof repo._version === "number") {
-          /* intentionally empty */
-        }
         attempt += 1;
         continue;
       }

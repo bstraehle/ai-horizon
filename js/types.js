@@ -13,7 +13,7 @@
 
 /** @typedef {{ x:number, y:number, width:number, height:number }} Rect */
 
-/** @typedef {{ nextFloat:()=>number, range?:(min:number,max:number)=>number }} RNGLike */
+/** @typedef {{ nextFloat:()=>number, range?:(min:number,max:number)=>number, nextInt?:(max:number)=>number, pick?:(arr:any[])=>any }} RNGLike */
 
 /** Basic logical view size for the canvas. */
 /** @typedef {{ width:number, height:number, dpr?: number }} ViewSize */

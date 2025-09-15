@@ -1204,7 +1204,6 @@ class AIHorizon {
           } catch (_e) {
             /* ignore */
           }
-          const _originalOnClick = submitBtn.onclick;
           submitBtn.addEventListener("click", () => {
             setTimeout(() => {
               try {
