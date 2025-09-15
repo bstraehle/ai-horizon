@@ -147,6 +147,11 @@ Entities (asteroids, bullets, explosions, particles, stars, nebula blobs, engine
 
 `LeaderboardManager` composes adapters: local storage by default; optional remote via `RemoteAdapter` (fetch) and example AWS Lambda (`server/lambda/ai-horizon-leaderboard.js`). Repository + formatter modules handle persistence normalization and display formatting.
 
+Recent cleanup:
+
+- Removed deprecated internal `LeaderboardManager._normalize` wrapper (use `normalize()` from `LeaderboardFormatter` directly).
+- Ensured zero unused imports; no functional changes to public API.
+
 ## Types & JSDoc
 
 `js/types.js` defines shared typedefs (events, states, shapes). Runtime code remains plain JS for minimal friction while still enjoying IDE intellisense through `// @ts-check` (selectively disabled in a few high-churn files). Prefer referencing shared types via `import('./types.js').TypeName` to avoid circular imports.

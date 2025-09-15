@@ -15,16 +15,11 @@
  * Migration Notes:
  *   - load/save/submit now ALWAYS return Promise.<T>. Old synchronous usage must `await`.
  *   - Use `LeaderboardManager._cacheEntries` for immediate state reads (read-only) between awaits.
- *   - `qualifiesForInitials`, `formatRow(s)`, `_normalize` delegated to new pure helpers in
+ *   - `qualifiesForInitials`, `formatRow(s)` delegated to pure helpers in
  *     `./leaderboard/` so they can be reused independently or imported directly in future.
  *   - A future breaking change will remove static mutable state; plan to inject a LeaderboardService.
  */
-import {
-  normalize,
-  qualifiesForInitials,
-  formatRow,
-  formatRows,
-} from "./leaderboard/LeaderboardFormatter.js";
+import { qualifiesForInitials, formatRow, formatRows } from "./leaderboard/LeaderboardFormatter.js";
 import { LeaderboardRepository } from "./leaderboard/LeaderboardRepository.js";
 export class LeaderboardManager {
   static IS_REMOTE = true;
@@ -39,12 +34,7 @@ export class LeaderboardManager {
   static _pendingLoadPromise = null;
 
   // --- Internal helpers --------------------------------------------------
-  /** Normalize raw entries into canonical shape (non-mutating). */
-  /** @param {{id:any,score:any}[]|any} arr */
-  // Deprecated: use imported normalize(). Kept for external stability.
-  static _normalize(arr) {
-    return normalize(arr);
-  }
+  // (Removed deprecated static _normalize helper – use imported normalize() directly.)
 
   /**
    * Determine if a score qualifies for initials entry given current entries.
