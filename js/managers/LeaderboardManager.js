@@ -28,6 +28,8 @@ export class LeaderboardManager {
   // Server-side leaderboard identifier used when posting scores
   static MAX_ENTRIES = 10;
   static KEY_LEADERBOARD = "aiHorizonLeaderboard";
+  // Cooldown to avoid redundant remote refresh immediately after authoritative sync (ms)
+  static REMOTE_REFRESH_COOLDOWN_MS = 2500;
   /** @type {{id:string,score:number}[]|null} */
   static _cacheEntries = null;
   /** @type {Promise<{id:string,score:number}[]>|null} */
@@ -36,6 +38,8 @@ export class LeaderboardManager {
    * @type {number|undefined}
    */
   static _version = undefined;
+  /** Timestamp (performance.now()/Date.now) of last successful authoritative remote sync */
+  static _lastRemoteSync = 0;
 
   // --- Internal helpers --------------------------------------------------
   // (Removed deprecated static _normalize helper – use imported normalize() directly.)
@@ -129,6 +133,10 @@ export class LeaderboardManager {
       // capture version if repository learned one
       if (typeof repo._version === "number") LeaderboardManager._version = repo._version;
       LeaderboardManager._cacheEntries = entries.slice();
+      if (remote) {
+        const now = (typeof performance !== "undefined" && performance.now()) || Date.now();
+        LeaderboardManager._lastRemoteSync = now;
+      }
       return entries.slice();
     })()
       .catch(() => [])
@@ -209,6 +217,10 @@ export class LeaderboardManager {
     const serverEntries = lastResult.entries;
     if (typeof repo._version === "number") LeaderboardManager._version = repo._version;
     LeaderboardManager._cacheEntries = serverEntries.slice();
+    if (remote && lastResult.ok) {
+      const now = (typeof performance !== "undefined" && performance.now()) || Date.now();
+      LeaderboardManager._lastRemoteSync = now;
+    }
     // Dispatch DOM event for backward compatibility
     try {
       if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
@@ -279,18 +291,28 @@ export class LeaderboardManager {
     // 1. If entries were provided by the caller, render them and return.
     if (Array.isArray(entries)) {
       doRender(entries);
+      // Option B: caller supplied entries; skip background remote load to avoid duplicate fetch
+      return;
     } else if (Array.isArray(LeaderboardManager._cacheEntries)) {
       doRender(LeaderboardManager._cacheEntries);
     }
-    // Always async now
-    (async () => {
-      try {
-        const arr = await LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
-        doRender(arr);
-      } catch (_) {
-        /* ignore */
+    // Potential background refresh (remote only) unless within cooldown window
+    if (LeaderboardManager.IS_REMOTE) {
+      const now = (typeof performance !== "undefined" && performance.now()) || Date.now();
+      if (
+        now - (LeaderboardManager._lastRemoteSync || 0) >=
+        LeaderboardManager.REMOTE_REFRESH_COOLDOWN_MS
+      ) {
+        (async () => {
+          try {
+            const arr = await LeaderboardManager.load({ remote: true });
+            doRender(arr);
+          } catch (_) {
+            /* ignore */
+          }
+        })();
       }
-    })();
+    }
   }
 }
 
