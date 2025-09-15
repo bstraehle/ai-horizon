@@ -16,6 +16,24 @@
  * - Deep freezing surfaces mistakes early (attempted mutation throws in strict mode) and
  *   allows safe sharing of references without defensive cloning.
  */
+/**
+ * Deep freeze helper (non-exported) used to recursively freeze configuration objects.
+ * @param {any} obj
+ * @returns {any}
+ */
+function deepFreeze(obj) {
+  if (obj && typeof obj === "object" && !Object.isFrozen(obj)) {
+    Object.getOwnPropertyNames(obj).forEach((prop) => {
+      const value = obj[prop];
+      if (value && typeof value === "object") {
+        deepFreeze(value);
+      }
+    });
+    Object.freeze(obj);
+  }
+  return obj;
+}
+
 const COLORS = deepFreeze({
   ASTEROID: {
     GRAD_IN: "#d4d4d4",
@@ -331,22 +349,3 @@ export const PI2 = Math.PI * 2;
  * @param {number} max
  */
 export const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-
-/**
- * Deeply freezes an object to make it immutable at all nested levels.
- * Note: Only freezes plain objects/arrays; primitives are ignored by Object.freeze.
- * @param {any} obj
- * @returns {any} The same object, deeply frozen
- */
-function deepFreeze(obj) {
-  if (obj && typeof obj === "object" && !Object.isFrozen(obj)) {
-    Object.getOwnPropertyNames(obj).forEach((prop) => {
-      const value = obj[prop];
-      if (value && typeof value === "object") {
-        deepFreeze(value);
-      }
-    });
-    Object.freeze(obj);
-  }
-  return obj;
-}

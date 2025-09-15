@@ -56,17 +56,4 @@ export class StorageAdapter {
       return false;
     }
   }
-
-  /**
-   * Remove a key.
-   * @param {string} key
-   */
-  remove(key) {
-    if (!this._storage) return;
-    try {
-      this._storage.removeItem(key);
-    } catch {
-      /* ignore */
-    }
-  }
 }

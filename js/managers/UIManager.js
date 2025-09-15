@@ -4,7 +4,7 @@
 import { LeaderboardManager } from "./LeaderboardManager.js";
 export class UIManager {
   static _preserveFocus = false;
-  /** Safe Element check for non-browser environments. */
+
   /**
    * Safe Element check for non-browser environments.
    * @param {unknown} obj
@@ -35,13 +35,6 @@ export class UIManager {
     const secs = s % 60;
     timerEl.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
   }
-
-  /** Set and persist high score; returns the new high score.
-   * @param {number} score
-   * @param {number} [prevHigh]
-   * @param {HTMLElement|null} [highScoreEl]
-   * @returns {number}
-   */
 
   /** Show pause overlay.
    * @param {HTMLElement|null} pauseScreen

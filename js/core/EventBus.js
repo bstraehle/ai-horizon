@@ -92,22 +92,4 @@ export class EventBus {
     if (type) this._handlers.delete(type);
     else this._handlers.clear();
   }
-
-  /**
-   * Check presence of at least one handler for an event.
-   * @param {import('../types.js').GameEvent} type Event identifier.
-   * @returns {boolean} True if at least one handler currently registered.
-   */
-  has(type) {
-    const set = this._handlers.get(type);
-    return !!set && set.size > 0;
-  }
-
-  /**
-   * Number of distinct event types with at least one handler.
-   * @returns {number}
-   */
-  get size() {
-    return this._handlers.size;
-  }
 }

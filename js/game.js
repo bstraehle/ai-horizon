@@ -1524,41 +1524,6 @@ class AIHorizon {
   drawBackground() {
     BackgroundManager.draw(getGameContext(this));
   }
-
-  /**
-   * Draw all asteroids with craters and outlines.
-   */
-  drawAsteroids() {
-    RenderManager.drawAsteroids(this.ctx, this.asteroids);
-  }
-
-  /**
-   * Draw all bullets and their trails.
-   */
-  drawBullets() {
-    RenderManager.drawBullets(this.ctx, this.bullets, this.sprites);
-  }
-
-  /**
-   * Draw collectible stars with pulsing and glow effects.
-   */
-  drawCollectibleStars() {
-    RenderManager.drawCollectibleStars(this.ctx, this.stars, this.sprites, this.timeSec);
-  }
-
-  /**
-   * Draw explosion effects with animated gradients.
-   */
-  drawExplosions() {
-    RenderManager.drawExplosions(this.ctx, this.explosions);
-  }
-
-  /**
-   * Draw all particles with fading and glow effects.
-   */
-  drawParticles() {
-    RenderManager.drawParticles(this.ctx, this.particles);
-  }
 }
 
 export { AIHorizon };
