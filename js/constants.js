@@ -71,18 +71,23 @@ const COLORS = deepFreeze({
     OUTLINE: "#bbb",
     SHADOW: "#000",
   },
-  STAR: { BASE: "#c4c4c4", GRAD_IN: "#b0b0b0", GRAD_MID: "#b0b0b0", GRAD_OUT: "#505050" },
+  STAR: {
+    BASE: "#c4c4c4",
+    GRAD_IN: "#c4c4c4",
+    GRAD_MID: "#909090",
+    GRAD_OUT: "#909090",
+  },
   STAR_RED: {
-    BASE: "#9c9c9c",
-    GRAD_IN: "#b4b4b4",
+    BASE: "#c4c4c4",
+    GRAD_IN: "#c4c4c4",
     GRAD_MID: "#7a0c0c",
-    GRAD_OUT: "#121212",
+    GRAD_OUT: "#7a0c0c",
   },
   UI: {
     OVERLAY_BACKDROP: "rgba(0,0,0,0.5)",
     OVERLAY_TEXT: "#fff",
   },
-  SCORE: { DANGER_RED: "#7a0c0c" },
+  SCORE: { DANGER_RED: "#b0b0b0" },
 });
 
 export const CONFIG = deepFreeze({
