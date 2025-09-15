@@ -34,6 +34,18 @@ export const handler = async (event) => {
         }
         updateData = JSON.parse(body);
         response = await updateItem(Number(queryStringParameters.id), updateData);
+        if (response && response.conflict) {
+          return {
+            statusCode: 409,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
+              "Access-Control-Allow-Headers": "Content-Type",
+            },
+            body: JSON.stringify(response),
+          };
+        }
         break;
 
       default:
@@ -84,6 +96,8 @@ async function getItem(id) {
     throw new Error(`Item with id ${id} not found`);
   }
 
+  // ensure version property exists for clients implementing optimistic concurrency
+  if (typeof result.Item.version !== "number") result.Item.version = 0;
   return result.Item;
 }
 
@@ -91,13 +105,18 @@ async function getItem(id) {
  * Update an item in the leaderboard table.
  * @param {number} id
  * @param {{[key:string]: any}} updateData
- * @returns {Promise<{message:string,item:any}>}
+ * @returns {Promise<{message:string,item:any,conflict?:boolean}>}
  */
 async function updateItem(id, updateData) {
   /** @type {{[key:string]: any}} */
   delete updateData.id;
+  const nowIso = new Date().toISOString();
+  updateData.updatedAt = nowIso;
 
-  updateData.updatedAt = new Date().toISOString();
+  // Optimistic concurrency: expect caller to send 'version'. If absent, treat as unconditional create of version (0 -> 1).
+  const providedVersion = typeof updateData.version === "number" ? updateData.version : undefined;
+  // version is not directly updated in the dynamic loop below; we increment explicitly.
+  delete updateData.version;
 
   /** @type {string[]} */
   const updateExpressions = [];
@@ -115,23 +134,47 @@ async function updateItem(id, updateData) {
     expressionAttributeValues[attributeValue] = updateData[key];
   });
 
+  // Always increment version atomically; add to update expression.
+  updateExpressions.push("#ver = if_not_exists(#ver, :zero) + :one");
+  expressionAttributeNames["#ver"] = "version";
+  expressionAttributeValues[":one"] = 1;
+  expressionAttributeValues[":zero"] = 0;
+
+  let condition = "attribute_exists(id)"; // ensure item exists
+  if (providedVersion !== undefined) {
+    // Only match if current version equals providedVersion
+    condition += " AND #ver = :expectedVersion";
+    expressionAttributeValues[":expectedVersion"] = providedVersion;
+  }
+
   const params = {
     TableName: TABLE_NAME,
-    Key: {
-      id: id,
-    },
+    Key: { id },
     UpdateExpression: `SET ${updateExpressions.join(", ")}`,
     ExpressionAttributeNames: expressionAttributeNames,
     ExpressionAttributeValues: expressionAttributeValues,
-    ConditionExpression: "attribute_exists(id)",
+    ConditionExpression: condition,
     ReturnValues: "ALL_NEW",
   };
 
-  const command = new UpdateCommand(params);
-  const result = await docClient.send(command);
-
-  return {
-    message: "Item updated successfully",
-    item: result.Attributes,
-  };
+  try {
+    const command = new UpdateCommand(params);
+    const result = await docClient.send(command);
+    return {
+      message: "Item updated successfully",
+      item: result.Attributes,
+    };
+  } catch (err) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "name" in err &&
+      err.name === "ConditionalCheckFailedException"
+    ) {
+      // Fetch current item so we can return latest version + scores for client to merge
+      const current = await getItem(id);
+      return { conflict: true, message: "Version mismatch", item: current };
+    }
+    throw err;
+  }
 }

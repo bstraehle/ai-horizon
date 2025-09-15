@@ -32,6 +32,10 @@ export class LeaderboardManager {
   static _cacheEntries = null;
   /** @type {Promise<{id:string,score:number}[]>|null} */
   static _pendingLoadPromise = null;
+  /** Server version for optimistic concurrency (undefined until a remote load/save).
+   * @type {number|undefined}
+   */
+  static _version = undefined;
 
   // --- Internal helpers --------------------------------------------------
   // (Removed deprecated static _normalize helper – use imported normalize() directly.)
@@ -122,6 +126,8 @@ export class LeaderboardManager {
     });
     const p = (async () => {
       const entries = remote ? await repo.loadRemote() : await repo.loadLocal();
+      // capture version if repository learned one
+      if (typeof repo._version === "number") LeaderboardManager._version = repo._version;
       LeaderboardManager._cacheEntries = entries.slice();
       return entries.slice();
     })()
@@ -147,6 +153,9 @@ export class LeaderboardManager {
       endpoint: LeaderboardManager.REMOTE_ENDPOINT,
       maxEntries: LeaderboardManager.MAX_ENTRIES,
     });
+    // propagate known version to repository
+    if (typeof LeaderboardManager._version === "number")
+      repo._version = LeaderboardManager._version;
 
     if (!remote) {
       const ok = await repo.saveLocal(payload);
@@ -164,7 +173,41 @@ export class LeaderboardManager {
       /* ignore */
     }
 
-    const { ok, entries: serverEntries } = await repo.saveRemote(payload);
+    let attempt = 0;
+    const MAX_ATTEMPTS = 3;
+    /** @type {{ok:boolean, conflict:boolean, entries:{id:string,score:number}[]}} */
+    let lastResult = { ok: false, conflict: false, entries: payload };
+    while (attempt < MAX_ATTEMPTS) {
+      lastResult = await repo.saveRemote(payload);
+      if (lastResult.ok) break;
+      if (lastResult.conflict) {
+        // On conflict: adopt server entries + version, merge and retry
+        LeaderboardManager._cacheEntries = lastResult.entries.slice();
+        if (typeof repo._version === "number") LeaderboardManager._version = repo._version;
+        // Rebuild payload by merging local desired entries into server snapshot
+        // (We simply take the higher scores per id, then re-sort)
+        const map = new Map();
+        for (const e of lastResult.entries) map.set(e.id, e.score);
+        for (const e of entries) {
+          const prev = map.get(e.id);
+          // Accept if prior score missing (undefined/null) or lower than new score
+          if (prev === undefined || prev === null || e.score > prev) map.set(e.id, e.score);
+        }
+        const merged = Array.from(map, ([id, score]) => ({ id, score }))
+          .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+          .slice(0, LeaderboardManager.MAX_ENTRIES);
+        payload.splice(0, payload.length, ...merged); // mutate existing array for next attempt
+        if (typeof repo._version === "number") {
+          // repo._version already updated; proceed to next attempt
+        }
+        attempt += 1;
+        continue;
+      }
+      // network or other failure: break (don't infinite loop)
+      break;
+    }
+    const serverEntries = lastResult.entries;
+    if (typeof repo._version === "number") LeaderboardManager._version = repo._version;
     LeaderboardManager._cacheEntries = serverEntries.slice();
     // Dispatch DOM event for backward compatibility
     try {
@@ -184,7 +227,7 @@ export class LeaderboardManager {
     } catch (_) {
       /* ignore */
     }
-    return ok;
+    return lastResult.ok;
   }
 
   /**

@@ -14,6 +14,7 @@ describe("LeaderboardManager remote save", () => {
 
   it("emits event and updates in-memory cache (no localStorage write)", async () => {
     const serverPayload = {
+      version: 1,
       scores: [
         { id: "XYZ", score: 999 },
         { id: "ABC", score: 100 },
@@ -21,12 +22,7 @@ describe("LeaderboardManager remote save", () => {
     };
 
     // Mock fetch to respond to PUT with 200 and the payload
-    globalThis.fetch = async (_url, _opts) => {
-      return {
-        ok: true,
-        json: async () => serverPayload,
-      };
-    };
+    globalThis.fetch = async (_url, _opts) => ({ ok: true, json: async () => serverPayload });
 
     let eventDetail = null;
     window.addEventListener("leaderboard:updated", (e) => {
