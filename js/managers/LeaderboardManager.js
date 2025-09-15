@@ -296,8 +296,12 @@ export class LeaderboardManager {
     } else if (Array.isArray(LeaderboardManager._cacheEntries)) {
       doRender(LeaderboardManager._cacheEntries);
     }
-    // Potential background refresh (remote only) unless within cooldown window
-    if (LeaderboardManager.IS_REMOTE) {
+    // Potential background refresh (remote only) unless within cooldown window.
+    // Suppress in test environments (Vitest/JSDOM) to avoid unintended network calls and flakiness.
+    const g = /** @type {any} */ (typeof globalThis !== "undefined" ? globalThis : {});
+    const proc = g.process;
+    const isTestEnv = !!(proc && proc.env && (proc.env.NODE_ENV === "test" || proc.env.VITEST));
+    if (LeaderboardManager.IS_REMOTE && !isTestEnv) {
       const now = (typeof performance !== "undefined" && performance.now()) || Date.now();
       if (
         now - (LeaderboardManager._lastRemoteSync || 0) >=

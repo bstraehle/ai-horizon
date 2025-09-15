@@ -23,7 +23,7 @@ export class RemoteAdapter {
    * @returns {Promise<T|null>}
    */
   async getJSON(urlOrPath) {
-    //console.log("GET", urlOrPath);
+    // console.log("GET", urlOrPath); // debug helper (disabled)
     if (!this._fetch) return null;
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     const to = controller ? setTimeout(() => controller.abort(), this._timeoutMs) : null;
@@ -49,7 +49,7 @@ export class RemoteAdapter {
    * @returns {Promise<T|null>}
    */
   async putJSON(urlOrPath, body) {
-    //console.log("PUT", urlOrPath, body);
+    // console.log("PUT", urlOrPath, body); // debug helper (disabled)
     if (!this._fetch) return null;
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     const to = controller ? setTimeout(() => controller.abort(), this._timeoutMs) : null;
