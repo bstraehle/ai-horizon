@@ -8,13 +8,24 @@ import { RemoteAdapter } from "../../adapters/RemoteAdapter.js";
  */
 export class LeaderboardRepository {
   /**
+   * Create a new repository instance.
+   *
+   * Behavior / Responsibilities:
+   * - Provides a unified async API for loading & saving leaderboard entries from localStorage and/or a remote endpoint.
+   * - Handles legacy remote shapes: either a plain array or an object containing `scores` + optional `version` / `conflict` flags.
+   * - Maintains a private optimistic concurrency `_version` used on remote PUT requests; updated from server responses.
+   *
+   * Failure Philosophy:
+   * - Local operations almost always succeed (wrapping adapter already guards). Failures return empty arrays / false booleans.
+   * - Remote failures return structured objects with `ok:false` so higher-level retry logic (`LeaderboardManager`) can decide.
+   *
    * @param {{
-   *   key?: string,
-   *   endpoint?: string,
-   *   maxEntries?: number,
-   *   storageAdapter?: StorageAdapter,
-   *   remoteAdapter?: RemoteAdapter,
-   * }} [opts]
+   *   key?: string,                 // Storage key for local persistence.
+   *   endpoint?: string,            // Remote HTTP endpoint root (omit for local-only mode).
+   *   maxEntries?: number,          // Safety upper bound applied on load/save slices.
+   *   storageAdapter?: StorageAdapter, // Injected adapter for testability.
+   *   remoteAdapter?: RemoteAdapter,   // Injected adapter for testability / mocking.
+   * }} [opts] Optional configuration overrides.
    */
   constructor(opts = {}) {
     this.key = opts.key || "aiHorizonLeaderboard";
@@ -24,14 +35,37 @@ export class LeaderboardRepository {
     this._remoteAdapter = opts.remoteAdapter || new RemoteAdapter({});
   }
 
-  /** @returns {Promise<{id:string,score:number}[]>} */
+  /**
+   * Load leaderboard entries from local storage.
+   *
+   * Process:
+   * - Delegates to StorageAdapter.getJSON (returns fallback [] on parse errors).
+   * - Normalizes data shape and truncates to `maxEntries`.
+   *
+   * @returns {Promise<{id:string,score:number}[]>} Normalized entries (possibly empty array).
+   */
   async loadLocal() {
     const parsed = this._storageAdapter.getJSON(this.key, []);
     if (!Array.isArray(parsed)) return [];
     return normalize(parsed).slice(0, this.maxEntries);
   }
 
-  /** @returns {Promise<{id:string,score:number}[]>} */
+  /**
+   * Load leaderboard entries from remote endpoint (if configured).
+   *
+   * Behavior:
+   * - If endpoint is empty, resolves to an empty list (no error).
+   * - Accepts legacy payload forms:
+   *   * Array: [ {id,score}, ... ]
+   *   * Object: { scores:[...], version?:number }
+   * - Stores returned version (or 0) on `_version` for subsequent optimistic `saveRemote` calls.
+   * - Normalizes + truncates result.
+   *
+   * Failure:
+   * - Network / adapter failure surfaces as thrown rejection upstream (adapter returns null? => empty array here).
+   *
+   * @returns {Promise<{id:string,score:number}[]>} Normalized remote entries (empty on missing endpoint or parse failure).
+   */
   async loadRemote() {
     if (!this.endpoint) return [];
     const parsed = await this._remoteAdapter.getJSON(this.endpoint);
@@ -46,18 +80,35 @@ export class LeaderboardRepository {
   }
 
   /**
-   * Save locally (overwrite) – never truncates beyond maxEntries already applied by caller.
-   * @param {{id:string,score:number}[]} entries
-   * @returns {Promise<boolean>}
+   * Persist entries locally (overwrite semantics).
+   *
+   * - Caller expected to have already applied ordering/truncation; method still enforces slice to `maxEntries` defensively.
+   * - Returns boolean success from underlying adapter.
+   *
+   * @param {{id:string,score:number}[]} entries Canonical entries.
+   * @returns {Promise<boolean>} True if write succeeded.
    */
   async saveLocal(entries) {
     return this._storageAdapter.setJSON(this.key, entries.slice(0, this.maxEntries));
   }
 
   /**
-   * Remote save. Returns normalized server entries when available; else falls back to provided.
-   * @param {{id:string,score:number}[]} entries
-   * @returns {Promise<{ok:boolean, conflict:boolean, entries:{id:string,score:number}[]}>}
+   * Attempt remote save (optimistic concurrency aware).
+   *
+   * Protocol:
+   * - Sends { scores:[...], version? } where version is last observed server version (if any).
+   * - Server may return one of:
+   *   * Success: { scores:[...], version:number }
+   *   * Conflict: { conflict:true, version:number, scores:[serverLatest...] }
+   *   * Legacy success: plain array of scores.
+   * - On conflict, returns { ok:false, conflict:true } with server's authoritative entries so caller can merge & retry.
+   * - On network / non-OK response (adapter -> null) returns { ok:false, conflict:false } with client payload (fallback).
+   *
+   * Version Handling:
+   * - `_version` updated on both success and conflict so subsequent retry includes newest version.
+   *
+   * @param {{id:string,score:number}[]} entries Proposed client entries (already normalized & sorted upstream).
+   * @returns {Promise<{ok:boolean, conflict:boolean, entries:{id:string,score:number}[]}>} Structured result for higher-level orchestration.
    */
   async saveRemote(entries) {
     if (!this.endpoint) return { ok: false, conflict: false, entries };

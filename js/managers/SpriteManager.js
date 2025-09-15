@@ -14,8 +14,27 @@ import { CONFIG } from "../constants.js";
  */
 export class SpriteManager {
   /**
-   * Pre-render frequently used sprites to offscreen canvases to reduce per-frame draw cost.
-   * @returns {import('../types.js').SpriteAtlas}
+   * Pre-render & cache frequently used vector effects (bullet + trail, yellow star, red star)
+   * into offscreen canvases to reduce per‑frame draw/setup cost.
+   *
+   * Performance Rationale:
+   * - Avoids repeating gradient construction & complex path stroking in hot render loops.
+   * - Consolidates bullet + trail into a single image blit (height includes trail segment) reducing draw calls.
+   *
+   * Fallback Semantics:
+   * - If a 2D context cannot be created (e.g. JSDOM / headless tests), drawing is skipped and blank canvases are returned;
+   *   downstream render code detects absence of gradient detail and gracefully falls back to entity draw methods.
+   *
+   * Determinism:
+   * - Pure function of CONFIG color constants; no RNG so re‑invocation yields identical pixel data.
+   *
+   * Return Contract:
+   * - `bullet`: Canvas with bullet body + trailing segment; consumer must stretch height to (bullet.height + bulletTrail).
+   * - `bulletTrail`: Numeric trail pixel height to add when drawing.
+   * - `star` / `starRed`: Square canvases sized by `starBaseSize`.
+   * - `starBaseSize`: Base resolution of star sprite; consumer scales down proportionally for final size / pulse.
+   *
+   * @returns {import('../types.js').SpriteAtlas} Sprite atlas object consumed by RenderManager.
    */
   static createSprites() {
     // Bullet sprite (includes trail)

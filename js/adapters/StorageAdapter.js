@@ -6,12 +6,19 @@
  * - Shields callers from JSON.parse exceptions; returns provided fallback instead.
  */
 export class StorageAdapter {
-  /** @param {{storage?: Storage|null}} [opts] */
+  /**
+   * Create a StorageAdapter.
+   * @param {{storage?: Storage|null}} [opts] Optional dependency injection hook (pass mock storage in tests).
+   */
   constructor(opts = {}) {
     this._storage = opts.storage || (typeof localStorage !== "undefined" ? localStorage : null);
   }
 
-  /** @returns {boolean} */
+  /**
+   * Whether an underlying storage implementation is available.
+   * Returns false in environments without Web Storage (SSR / privacy modes).
+   * @returns {boolean}
+   */
   get available() {
     return !!this._storage;
   }

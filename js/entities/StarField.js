@@ -1,7 +1,14 @@
 import { CONFIG } from "../constants.js";
 
 /**
- * Provides static methods for initializing and rendering the animated star field background.
+ * StarField – procedural background star layers (legacy single array or layered structure).
+ *
+ * Modes:
+ *  - Legacy: returns StarData[] when CONFIG.STARFIELD.LAYERS absent/empty.
+ *  - Layered: returns { layers: [{name, stars: StarData[], config:{twinkleRate, twinkleXFactor}}] }.
+ *
+ * Twinkle: alpha modulation by sin(time * twinkleRate + x * twinkleXFactor).
+ * Movement: vertical drift; stars recycled to RESET_Y when passing bottom.
  */
 export class StarField {
   /**
@@ -14,15 +21,18 @@ export class StarField {
    */
 
   /**
-   * Initializes the star field array.
-   * @param {number} width - Canvas width in logical pixels.
-   * @param {number} height - Canvas height in logical pixels.
-   * @returns {StarData[]} Array of star objects.
-   */
-  /**
-   * @param {number} width
-   * @param {number} height
-   * @param {import('../types.js').RNGLike} [rng]
+   * Initialize star field runtime structure.
+   *
+   * Behavior:
+   *  - Builds either flat array or layered object depending on CONFIG.STARFIELD.LAYERS.
+   *  - Each star assigned size/speed/brightness from configurable ranges.
+   *  - Mobile flag reduces count using STARFIELD_COUNT_MOBILE if provided.
+   *
+   * @param {number} width Canvas width.
+   * @param {number} height Canvas height.
+   * @param {import('../types.js').RNGLike} [rng] Optional RNG (nextFloat()).
+   * @param {boolean} [isMobile=false] Mobile flag.
+   * @returns {StarData[] | {layers:Array<{name:string,stars:StarData[],config:{twinkleRate:number,twinkleXFactor:number}}>} }
    */
   static init(width, height, rng, isMobile = false) {
     const rand = rng || { nextFloat: Math.random.bind(Math) };
@@ -78,15 +88,16 @@ export class StarField {
   }
 
   /**
-   * Draws the star field on the canvas.
-   * @param {CanvasRenderingContext2D} ctx - The canvas rendering context.
-   * @param {number} width - Canvas width in logical pixels.
-   * @param {number} height - Canvas height in logical pixels.
-   * @param {StarData[]} starField - Array of star objects.
-   * @param {number} timeSec - Elapsed time in seconds for twinkle.
-   * @param {boolean} [paused=false] - If true, star positions won't advance.
-   * @param {number} [dtSec=CONFIG.TIME.DEFAULT_DT] - Delta time in seconds for movement, ignored if paused.
-   * @param {{ nextFloat:()=>number }=} rng - Optional RNG-like with nextFloat()
+   * Render star field (advances motion unless paused, applies twinkle modulation).
+   *
+   * @param {CanvasRenderingContext2D} ctx 2D context.
+   * @param {number} width Canvas width.
+   * @param {number} height Canvas height.
+   * @param {StarData[] | {layers:Array<{stars:StarData[],config:{twinkleRate:number,twinkleXFactor:number}}>} } starField Runtime structure from init().
+   * @param {number} timeSec Elapsed time seconds.
+   * @param {boolean} [paused=false] If true, vertical advancement disabled.
+   * @param {number} [dtSec=CONFIG.TIME.DEFAULT_DT] Delta seconds.
+   * @param {{ nextFloat:()=>number }=} rng Optional RNG for respawn x jitter.
    */
   static draw(
     ctx,
@@ -145,14 +156,18 @@ export class StarField {
   }
 
   /**
-   * Resize an existing starField array proportionally from previous dimensions to new ones.
-   * Returns a new array reference with scaled x/y positions. Sizes and speeds are scaled by the
-   * average scale factor to preserve appearance.
-   * @param {StarData[]} starField
-   * @param {number} prevW
-   * @param {number} prevH
-   * @param {number} newW
-   * @param {number} newH
+   * Resize star field (legacy or layered) to new canvas dimensions.
+   *
+   * Scaling Strategy:
+   *  - x,y scaled individually; size & speed scaled by average factor for consistent look.
+   *  - Brightness unchanged.
+   *
+   * @param {StarData[] | {layers:Array<{stars:StarData[]}>}} starField Existing structure.
+   * @param {number} prevW Previous width.
+   * @param {number} prevH Previous height.
+   * @param {number} newW New width.
+   * @param {number} newH New height.
+   * @returns {any} New scaled structure matching original shape.
    */
   static resize(starField, prevW, prevH, newW, newH) {
     if (!starField || prevW <= 0 || prevH <= 0) return starField;

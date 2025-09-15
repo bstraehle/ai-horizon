@@ -4,8 +4,19 @@
  */
 export const MAX_DEFAULT = 10;
 
-/** Normalize raw entries into canonical shape (non-mutating). */
-/** @param {{id:any,score:any}[]|any} arr */
+/**
+ * Normalize raw leaderboard entries into a canonical immutable array shape.
+ *
+ * Behavior:
+ * - Coerces each entry's `id` to a string (empty string fallback) and `score` to a finite number (0 fallback).
+ * - Filters nothing: preserves array length for stable indexing; caller can filter separately.
+ * - Defensive: non-array inputs yield an empty array.
+ *
+ * Complexity: O(N) over input length with minimal allocations (new array + small objects).
+ *
+ * @param {{id:any,score:any}[]|any} arr Potential untrusted raw data.
+ * @returns {{id:string,score:number}[]} New normalized array (never the original reference).
+ */
 export function normalize(arr) {
   return Array.isArray(arr)
     ? arr.map((e) => ({ id: String(e?.id || ""), score: Number(e?.score || 0) }))
@@ -13,15 +24,19 @@ export function normalize(arr) {
 }
 
 /**
- * Determine if a score qualifies for initials entry given current entries.
+ * Determine whether a score qualifies for showing the initials input UI.
+ *
  * Rules:
- *  - Score must be > 0.
- *  - If fewer than 3 existing entries, any positive score qualifies (bootstrap behavior).
- *  - Otherwise require the score to exceed at least one of the current top max scores.
- * NOTE: `entries` may be unsorted; function does not mutate the input.
- * @param {number} score
- * @param {{id:string,score:number}[]|null|undefined} entries
- * @param {number} [max=MAX_DEFAULT]
+ * - Score must be a finite positive number (>0).
+ * - Bootstrap: if fewer than 3 existing entries, any positive score qualifies.
+ * - Otherwise sort descending, take top `max`, and succeed if the candidate score strictly beats
+ *   at least one of those (ties do NOT qualify to encourage improvement).
+ * - Fail‑open philosophy: unexpected errors (sorting, data shape) return true to avoid UX dead‑ends.
+ *
+ * @param {number} score Candidate score.
+ * @param {{id:string,score:number}[]|null|undefined} entries Current (possibly unsorted) entries.
+ * @param {number} [max=MAX_DEFAULT] Upper bound list length considered for qualification.
+ * @returns {boolean} True if user should be prompted for initials.
  */
 export function qualifiesForInitials(score, entries, max = MAX_DEFAULT) {
   if (typeof score !== "number" || !Number.isFinite(score) || score <= 0) return false;
@@ -39,10 +54,17 @@ export function qualifiesForInitials(score, entries, max = MAX_DEFAULT) {
 }
 
 /**
- * Produce display label components for an entry.
- * @param {{id:string,score:number}} entry
- * @param {number} index Zero-based rank index
- * @returns {{rank:number,badge:string,medal:string,thumb:boolean,text:string}}
+ * Format a single leaderboard entry into both semantic parts and a composite text string.
+ *
+ * Presentation Rules:
+ * - Medals for ranks 1–3 using emoji (🥇/🥈/🥉).
+ * - Thumbs‑up indicator for ranks >=4 (legacy visual cue).
+ * - Badge displays 1–3 uppercase letters; otherwise '???'.
+ * - Text order: medal? + thumb? + rank — BADGE — score.
+ *
+ * @param {{id:string,score:number}} entry Canonical normalized entry.
+ * @param {number} index Zero‑based index (rank = index + 1).
+ * @returns {{rank:number,badge:string,medal:string,thumb:boolean,text:string}} Structured + textual formatting.
  */
 export function formatRow(entry, index) {
   const rank = index + 1;
@@ -57,9 +79,14 @@ export function formatRow(entry, index) {
 }
 
 /**
- * Format multiple entries in one pass (pure helper).
- * @param {{id:string,score:number}[]} entries
- * @returns {string[]} text rows limited to 100 items (UI safeguard)
+ * Batch format multiple entries into an array of text rows.
+ *
+ * Safeguards:
+ * - Limits output to first 100 entries to avoid pathological DOM list inflation.
+ * - Non-array or empty array returns an empty list (pure behavior).
+ *
+ * @param {{id:string,score:number}[]} entries Normalized entries.
+ * @returns {string[]} Formatted text lines (length <= 100).
  */
 export function formatRows(entries) {
   if (!Array.isArray(entries) || entries.length === 0) return [];

@@ -308,10 +308,12 @@ class AIHorizon {
 
   /**
    * Create a transient score popup drawn on the canvas.
-   * @param {number} x
-   * @param {number} y
-   * @param {number} score
-   * @param {{color?:string,fontSize?:number,fontWeight?:string,glow?:boolean,glowColor?:string,glowBlur?:number,stroke?:string,maxLife?:number}} [opts]
+   * Visual only; does not affect game logic besides animating feedback for scoring events.
+   * Lifespan is short and the popup fades/moves (handled in render/update systems).
+   * @param {number} x Canvas-space X coordinate where popup appears.
+   * @param {number} y Canvas-space Y coordinate where popup appears.
+   * @param {number} score Amount to display (rendered with a + prefix).
+   * @param {{color?:string,fontSize?:number,fontWeight?:string,glow?:boolean,glowColor?:string,glowBlur?:number,stroke?:string,maxLife?:number}} [opts] Visual customization overrides.
    */
   createScorePopup(x, y, score, opts) {
     const o = opts || {};
@@ -333,8 +335,10 @@ class AIHorizon {
 
   /** Create a small gold particle burst for indestructible asteroid kills. */
   /**
-   * @param {number} x
-   * @param {number} y
+   * Radial particle emission used as feedback when an indestructible asteroid is removed.
+   * Uses the shared particle pool to avoid allocations.
+   * @param {number} x Center X coordinate of the burst.
+   * @param {number} y Center Y coordinate of the burst.
    */
   createGoldBurst(x, y) {
     const rng = this.rng;
@@ -357,7 +361,10 @@ class AIHorizon {
 
   /**
    * Detect if the user is on a mobile device.
-   * @returns {boolean} True if mobile device detected, else false.
+   * Multi-strategy heuristic using User-Agent Client Hints, pointer media queries,
+   * and a final UA regex fallback. Cached indirectly via instance field that
+   * callers may store; safe to call repeatedly.
+   * @returns {boolean} True if mobile device detected; false otherwise.
    */
   isMobile() {
     // Prefer User-Agent Client Hints when available
@@ -380,6 +387,8 @@ class AIHorizon {
 
   /**
    * Bind all event handler methods to the current instance.
+   * Must be called once in constructor before registering listeners so that
+   * `removeEventListener` works reliably (stable function identities).
    */
   bindEventHandlers() {
     this.handleKeyDown = this.handleKeyDown.bind(this);
@@ -408,6 +417,7 @@ class AIHorizon {
 
   /**
    * Set up keyboard, mouse, touch, and button event listeners.
+   * Delegates to InputManager for DOM wiring; stores unsubscribe handle for later cleanup.
    */
   setupEventListeners() {
     InputManager.setup(
@@ -474,8 +484,12 @@ class AIHorizon {
 
   /**
    * Determine if the pause state should toggle based on the event and current game state.
-   * @param {KeyboardEvent} e
-   * @returns {boolean}
+   * Guard rails:
+   * - Ignores key repeats.
+   * - Only responds while running or paused.
+   * - Accepts any configured pause/confirm code.
+   * @param {KeyboardEvent} e Keyboard event to evaluate.
+   * @returns {boolean} True if pause should toggle.
    */
   shouldTogglePause(e) {
     if (!this.state.isRunning() && !this.state.isPaused()) return false;

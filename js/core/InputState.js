@@ -4,6 +4,7 @@
  * Design:
  * - Simple POJO style container mutated by InputManager handlers each frame.
  * - Queried by gameplay systems to avoid direct DOM event reliance mid‑loop.
+ * - Kept intentionally minimal; no getters/setters to reduce overhead in hot paths.
  */
 export class InputState {
   constructor() {
@@ -11,7 +12,11 @@ export class InputState {
     this.keys = {};
     /** @type {{ x:number, y:number }} */
     this.mouse = { x: 0, y: 0 };
-    /** @type {boolean} */
+    /**
+     * True while the primary fire control is held (mouse, touch, or key).
+     * Updated by input handlers; consumed by game update for continuous firing.
+     * @type {boolean}
+     */
     this.fireHeld = false;
   }
 

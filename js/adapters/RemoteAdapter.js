@@ -7,7 +7,11 @@
  */
 export class RemoteAdapter {
   /**
+   * Create a RemoteAdapter.
    * @param {{ fetchFn?: typeof fetch, baseUrl?: string, timeoutMs?: number }} [opts]
+   *  - fetchFn: Provide a custom fetch (e.g., mock in tests).
+   *  - baseUrl: Optional prefix automatically prepended to relative paths.
+   *  - timeoutMs: Abort request after this many milliseconds (default 8000).
    */
   constructor(opts = {}) {
     this._fetch = opts.fetchFn || (typeof fetch !== "undefined" ? fetch.bind(globalThis) : null);

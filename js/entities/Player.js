@@ -4,20 +4,25 @@ import { clamp, CONFIG, PI2 } from "../constants.js";
 /** @typedef {{ width:number, height:number }} ViewSize */
 
 /**
- * Player – user-controlled ship handling movement & drawing.
+ * Player – user-controlled ship (movement + drawing only; side-effects externalized).
  *
  * Responsibilities:
- * - Merge discrete keyboard control with fallback mouse steering (keyboard wins when pressed).
- * - Maintain positional state & clamp to current view bounds.
- * - Render a lightweight emoji-inspired rocket via immediate mode canvas calls.
+ *  - Reconcile keyboard vs mouse steering (keyboard dominance to avoid jitter).
+ *  - Clamp position to dynamic view bounds each frame.
+ *  - Provide bounding box for collision queries.
+ *  - Draw an emoji-inspired rocket (single path operations) for minimal overdraw.
  *
- * Input precedence:
- * - Keyboard active when any movement key held; mouse ignored to avoid jittery mixing.
- * - When no keys: rocket smoothly lerps toward cursor center (using CONFIG.PLAYER.MOUSE_LERP).
+ * Input Precedence:
+ *  - If any movement key pressed (arrows / WASD) => keyboard path, ignore mouse.
+ *  - Else, smooth-lerp center toward mouse (CONFIG.PLAYER.MOUSE_LERP factor per second).
  *
- * Rendering complexity intentionally kept local rather than split into sub-entities to
- * reduce draw call overhead and keep the visual cohesive. Effects (engine trail, particles)
- * are handled by separate entity systems.
+ * Performance Notes:
+ *  - Update: O(1) arithmetic + clamp; no allocations.
+ *  - Draw: single complex path + a few simple shapes; no gradients inside loops.
+ *
+ * Separation of Concerns:
+ *  - Engine flame particles handled by EngineTrail / external systems.
+ *  - Shooting / scoring handled elsewhere (Player holds no gameplay timers here).
  */
 export class Player {
   /**
@@ -35,8 +40,19 @@ export class Player {
     this.speed = speed;
   }
 
-  /** Update position from keyboard or mouse.
-   * @param {KeyMap} input @param {Point} mousePos @param {ViewSize} view @param {number} [dtSec]
+  /**
+   * Update player position using keyboard dominance or mouse lerp fallback.
+   *
+   * Keyboard Path:
+   *  - Applies directional deltas scaled by dtSec * speed.
+   * Mouse Path:
+   *  - Lerp factor = clamp(MOUSE_LERP * dtSec, 0..1) (prevents overshoot at large dt).
+   *
+   * Invariants: position clamped within [0, view - size].
+   * @param {KeyMap} input Key state map (true = pressed).
+   * @param {Point} mousePos Current mouse coords (canvas space) used only when no key pressed.
+   * @param {ViewSize} view Current playable area (width/height).
+   * @param {number} [dtSec=CONFIG.TIME.DEFAULT_DT] Delta seconds.
    */
   update(input, mousePos, view, dtSec = CONFIG.TIME.DEFAULT_DT) {
     const keyboardPressed =
@@ -66,14 +82,14 @@ export class Player {
   }
 
   /**
-   * Draw the player rocket.
-   * Layers (in order):
-   * 1. Body with vertical gradient + outline
-   * 2. Side fins (mirrored) sharing stroke for coherence
-   * 3. Cockpit window radial-ish gradient
-   * 4. Gun/nozzle rectangle
-   * 5. Engine flame with radial gradient + triangle mask
-   * @param {CanvasRenderingContext2D} ctx
+   * Draw rocket layers (body, fins, cockpit, gun, flame).
+   * Layer Order:
+   *  1. Body (grad + outline)
+   *  2. Fins (mirrored red shapes)
+   *  3. Cockpit window (blue gradient circle)
+   *  4. Gun/nozzle rectangle
+   *  5. Engine flame triangle w/ radial gradient
+   * @param {CanvasRenderingContext2D} ctx 2D context.
    */
   draw(ctx) {
     // Draw a rounded rocket that resembles the 🚀 emoji:
@@ -186,7 +202,10 @@ export class Player {
     ctx.restore();
   }
 
-  /** Returns the axis-aligned bounding box for collisions. */
+  /**
+   * Provide axis-aligned bounding box (collision system input).
+   * @returns {{x:number,y:number,width:number,height:number}}
+   */
   getBounds() {
     return { x: this.x, y: this.y, width: this.width, height: this.height };
   }

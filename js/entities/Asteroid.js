@@ -13,14 +13,34 @@ import { CONFIG, PI2 } from "../constants.js";
  */
 export class Asteroid {
   /**
-   * @param {number} x
-   * @param {number} y
-   * @param {number} width
-   * @param {number} height
-   * @param {number} speed
-   * @param {import('../types.js').RNGLike} [rng]
-   * @param {boolean} [isIndestructible=false]
-   * @param {any} [paletteOverride]
+   * Construct a new asteroid / planet entity (or reset template when pooled).
+   *
+   * Purpose:
+   *  - Represent a falling obstacle with optional indestructible (planet) styling.
+   *  - Optionally generate textured crater emboss geometry (visual only) with reveal animation.
+   *  - Parameterize color palette & speed via palette overrides or randomized planet palettes.
+   *
+   * Crater Generation:
+   *  - Count = base + variable (see CONFIG.ASTEROID.CRATER_EMBOSS COUNT_* keys).
+   *  - Reserve list preallocated when EXTRA_MAX > 0 to allow progressive damage reveal on planets.
+   *  - Each crater stores relative offset (dx,dy), radius r, and transient grow factor for reveal.
+   *
+   * Indestructible Planets:
+   *  - Use alternate palette list (ASTEROID_PLANETS) or provided override for thematic variety.
+   *  - Track hits to drive crack line rendering & crater activation.
+   *
+   * Performance Notes:
+   *  - Heavy math only during construction/reset (random generation). Per-frame update is O(craters).
+   *  - Drawing loops over craters; configuration allows disabling emboss entirely for perf.
+   *
+   * @param {number} x World x (top-left)
+   * @param {number} y World y (top-left)
+   * @param {number} width Diameter proxy (used to derive radius)
+   * @param {number} height Diameter proxy (kept for symmetry with other entities; should match width)
+   * @param {number} speed Downward speed (pixels/sec before palette speed factor)
+   * @param {import('../types.js').RNGLike} [rng] Optional deterministic RNG (nextFloat())
+   * @param {boolean} [isIndestructible=false] If true behaves like a multi‑hit planet
+   * @param {any} [paletteOverride] Optional palette object to force style (used for curated planets)
    */
   constructor(x, y, width, height, speed, rng, isIndestructible = false, paletteOverride = null) {
     this.x = x;
@@ -83,6 +103,15 @@ export class Asteroid {
     /** @type {{angle:number,len:number}[]} */ this._damageLines = [];
   }
 
+  /**
+   * Advance vertical position and animate crater reveal grows.
+   *
+   * Side Effects:
+   *  - Mutates y, crater grow factors.
+   *
+   * Complexity: O(C) where C = current crater count.
+   * @param {number} [dtSec=CONFIG.TIME.DEFAULT_DT] Delta time seconds.
+   */
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
     this.y += this.speed * dtSec;
     const cfg = CONFIG.ASTEROID.CRATER_EMBOSS;
@@ -96,8 +125,19 @@ export class Asteroid {
   }
 
   /**
-   * Render the asteroid.
-   * @param {CanvasRenderingContext2D} ctx
+   * Render asteroid / planet with gradient fill, crater emboss lighting, damage cracks and shield variance.
+   *
+   * Rendering Pipeline:
+   *  1. Body radial gradient (palette GRAD_*).
+   *  2. Optional crater base fill + inner shadow + highlight arcs (per crater).
+   *  3. Outline stroke (thicker if indestructible).
+   *  4. Damage crack splines proportional to hit severity (planets only).
+   *
+   * Perf Considerations:
+   *  - Uses multiple gradients; try disabling CRATER_EMBOSS for low-end devices.
+   *  - Crack generation limited by pushes in onBulletHit (bounded ~5 lines + final crack).
+   *
+   * @param {CanvasRenderingContext2D} ctx Target 2D context (state restored before return).
    */
   draw(ctx) {
     ctx.save();
@@ -235,20 +275,30 @@ export class Asteroid {
     ctx.restore();
   }
 
+  /**
+   * Get current axis-aligned bounding box for collision grid.
+   * @returns {{x:number,y:number,width:number,height:number}}
+   */
   getBounds() {
     return { x: this.x, y: this.y, width: this.width, height: this.height };
   }
 
   /**
-   * Reset for object pooling.
-   * @param {number} x
-   * @param {number} y
-   * @param {number} width
-   * @param {number} height
-   * @param {number} speed
-   * @param {import('../types.js').RNGLike} [rng]
-   * @param {boolean} [isIndestructible=false]
-   * @param {any} [paletteOverride]
+   * Reinitialize instance for reuse from object pool.
+   * Mirrors constructor logic (must stay in sync with crater generation & palette selection).
+   *
+   * Differences vs constructor:
+   *  - Does not clear properties already re-assigned (simply overwrites all entity state).
+   *  - Sets _initialCraterCount to undefined when emboss disabled to allow later enable logic.
+   *
+   * @param {number} x New x
+   * @param {number} y New y
+   * @param {number} width Diameter proxy
+   * @param {number} height Diameter proxy
+   * @param {number} speed Base downward speed
+   * @param {import('../types.js').RNGLike} [rng] Optional deterministic RNG
+   * @param {boolean} [isIndestructible=false] Planet mode flag
+   * @param {any} [paletteOverride] Optional palette override
    */
   reset(x, y, width, height, speed, rng, isIndestructible = false, paletteOverride = null) {
     this.x = x;
@@ -313,7 +363,17 @@ export class Asteroid {
     this.speed = speedFactor ? speed * speedFactor : speed;
   }
 
-  /** @param {any} [game] */
+  /**
+   * Register a bullet impact.
+   *
+   * Behavior:
+   *  - Destructible asteroid: returns true immediately (caller should remove it) and no visual cracks.
+   *  - Indestructible planet: increments hit counter, adds damage line (capped), may activate extra craters.
+   *  - Spawns crater dust particles for newly activated craters if puff feature enabled.
+   *
+   * @param {any} [game] Minimal game facade providing particlePool / particles array (optional). If absent, dust ignored.
+   * @returns {boolean} true when entity should be destroyed (regular) or when planet reached max hits.
+   */
   onBulletHit(game) {
     if (!this.isIndestructible) return true;
     this._hits = (this._hits || 0) + 1;
@@ -359,7 +419,13 @@ export class Asteroid {
     return this._hits >= (CONFIG.ASTEROID.INDESTRUCTIBLE_HITS || 10);
   }
 
-  /** @param {Crater} crater @param {{particlePool:any,particles:any[],rng?:any}} game */
+  /**
+   * Spawn crater dust particle fan once per crater.
+   *
+   * Side Effects: pushes new particles (if pool acquire succeeds) into game.particles.
+   * @param {Crater} crater Activated crater descriptor.
+   * @param {{particlePool:any,particles:any[],rng?:any}} game Game particle context.
+   */
   _spawnCraterDust(crater, game) {
     if (!game || !game.particlePool || !game.particles) return;
     if (crater._puffed) return;

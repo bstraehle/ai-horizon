@@ -25,14 +25,22 @@ import { CONFIG } from "../constants.js";
  */
 
 /**
- * getGameContext – build a read‑only snapshot passed to stateless managers.
- *
- * Goals:
- * - Narrow surface area exposed to background / render logic (prevents tight coupling to full game instance).
- * - Provide consistent timing + platform flags without exposing mutable collections directly.
- * - Avoid allocations beyond the shallow object (simple pass‑through of existing references).
- *
- * @param {any} game
+ * getGameContext – construct a lightweight snapshot consumed by stateless managers (render, background, etc.).
+ * Purpose: Provide only the fields external systems need while insulating internal mutable arrays & logic.
+ * Allocation: Creates one shallow object; nested references (ctx, view, background objects) are reused.
+ * Immutability Contract: Callers MUST treat the returned object and its nested properties as read-only.
+ * Field Summary:
+ *  - ctx: Canvas 2D context used for draw calls.
+ *  - view: { width, height, dpr } describing the logical viewport.
+ *  - running / paused / gameOver: FSM-derived phase flags.
+ *  - animTime: Cumulative time in ms since game start (monotonic per session).
+ *  - timeSec: Same as animTime but seconds.
+ *  - dtSec: Delta time of last fixed update step.
+ *  - timerRemaining / timerSeconds: Countdown state (may be undefined when feature disabled).
+ *  - isMobile: Platform heuristic for adaptive spawning / speeds.
+ *  - rng: Deterministic RNG interface for background / effects.
+ *  - background: { nebulaConfigs, starField } for background rendering.
+ * @param {any} game Game instance (AIHorizon) providing source state.
  * @returns {GameContext}
  */
 export function getGameContext(game) {

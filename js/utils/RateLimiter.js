@@ -1,18 +1,38 @@
 /**
- * RateLimiter – fixed-interval gate for discrete repeatable actions (e.g. firing, spawning).
+ * RateLimiter – time gate enforcing a minimum interval between accepted actions.
  *
- * Responsibilities:
- * - Enforce a minimum elapsed time between successful attempts.
- * - Provide a side‑effect free probe (`try`) that signals allowance via boolean result.
+ * Purpose
+ * -------
+ * Wraps a monotonic time source to allow an operation only when the configured interval has fully
+ * elapsed since the last permitted execution. Useful for throttling projectile fire, spawn waves,
+ * network sync bursts, or UI interaction cooldowns.
  *
- * Design notes:
- * - Optional injected time source improves determinism in unit tests & replay scenarios.
- * - `try(fn)` pattern keeps call sites concise (no separate branch when allowed).
+ * Behavior
+ * --------
+ * - try(fn?): If current time >= next allowed timestamp, schedules next window and optionally
+ *   invokes the provided callback, returning true. Otherwise returns false with no side effects.
+ * - reset(): Clears the internal schedule so the next try succeeds immediately.
+ * - setInterval(ms): Adjusts the gating interval (does not retroactively modify already scheduled nextAt).
+ *
+ * Determinism
+ * -----------
+ * Deterministic when supplied with a deterministic `getTimeMs` function (e.g., a manual test clock).
+ * Default time source uses `performance.now` (high‑resolution) or `Date.now` fallback.
+ *
+ * Performance
+ * -----------
+ * All operations O(1). Stores only scalar timestamps. No allocations after construction.
+ *
+ * Failure Modes / Edge Cases
+ * --------------------------
+ * - Negative interval coerced via bitwise OR to signed 32-bit integer then used (may allow rapid fire).
+ * - Large intervals supported (int range); overflow in nextAt only for extreme values > ~2^53 ms.
+ * - Callback exceptions propagate (no catch) preserving fail-fast semantics.
  */
 export class RateLimiter {
   /**
-   * @param {number} intervalMs - Minimum time between allowed calls.
-   * @param {() => number} [getTimeMs] - Function returning the current time in milliseconds; defaults to performance.now/Date.now.
+   * @param {number} intervalMs Minimum elapsed milliseconds required between accepted attempts.
+   * @param {() => number} [getTimeMs] Optional custom time source for deterministic testing.
    */
   constructor(intervalMs, getTimeMs) {
     this._interval = intervalMs | 0;
@@ -24,9 +44,10 @@ export class RateLimiter {
   }
 
   /**
-   * Attempt to execute a function if the limiter allows it.
-   * @param {() => void} [fn]
-   * @returns {boolean} true if executed, false otherwise
+   * Attempt a gated action.
+   * Success Path: Updates internal next allowable timestamp and calls `fn` (if provided).
+   * @param {() => void} [fn] Optional side-effect to execute when allowed.
+   * @returns {boolean} True if action allowed (and executed), false if still cooling down.
    */
   try(fn) {
     const now = this._now();
@@ -38,14 +59,14 @@ export class RateLimiter {
     return false;
   }
 
-  /** Reset the limiter to allow an immediate next call. */
+  /** Reset cooldown so the very next try() succeeds immediately. */
   reset() {
     this._nextAt = 0;
   }
 
   /**
-   * Update the interval (milliseconds) used by this limiter.
-   * @param {number} intervalMs
+   * Change the enforced interval going forward (does not adjust already scheduled _nextAt).
+   * @param {number} intervalMs New interval in ms.
    */
   setInterval(intervalMs) {
     this._interval = intervalMs | 0;

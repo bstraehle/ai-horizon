@@ -1,14 +1,28 @@
 import { CONFIG } from "../constants.js";
 
 /**
- * Provides static methods for rendering the main game background gradient.
+ * Background – static utility for painting the vertical space gradient.
+ *
+ * Purpose:
+ *  - Provide a single inexpensive fill each frame before any parallax / entities render.
+ *  - Centralize palette usage (CONFIG.COLORS.BACKGROUND) for theme adjustments.
+ *
+ * Design Notes:
+ *  - No state retained; stateless pure helper aside from canvas side-effects.
+ *  - Gradient recreated each call (fast enough for typical canvas sizes; could be cached if profiling warrants).
+ *
+ * Failure Modes: none (guards not required; relies on valid ctx).
  */
 export class Background {
   /**
-   * Draws the background gradient.
-   * @param {CanvasRenderingContext2D} ctx - The canvas rendering context.
-   * @param {number} width - Canvas width in logical pixels.
-   * @param {number} height - Canvas height in logical pixels.
+   * Paint the background gradient from TOP -> MID -> BOTTOM colors.
+   *
+   * Side Effects: mutates canvas drawing state (restored via save/restore).
+   * Performance: single rect fill; negligible vs entity rendering.
+   *
+   * @param {CanvasRenderingContext2D} ctx Target 2D context.
+   * @param {number} width Canvas logical width.
+   * @param {number} height Canvas logical height.
    */
   static draw(ctx, width, height) {
     ctx.save();

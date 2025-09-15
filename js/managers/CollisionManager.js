@@ -46,8 +46,18 @@ const ARR_POOL_MAX = 256;
  * It operates on the passed `game` instance to avoid broad refactors.
  */
 export class CollisionManager {
-  /** Get an empty array from the pool (or a new one).
-   * @returns {any[]}
+  /**
+   * Acquire an empty array from the module‑scoped pool (or create a new one).
+   *
+   * Rationale:
+   * - Spatial hash construction and neighborhood queries allocate many short‑lived arrays per frame.
+   * - Pooling avoids GC churn / minor collection pauses at high bullet + asteroid counts.
+   *
+   * Contract:
+   * - Returned array MUST be released via `_releaseArr` after use.
+   * - Contents are unspecified (array is always length=0 on return).
+   *
+   * @returns {any[]} Reusable empty array.
    * @private
    */
   static _getArr() {
@@ -55,8 +65,17 @@ export class CollisionManager {
     return arr !== undefined ? arr : [];
   }
 
-  /** Return an array to the pool after clearing it.
-   * @param {any[]} arr
+  /**
+   * Return an array to the pool after clearing it (length reset only – elements eligible for GC).
+   *
+   * Pool Limits:
+   * - Pool is capped at ARR_POOL_MAX to prevent unbounded memory growth during stress tests.
+   *
+   * Safety:
+   * - Idempotent for arrays already length=0.
+   * - Caller MUST NOT use the array after release (treated as borrowed resource).
+   *
+   * @param {any[]} arr Borrowed array previously obtained via `_getArr`.
    * @returns {void}
    * @private
    */
@@ -67,11 +86,15 @@ export class CollisionManager {
     }
   }
   /**
-   * Axis-aligned bounding box collision detection (strict AABB).
-   * Accepts either raw rects or objects exposing getBounds().
-   * @param {Rect | { getBounds: () => Rect }} rect1
-   * @param {Rect | { getBounds: () => Rect }} rect2
-   * @returns {boolean}
+   * Axis‑aligned bounding box intersection test (strict AABB) with duck typing.
+   *
+   * Behavior:
+   * - If an object exposes `getBounds():Rect`, that value is used; otherwise the object itself is assumed Rect‑like.
+   * - No allocations: all work is scalar comparisons.
+   *
+   * @param {Rect | { getBounds: () => Rect }} rect1 First rectangle or bounds provider.
+   * @param {Rect | { getBounds: () => Rect }} rect2 Second rectangle or bounds provider.
+   * @returns {boolean} True if rectangles overlap (non‑separated on both axes).
    */
   static intersects(rect1, rect2) {
     /** @type {Rect} */
@@ -98,8 +121,34 @@ export class CollisionManager {
   }
 
   /**
-   * Perform all collision checks and trigger events/removals.
-   * @param {import('../types.js').CollisionGameSlice} game - The game instance slice.
+   * Perform all collision detection phases for the current frame.
+   *
+   * Phases:
+   * 1. Build spatial hash grid of asteroids (broad phase acceleration structure).
+   * 2. Bullet→Asteroid tests using neighborhood lookup via grid buckets.
+   * 3. Player→Asteroid early‑exit lethal check.
+   * 4. Player→Star collection pass.
+   * 5. Cleanup: recycle temporary arrays / grid buckets back into pool.
+   *
+   * Events Emitted (if game.events present):
+   * - 'bulletHitAsteroid' { asteroid, bullet }
+   * - 'playerHitAsteroid' { asteroid }
+   * - 'collectedStar' { star }
+   *
+   * Object Pool Interactions:
+   * - Releases consumed bullets/asteroids/stars back into their respective pools when removed.
+   *
+   * Complexity:
+   * - Building grid: O(A * C) where C is average cell coverage (1–4 typical).
+   * - Bullet queries: O(B * (C + M)) where M is avg asteroids in queried buckets (small under uniform distribution).
+   * - Worst case (all in one cell): O(B*A) but rare and still fast at tested scales.
+   *
+   * Safety / Edge Cases:
+   * - Guards against null bullet entries.
+   * - Indestructible asteroids may invoke custom onBulletHit/onShieldHit handlers controlling destruction.
+   * - Early return after player death prevents unnecessary star checks.
+   *
+   * @param {import('../types.js').CollisionGameSlice} game Game slice containing entities & pools.
    * @returns {void}
    */
   static check(game) {

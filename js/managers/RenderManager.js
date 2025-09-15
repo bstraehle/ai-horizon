@@ -24,8 +24,14 @@ import { CONFIG } from "../constants.js";
  */
 export class RenderManager {
   /**
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {any[]} asteroids
+   * Draw all asteroids in their deterministic order.
+   *
+   * Performance:
+   * - Hot path: simple for loop avoids iterator overhead.
+   * - Assumes each asteroid exposes a zero‑alloc draw(ctx) method.
+   *
+   * @param {CanvasRenderingContext2D} ctx Target 2D context.
+   * @param {any[]} asteroids Asteroid entity list.
    */
   static drawAsteroids(ctx, asteroids) {
     for (let i = 0; i < asteroids.length; i++) {
@@ -34,9 +40,15 @@ export class RenderManager {
   }
 
   /**
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {any[]} bullets
-   * @param {any} sprites
+   * Draw bullets (and their trail) using sprite atlas when available; fallback to per‑bullet draw.
+   *
+   * Behavior:
+   * - When a pre‑rendered bullet sprite exists, draws a single atlas slice scaling height to include trail region.
+   * - Otherwise delegates to bullet.draw for compatibility / test environments (no DOM / offscreen failure).
+   *
+   * @param {CanvasRenderingContext2D} ctx Target 2D context.
+   * @param {any[]} bullets Bullet list.
+   * @param {any} sprites Optional sprite atlas object (from SpriteManager.createSprites()).
    */
   static drawBullets(ctx, bullets, sprites) {
     const spr = sprites && sprites.bullet;
@@ -57,10 +69,16 @@ export class RenderManager {
   }
 
   /**
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {any[]} stars
-   * @param {any} sprites
-   * @param {number} [timeSec]
+   * Draw collectible (foreground) stars with pulse animation & red variant support.
+   *
+   * Behavior:
+   * - Uses pre‑rendered star or red star sprite if available, scaling with optional pulse modulation.
+   * - Falls back to entity draw when sprites missing (test / minimal mode).
+   *
+   * @param {CanvasRenderingContext2D} ctx Target 2D context.
+   * @param {any[]} stars Star entities.
+   * @param {any} sprites Optional sprite atlas (may contain star/starRed).
+   * @param {number} [timeSec] Absolute time (seconds) used for pulse phase.
    */
   static drawCollectibleStars(ctx, stars, sprites, timeSec = 0) {
     const starSpr = sprites && sprites.star;
@@ -92,8 +110,9 @@ export class RenderManager {
   }
 
   /**
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {any[]} explosions
+   * Draw active explosion animations.
+   * @param {CanvasRenderingContext2D} ctx 2D context.
+   * @param {any[]} explosions Explosion entities.
    */
   static drawExplosions(ctx, explosions) {
     for (let i = 0; i < explosions.length; i++) {
@@ -102,8 +121,13 @@ export class RenderManager {
   }
 
   /**
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {any[]} particles
+   * Draw transient particle effects (engine sparks, debris, etc.).
+   *
+   * State Reset:
+   * - Ensures ctx.globalAlpha restored to 1 after iteration because particles may modify it.
+   *
+   * @param {CanvasRenderingContext2D} ctx 2D context.
+   * @param {any[]} particles Particle entities.
    */
   static drawParticles(ctx, particles) {
     for (let i = 0; i < particles.length; i++) {
@@ -113,8 +137,23 @@ export class RenderManager {
   }
 
   /**
-   * Draw the entire game frame in the correct order.
-   * @param {any} game
+   * Composite the full frame respecting deterministic layering.
+   *
+   * Layer Order:
+   *  1. Background (via game.drawBackground())
+   *  2. Asteroids
+   *  3. Bullets + collectible stars
+   *  4. Explosions
+   *  5. Particles
+   *  6. Player ship
+   *  7. Engine trail (after ship for glow overlap)
+   *  8. Score popups (text overlays)
+   *
+   * Safety:
+   * - Guards optional drawBackground / engineTrail presence.
+   * - Removes expired score popups in-place (reverse iteration) to avoid skipping elements.
+   *
+   * @param {any} game Aggregate game object exposing ctx + entity arrays.
    */
   static draw(game) {
     // Background

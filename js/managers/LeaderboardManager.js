@@ -112,10 +112,23 @@ export class LeaderboardManager {
   }
 
   /**
-   * Load leaderboard entries (safe).
-   * Always returns a Promise resolving to the array.
-   * @param {{remote?:boolean}=} options
-   * @returns {Promise<{id:string,score:number}[]>}
+   * Load leaderboard entries with caching + optional remote fetch.
+   *
+   * Behavior:
+   * - Returns in‑flight promise if a load is already pending to prevent duplicate network calls (de‑dupe).
+   * - When `remote:false` and cache populated, resolves immediately with a copy (fast path, no I/O).
+   * - When remote, updates `_lastRemoteSync` timestamp for cooldown logic in `render`.
+   * - Captures version from repository to support optimistic concurrency in subsequent `save` calls.
+   *
+   * Failure Handling:
+   * - Any adapter/network error yields empty array (swallowed) so UI can gracefully degrade.
+   * - Pending promise cleared in finally to allow retries.
+   *
+   * Caching:
+   * - `_cacheEntries` always set to a fresh copy of loaded entries for synchronous lookups.
+   *
+   * @param {{remote?:boolean}=} options Set `remote:true` to force remote fetch even if cache exists.
+   * @returns {Promise<{id:string,score:number}[]>} Normalized entries (possibly empty array) – never rejects.
    */
   static async load({ remote = this.IS_REMOTE } = {}) {
     if (LeaderboardManager._pendingLoadPromise) return LeaderboardManager._pendingLoadPromise;
@@ -148,11 +161,27 @@ export class LeaderboardManager {
   }
 
   /**
-   * Save leaderboard entries (safe).
-   * Always returns a Promise resolving to boolean.
-   * @param {{id:string,score:number}[]} entries
-   * @param {{remote?:boolean}=} options
-   * @returns {Promise<boolean>}
+   * Persist leaderboard entries (local or remote) with optimistic concurrency & conflict resolution.
+   *
+   * Local Mode:
+   * - Writes immediately via repository; updates cache only on success.
+   *
+   * Remote Mode:
+   * - Optimistic UI update: cache updated & list rendered before network round‑trip completes.
+   * - Up to 3 attempts on version conflict. Merge strategy picks max score per id, re‑sorts, truncates.
+   * - Network / non‑conflict failure aborts retry loop early.
+   * - Always refreshes DOM list after final result (success or best effort) and emits 'leaderboard:updated'.
+   *
+   * Concurrency:
+   * - Uses stored `_version` (if known) to include in payload enabling server optimistic checks.
+   * - Updates `_version` from repository after each attempt.
+   *
+   * Return Value:
+   * - Boolean indicating ultimate success (server accepted) vs failure (still possibly updated cache optimistically).
+   *
+   * @param {{id:string,score:number}[]} entries Canonical sorted entries to persist (caller ensures ordering).
+   * @param {{remote?:boolean}=} options Set remote true to attempt HTTP save; false for local only.
+   * @returns {Promise<boolean>} True if remote/local persistence definitively succeeded.
    */
   static async save(entries, { remote = this.IS_REMOTE } = {}) {
     const payload = entries.slice(0, LeaderboardManager.MAX_ENTRIES);
@@ -243,12 +272,18 @@ export class LeaderboardManager {
   }
 
   /**
-   * Submit a score and persist top-N.
-   * Always returns a Promise resolving to boolean.
-   * @param {number} score
-   * @param {string} userId
-   * @param {{remote?:boolean}=} options
-   * @returns {Promise<boolean>}
+   * Submit a single score (append + sort + truncate + save).
+   *
+   * Flow:
+   * - Validates positive finite score; rejects invalid silently with false (UI convenience).
+   * - Loads existing entries (possibly remote) then inserts new (id validated against /^[A-Z]{1,3}$/).
+   * - Stable ordering: higher score first; ties resolved by lexicographic id (deterministic for tests).
+   * - Delegates persistence to `save` (inherits its optimistic/concurrency behavior).
+   *
+   * @param {number} score Raw numeric score (floored to integer).
+   * @param {string} userId User provided 1–3 uppercase letters; fallback '???' if invalid.
+   * @param {{remote?:boolean}=} options Whether to also sync remotely.
+   * @returns {Promise<boolean>} True if ultimately persisted (see save docs for semantics).
    */
   static async submit(score, userId, { remote = false } = {}) {
     if (typeof score !== "number" || !Number.isFinite(score) || score <= 0) return false;
@@ -262,10 +297,22 @@ export class LeaderboardManager {
   }
 
   /**
-   * Render leaderboard into an ordered list element.
-   * If `entries` provided, uses them directly; otherwise resolves via `load()`.
-   * @param {HTMLElement|null} listEl
-   * @param {{id:string,score:number}[]=} entries
+   * Render the current (or provided) leaderboard into an <ol>/<ul> element.
+   *
+   * Behavior:
+   * - If explicit `entries` provided: renders them immediately (skips remote fetch) for caller-controlled flows.
+   * - Else renders cached entries (if any) and optionally schedules a background remote refresh if cooldown elapsed.
+   * - Background refresh suppressed in test environments (NODE_ENV=test or VITEST) to avoid flaky network calls.
+   *
+   * Cooldown Logic:
+   * - Remote refresh only attempted if `now - _lastRemoteSync >= REMOTE_REFRESH_COOLDOWN_MS`.
+   * - Prevents spamming endpoint on rapid UI re-renders (e.g., focus changes).
+   *
+   * DOM Safety:
+   * - Best-effort; failures are swallowed. Removes all children then appends new <li> rows or 'No scores yet'.
+   *
+   * @param {HTMLElement|null} listEl Target list element (ignored if null).
+   * @param {{id:string,score:number}[]=} entries Optional pre-fetched entries to render directly.
    */
   static render(listEl, entries) {
     if (!listEl) return;

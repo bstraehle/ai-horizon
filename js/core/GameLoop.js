@@ -19,13 +19,17 @@ import { CONFIG } from "../constants.js";
  */
 export class GameLoop {
   /**
+   * Create a GameLoop.
+   * Purpose: Drive a deterministic fixed-step simulation with a decoupled render pass.
+   * Timing Model: Accumulates elapsed frame time; executes up to maxSubSteps fixed updates of size stepMs.
+   * Overrun Guard: Clamps per-frame catch-up to stepMs * maxSubSteps to avoid spiral-of-death.
    * @param {{
-   *   update: (dtMs:number, dtSec:number) => void,
-   *   draw: (frameDtMs:number) => void,
-   *   shouldUpdate?: () => boolean,
-   *   stepMs?: number,
-   *   maxSubSteps?: number
-   * }} opts
+   *   update: (dtMs:number, dtSec:number) => void, // Called once per fixed step.
+   *   draw: (frameDtMs:number) => void,             // Called once per animation frame (after updates).
+   *   shouldUpdate?: () => boolean,                // Gate to pause simulation while still drawing.
+   *   stepMs?: number,                             // Fixed step size (ms).
+   *   maxSubSteps?: number                         // Max update iterations per frame.
+   * }} opts Configuration object.
    */
   constructor(opts) {
     this._update = opts.update;
@@ -40,7 +44,11 @@ export class GameLoop {
     this._tick = this._tick.bind(this);
   }
 
-  /** Start the loop (idempotent). */
+  /**
+   * Start the loop (idempotent).
+   * Effects: Resets accumulator & timestamps; schedules first RAF.
+   * Guard: No-op if already running.
+   */
   start() {
     if (this._running) return;
     this._running = true;
@@ -49,7 +57,11 @@ export class GameLoop {
     this._rafId = requestAnimationFrame(this._tick);
   }
 
-  /** Stop the loop (idempotent). */
+  /**
+   * Stop the loop (idempotent).
+   * Effects: Cancels outstanding RAF and marks not running.
+   * Guard: No-op if not running.
+   */
   stop() {
     if (!this._running) return;
     this._running = false;
@@ -59,6 +71,12 @@ export class GameLoop {
 
   /**
    * Internal RAF callback.
+   * Flow:
+   * 1. Compute frame delta.
+   * 2. Accumulate (clamped) and perform up to maxSubSteps updates while accumulator >= step.
+   * 3. Invoke draw once with raw frame delta (for transient visual effects).
+   * 4. Queue next RAF if still running.
+   * Paused Behavior: If shouldUpdate() returns false, accumulator is reset (prevents large jump on resume).
    * @param {number} now High-resolution timestamp from requestAnimationFrame.
    * @private
    */

@@ -19,37 +19,69 @@ export class GameStateMachine {
     this.state = "menu";
   }
 
-  /** @returns {boolean} */ isRunning() {
+  /**
+   * Predicate: is the simulation actively advancing?
+   * @returns {boolean}
+   */
+  isRunning() {
     return this.state === "running";
   }
-  /** @returns {boolean} */ isPaused() {
+  /**
+   * Predicate: is the game temporarily halted (can resume to running)?
+   * @returns {boolean}
+   */
+  isPaused() {
     return this.state === "paused";
   }
-  /** @returns {boolean} */ isMenu() {
+  /**
+   * Predicate: initial/menu state (pre-game or after full reset).
+   * @returns {boolean}
+   */
+  isMenu() {
     return this.state === "menu";
   }
-  /** @returns {boolean} */ isGameOver() {
+  /**
+   * Predicate: terminal state until player initiates a restart.
+   * @returns {boolean}
+   */
+  isGameOver() {
     return this.state === "gameover";
   }
 
-  /** Transition to running from menu/gameover/paused. */
+  /**
+   * Transition: running.
+   * Allowed From: menu | gameover | paused.
+   * No-op if already running.
+   */
   start() {
     if (this.state === "menu" || this.state === "gameover" || this.state === "paused") {
       this.state = "running";
     }
   }
 
-  /** Pause only when running. */
+  /**
+   * Transition: paused.
+   * Allowed From: running.
+   * No-op otherwise.
+   */
   pause() {
     if (this.state === "running") this.state = "paused";
   }
 
-  /** Resume only when paused. */
+  /**
+   * Transition: running (resume).
+   * Allowed From: paused.
+   * No-op otherwise.
+   */
   resume() {
     if (this.state === "paused") this.state = "running";
   }
 
-  /** Move to gameover from running or paused. */
+  /**
+   * Transition: gameover.
+   * Allowed From: running | paused.
+   * No-op otherwise.
+   */
   end() {
     if (this.state === "running" || this.state === "paused") this.state = "gameover";
   }

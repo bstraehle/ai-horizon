@@ -1,24 +1,76 @@
 import { CONFIG } from "../constants.js";
 
 /**
- * EventHandlers – centralized registration of EventBus side effects.
+ * EventHandlers – centralized wiring of EventBus driven gameplay side‑effects.
  *
- * Purpose:
- * - Isolate cross‑cutting reactions (scoring, particle spawning, explosions, game over) from core logic.
- * - Keep `game.js` lean while maintaining a single file to audit gameplay side effects.
- * - Provide a single unsubscribe function for cleanup in tests or hot reload scenarios.
+ * Purpose
+ * -------
+ * Provide one auditable location where score mutations, VFX (explosions / particles), UI popups
+ * and terminal state transitions (game over) are bound to domain events. This keeps `game.js`
+ * slim and makes it easy to reason about all non‑pure reactions the game performs each frame.
  *
- * Notes:
- * - Handlers are intentionally small and defer complex logic to game instance helper methods.
- * - Duplicate event subscriptions are avoided by storing and invoking returned unsubscribe callbacks.
+ * Behavior & Covered Events
+ * -------------------------
+ * - bulletHitAsteroid: Awards score (different value for indestructible asteroids), spawns an
+ *   explosion entity and optionally a score popup.
+ * - playerHitAsteroid: Triggers the game over sequence exactly once per emission chain.
+ * - collectedStar (score path): Awards score (bonus for red stars) and shows a popup for red stars.
+ * - collectedStar (particle path): Emits a deterministic radial particle burst whose velocity
+ *   magnitudes incorporate RNG variance for visual variety while keeping angle distribution stable.
+ *
+ * Determinism
+ * -----------
+ * Deterministic outcomes rely on the caller providing a seeded RNG (`game.rng`). Angle placement of
+ * the star particle burst is fixed; only speed variance is randomized, preserving reproducible tests
+ * when the RNG seed is controlled.
+ *
+ * Performance
+ * -----------
+ * Handlers avoid heap allocations except when pushing pooled entities / particles. Loops are tight
+ * and short due to bounded burst counts (`CONFIG.STAR.PARTICLE_BURST`). Popup option objects are
+ * small literals created only for qualifying events (rare vs per‑frame). All other work defers to
+ * existing pooled systems (`particlePool`, `createExplosion`).
+ *
+ * Side Effects
+ * ------------
+ * Mutates: `game.score`, `game.particles[]`, popup/UI layers, and may transition game state via
+ * `game.gameOver()`. Calls rendering / audio hooks indirectly through `createExplosion` & popups.
+ *
+ * Failure Modes / Defensive Notes
+ * -------------------------------
+ * - Missing properties on payload objects are gracefully ignored (guards check existence).
+ * - If popup helpers are absent, scoring still proceeds without throwing.
+ * - Indestructible asteroid handling defaults to a dedicated score constant.
+ *
+ * Testing
+ * -------
+ * The returned aggregated unsubscribe function enables isolated unit tests: register → emit events
+ * → assert game state → teardown (unsubscribe) to prevent test cross‑pollination.
  */
-/** Centralized EventBus subscriptions and side-effects. */
 export const EventHandlers = {
   /**
-   * Wire up event handlers for the given game instance.
-   * Returns an unsubscribe function to remove all handlers if needed.
-   * @param {any} game
-   * @returns {()=>void}
+   * Register all event handlers against the supplied game instance.
+   *
+   * Contract
+   * --------
+   * Input: A mutable `game` object exposing: `events`, `score`, `rng`, pools (particlePool,
+   * explosionPool), collections (particles), creation helpers (`createExplosion`,
+   * `createScorePopup`), scoring updater (`updateScore`), and terminal method (`gameOver`).
+   * Output: A single function that when invoked unsubscribes every registered handler exactly once.
+   *
+   * Ordering & Idempotency
+   * ----------------------
+   * Order of handler registration matches declaration order; no reliance on inter‑handler ordering
+   * currently exists. Calling `register` multiple times without invoking prior unsubscribe will
+   * duplicate listeners—callers should treat this as a one‑shot setup per game lifecycle.
+   *
+   * Error Handling
+   * --------------
+   * Handlers are resilient to partial payloads and will early return or branch safely when optional
+   * helpers are missing (e.g., `createScorePopup`).
+   *
+   * @param {any} game Mutable game instance (loosely typed to avoid circular imports in JSDoc)
+   * @returns {() => void} Unsubscribe all registered event listeners.
    */
   register(game) {
     const { events } = game;
@@ -28,7 +80,17 @@ export const EventHandlers = {
     // bulletHitAsteroid → score, explosion, optional popup
     unsubs.push(
       // @ts-ignore
-      /** @param {any} payload */
+      /**
+       * bulletHitAsteroid handler
+       *
+       * Payload Shape: { asteroid: { x:number, y:number, width:number, height:number, isIndestructible?:boolean } }
+       * Effects: Mutates score, triggers explosion entity creation, optional score popup (+100) when
+       *           asteroid is indestructible, then invokes score UI refresh.
+       * Determinism: Explosion position derived from asteroid center (pure). Score constant selection
+       *              is branch‑based (no randomness). Popup styling fixed.
+       * Failure Modes: If asteroid missing, handler becomes a no‑op except safe `updateScore` call.
+       * @param {any} payload
+       */
       events.on("bulletHitAsteroid", function (/** @type {{ asteroid:any }} */ payload) {
         const { asteroid } = payload;
         // Award points (special-case indestructible asteroids)
@@ -76,7 +138,15 @@ export const EventHandlers = {
     // collectedStar → score + optional popup
     unsubs.push(
       // @ts-ignore
-      /** @param {any} payload */
+      /**
+       * collectedStar (score branch)
+       *
+       * Payload Shape: { star: { x:number, y:number, width:number, height:number, isRed?:boolean } }
+       * Effects: Adds base or red‑bonus score, updates UI score, optionally spawns +50 popup (red only).
+       * Determinism: Score increment is branch‑based; popup styling fixed.
+       * Failure Modes: Missing star payload yields guarded no‑op aside from safe UI refresh attempt.
+       * @param {any} payload
+       */
       events.on("collectedStar", function (/** @type {{ star:any }} */ payload) {
         const { star } = payload;
         const add = star && star.isRed ? CONFIG.GAME.STAR_SCORE_RED : CONFIG.GAME.STAR_SCORE;
@@ -107,7 +177,16 @@ export const EventHandlers = {
     // collectedStar → particle burst
     unsubs.push(
       // @ts-ignore
-      /** @param {any} payload */
+      /**
+       * collectedStar (particle burst branch)
+       *
+       * Payload Shape: same as score branch.
+       * Effects: Allocates (via pool) N radial particles whose base angles are evenly distributed.
+       * Performance: O(N) where N = CONFIG.STAR.PARTICLE_BURST (small constant). Single push per particle.
+       * Determinism: Angle distribution stable; speed variance depends on seeded RNG for reproducibility.
+       * Failure Modes: Missing star payload short‑circuits loop. Pool acquire errors propagate (none expected).
+       * @param {any} payload
+       */
       events.on("collectedStar", function (/** @type {{ star:any }} */ payload) {
         const { star } = payload;
         const rng = game.rng;

@@ -1,8 +1,22 @@
 import { CONFIG } from "../constants.js";
 
-/** Player projectile. */
+/**
+ * Bullet – lightweight upward projectile fired by player.
+ *
+ * Design:
+ *  - No acceleration; linear motion only (speed in pixels/sec).
+ *  - Minimal draw: gradient body + trail rectangle to keep fill rate low.
+ *  - Pool friendly: all state primitive; reset simply overwrites fields.
+ */
 export class Bullet {
-  /** @param {number} x @param {number} y @param {number} width @param {number} height @param {number} speed */
+  /**
+   * Construct bullet instance (usually via object pool acquire).
+   * @param {number} x Spawn x (top-left)
+   * @param {number} y Spawn y (top-left)
+   * @param {number} width Visual width
+   * @param {number} height Visual height (body length)
+   * @param {number} speed Upward speed (pixels/sec)
+   */
   constructor(x, y, width, height, speed) {
     this.x = x;
     this.y = y;
@@ -11,13 +25,17 @@ export class Bullet {
     this.speed = speed;
   }
 
-  /** Move upward. */
+  /**
+   * Advance bullet along negative Y axis.
+   * @param {number} [dtSec=CONFIG.TIME.DEFAULT_DT] Delta seconds.
+   */
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
     this.y -= this.speed * dtSec;
   }
 
-  /** Draw bullet.
-   * @param {CanvasRenderingContext2D} ctx
+  /**
+   * Render bullet body + small trailing segment.
+   * @param {CanvasRenderingContext2D} ctx 2D context (state saved/restored outside caller responsibility).
    */
   draw(ctx) {
     ctx.save();
@@ -34,19 +52,21 @@ export class Bullet {
     ctx.restore();
   }
 
-  /** Returns the axis-aligned bounding box for collisions.
+  /**
+   * Get current axis-aligned bounds for collision system.
    * @returns {import('../types.js').Rect}
    */
   getBounds() {
     return { x: this.x, y: this.y, width: this.width, height: this.height };
   }
 
-  /** Reset to a fresh state for pooling.
-   * @param {number} x
-   * @param {number} y
-   * @param {number} width
-   * @param {number} height
-   * @param {number} speed
+  /**
+   * Reinitialize bullet for reuse (object pool pattern).
+   * @param {number} x New x
+   * @param {number} y New y
+   * @param {number} width Width
+   * @param {number} height Height
+   * @param {number} speed Upward speed
    */
   reset(x, y, width, height, speed) {
     this.x = x;

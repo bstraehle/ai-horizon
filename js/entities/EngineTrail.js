@@ -1,14 +1,32 @@
 import { CONFIG, PI2 } from "../constants.js";
 
-/** Engine exhaust trail particles. */
+/**
+ * EngineTrail – transient flame puff particles emitted from player engine.
+ *
+ * Responsibilities:
+ *  - Spawn short-lived particles behind the rocket for motion feedback.
+ *  - Maintain an in-memory list (simple array) with per-frame culling when life <= 0.
+ *
+ * Data Shape: { x, y, life, maxLife, size }
+ *  - life decrements toward 0 (alpha derived as life / maxLife).
+ *  - size randomized to add visual variety; optionally from provided RNG for determinism.
+ */
 export class EngineTrail {
+  /** Create empty trail container. */
   constructor() {
-    /** @type {Array<{x:number,y:number,life:number,maxLife:number,size:number}>} */
+    /** @type {Array<{x:number,y:number,life:number,maxLife:number,size:number}>} Particle list */
     this.particles = [];
   }
 
-  /** Add a particle.
-   * @param {{x:number,y:number,width:number,height:number}} player @param {import('../types.js').RNGLike} [rng]
+  /**
+   * Emit a new engine particle at current player exhaust position.
+   *
+   * Placement:
+   *  - Centered horizontally on player midpoint.
+   *  - Spawn Y at player bottom (creates contiguous stream below rocket).
+   *
+   * @param {{x:number,y:number,width:number,height:number}} player Player bounds.
+   * @param {import('../types.js').RNGLike} [rng] Optional deterministic RNG.
    */
   add(player, rng) {
     const centerX = player.x + player.width / 2;
@@ -29,7 +47,11 @@ export class EngineTrail {
     });
   }
 
-  /** Update particles. */
+  /**
+   * Advance particle positions (downward drift) and age them, removing expired entries.
+   * Complexity: O(N) in particle count with in-place splice removal.
+   * @param {number} [dtSec=CONFIG.TIME.DEFAULT_DT] Delta seconds.
+   */
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const particle = this.particles[i];
@@ -41,8 +63,9 @@ export class EngineTrail {
     }
   }
 
-  /** Draw particles.
-   * @param {CanvasRenderingContext2D} ctx
+  /**
+   * Draw engine trail particles as soft radial gradients in elongated ellipse shape.
+   * @param {CanvasRenderingContext2D} ctx 2D context.
    */
   draw(ctx) {
     ctx.save();

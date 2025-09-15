@@ -1,10 +1,15 @@
 import { CONFIG, PI2 } from "../constants.js";
 
 /**
- * Class representing nebula visual effects for the game background.
- * Provides static methods to initialize and render nebula gradients.
+ * Nebula – procedural multi-blob soft glow backgrounds (parallax-lite layer).
  *
- * Nebulae are rendered as radial gradients with randomized positions, radii, and colors.
+ * Overview:
+ *  - Each nebula configuration = central position + base radius + color pair + animated sub-blobs.
+ *  - Blobs wobble (offset sine/cos) & rotate / scale providing subtle motion without heavy particle cost.
+ *  - Primarily aesthetic; not interactive and rendered with additive blending (lighter).
+ *
+ * Determinism: Optional RNGLike can seed creation for reproducible themes.
+ * Performance: Blob count & wobble math chosen to remain small (O(totalBlobs)). Disable or reduce counts via CONFIG for low-end.
  */
 export class Nebula {
   /**
@@ -38,19 +43,18 @@ export class Nebula {
    */
 
   /**
-   * Initializes nebula configurations for rendering.
-   * Generates an array of nebula objects with randomized position, radius, and color properties.
+   * Initialize a nebula configuration array.
    *
-   * @param {number} width - Canvas width in logical pixels.
-   * @param {number} height - Canvas height in logical pixels.
-   * @param {boolean} isMobile - Indicates if the rendering is for a mobile device, affecting nebula count and size.
-   * @returns {NebulaConfig[]} Array of nebula configuration objects, each containing x, y, r, color0, and color1.
-   */
-  /**
-   * @param {number} width
-   * @param {number} height
-   * @param {boolean} isMobile
-   * @param {import('../types.js').RNGLike} [rng]
+   * Behavior:
+   *  - Chooses color variant randomly from theme list.
+   *  - Derives blobCount with mobile-aware config differences.
+   *  - Each blob stores base offsets (baseOx/baseOy) plus runtime wobble parameters.
+   *
+   * @param {number} width Canvas width.
+   * @param {number} height Canvas height.
+   * @param {boolean} isMobile Mobile flag (affects counts & size ranges).
+   * @param {import('../types.js').RNGLike} [rng] Optional RNG for determinism (must expose nextFloat()).
+   * @returns {NebulaConfig[]} Array of nebula runtime configs.
    */
   static init(width, height, isMobile, rng) {
     const nebulaColors = [
@@ -121,18 +125,17 @@ export class Nebula {
   }
 
   /**
-   * Animates nebula by updating position and radius over time.
-   * @param {number} width - Canvas width in logical pixels.
-   * @param {number} height - Canvas height in logical pixels.
-   * @param {NebulaConfig[]} nebulaConfigs - Array of nebula configuration objects.
-   * @param {boolean} isMobile - Indicates if the rendering is for a mobile device, affecting nebula count and size.
-   */
-  /**
-   * @param {number} width
-   * @param {number} height
-   * @param {NebulaConfig[]} nebulaConfigs
-   * @param {boolean} isMobile
-   * @param {number} [dtSec]
+   * Advance nebula animation (position drift + radius modulation + blob wobble).
+   *
+   * Wobble Model: Each blob uses independent sine/cos pairs with rate offsets for organic motion.
+   * Clamping: Reverses velocity components when exceeding canvas or radius limits.
+   * Complexity: O(N + totalBlobs) each frame.
+   *
+   * @param {number} width Canvas width.
+   * @param {number} height Canvas height.
+   * @param {NebulaConfig[]} nebulaConfigs Mutable array from init().
+   * @param {boolean} isMobile Mobile flag (used for min/max radius bounds).
+   * @param {number} [dtSec=CONFIG.TIME.DEFAULT_DT] Delta time seconds.
    */
   static update(width, height, nebulaConfigs, isMobile, dtSec = CONFIG.TIME.DEFAULT_DT) {
     for (const nebula of nebulaConfigs) {
@@ -163,11 +166,13 @@ export class Nebula {
   }
 
   /**
-   * Draws nebula gradients on the canvas using the provided nebula configurations.
-   * Each nebula is rendered as a radial gradient at its specified position and radius.
+   * Render nebula layers (each blob as radial gradient with additive blending).
    *
-   * @param {CanvasRenderingContext2D} ctx - The canvas rendering context.
-   * @param {NebulaConfig[]} nebulaConfigs - Array of nebula configuration objects from Nebula.init().
+   * Blend Mode: uses globalCompositeOperation 'lighter' for glow accumulation.
+   * Fallback: if no blobs property, synthesizes single blob (legacy compatibility).
+   *
+   * @param {CanvasRenderingContext2D} ctx 2D context.
+   * @param {NebulaConfig[]} nebulaConfigs Array from init().
    */
   static draw(ctx, nebulaConfigs) {
     // Third argument (previously theme progress) is now ignored; transition to red removed.
@@ -203,14 +208,18 @@ export class Nebula {
   }
 
   /**
-   * Resize nebula configs from previous canvas size to new canvas size.
-   * Scales positions and radii proportionally and adjusts blob base offsets.
-   * @param {NebulaConfig[]} nebulaConfigs
-   * @param {number} prevW
-   * @param {number} prevH
-   * @param {number} newW
-   * @param {number} newH
-   * @returns {NebulaConfig[]}
+   * Scale nebula configuration set to new canvas dimensions.
+   *
+   * Approach:
+   *  - Scale x,y independently (sx, sy) for position retention.
+   *  - Radius & blob radii scaled by average factor to preserve circular aspect visually.
+   *
+   * @param {NebulaConfig[]} nebulaConfigs Existing config array.
+   * @param {number} prevW Previous width.
+   * @param {number} prevH Previous height.
+   * @param {number} newW New width.
+   * @param {number} newH New height.
+   * @returns {NebulaConfig[]} New scaled configs.
    */
   static resize(nebulaConfigs, prevW, prevH, newW, newH) {
     if (!nebulaConfigs || prevW <= 0 || prevH <= 0) return nebulaConfigs;

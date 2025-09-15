@@ -1,30 +1,58 @@
 /**
- * RNG – lightweight, seedable pseudo-random generator (mulberry32).
+ * RNG – lightweight, seedable pseudo-random number generator using mulberry32 core.
  *
- * Goals:
- * - Deterministic sequences for identical seeds (supports reproducible tests / replays).
- * - Zero allocations during generation (after construction).
- * - Convenience helpers (range, pick, sign) built atop a uniform float.
+ * Purpose
+ * -------
+ * Provide deterministic, reproducible random sequences for gameplay systems (spawning, variation,
+ * particle jitter) without incurring allocations or depending on global Math.random. Supports
+ * fixed seeds (test determinism) and convenient string hashing for human-friendly seeds.
  *
- * Implementation & quality:
- * - Mulberry32 offers acceptable statistical quality for arcade gameplay (not cryptographically secure).
- * - Output of `nextFloat()` spans [0,1).
+ * Algorithm
+ * ---------
+ * mulberry32: Fast, 32-bit state PRNG with acceptable distribution for arcade gameplay (NOT
+ * cryptographically secure). Produces uniformly distributed floats in [0, 1).
  *
- * Seeding options:
- * - Numeric: `new RNG(123)`.
- * - String: `RNG.fromString('seed')` (FNV‑1a hash to u32).
- * - Omitted: non‑deterministic seed (crypto if available, else hashed timestamps).
+ * Seeding Modes
+ * -------------
+ * - Numeric: new RNG(123) — exact 32-bit seed.
+ * - String: RNG.fromString('level-1') — FNV-1a hashed into 32-bit unsigned integer.
+ * - Omitted / Non-numeric: Attempts secure entropy via crypto.getRandomValues; falls back to
+ *   hashed timestamp mixing if unavailable.
+ *
+ * Determinism
+ * -----------
+ * Identical seeds yield identical sequences across platforms (bitwise operations defined). All
+ * helper methods derive solely from nextFloat's output ensuring consistent streams.
+ *
+ * Methods & Bounds
+ * ----------------
+ * - nextFloat(): [0, 1) (never returns 1.0).
+ * - nextInt(max): [0, max) integer (floor of float * max).
+ * - range(min, max): [min, max) float.
+ * - pick(array): Uniform element from array (throws if array empty indirectly via undefined access).
+ * - sign(): Returns -1 or 1 with equal 0.5 probability.
+ * - reseed(seed): Reset internal state to a new sequence.
+ *
+ * Failure Modes / Notes
+ * ---------------------
+ * - Supplying non-finite numeric seed coerces to non-deterministic path.
+ * - Empty array to pick() returns undefined (caller responsibility to validate).
+ * - Not suitable for fairness-critical or security-sensitive randomness.
  */
 export class RNG {
   /**
-   * @param {number} [seed] - 32-bit unsigned seed; if omitted, a non-deterministic seed is chosen.
+   * Construct an RNG instance.
+   * @param {number} [seed] Optional 32-bit unsigned seed; if omitted, a non-deterministic seed is chosen.
    */
   constructor(seed) {
     this._s = RNG._seed32(seed);
   }
 
-  /** Create a RNG from a string (hashed to u32). */
-  /** @param {string} str */
+  /**
+   * Create an RNG from a string seed (FNV-1a hash -> u32).
+   * @param {string} str
+   * @returns {RNG}
+   */
   static fromString(str) {
     let h = 2166136261 >>> 0; // FNV-1a
     for (let i = 0; i < str.length; i++) {
@@ -34,7 +62,10 @@ export class RNG {
     return new RNG(h >>> 0);
   }
 
-  /** Returns a float in (0, 1). */
+  /**
+   * Next uniform float in [0, 1).
+   * @returns {number}
+   */
   nextFloat() {
     let t = (this._s += 0x6d2b79f5) >>> 0;
     t = Math.imul(t ^ (t >>> 15), t | 1);
@@ -42,36 +73,57 @@ export class RNG {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   }
 
-  /** Integer in (0, max) */
-  /** @param {number} max */
+  /**
+   * Integer in [0, max).
+   * @param {number} max Exclusive upper bound (must be > 0 for meaningful output).
+   * @returns {number}
+   */
   nextInt(max) {
     return (this.nextFloat() * max) | 0;
   }
 
-  /** Float in (min, max) */
-  /** @param {number} min @param {number} max */
+  /**
+   * Float in [min, max).
+   * @param {number} min
+   * @param {number} max
+   * @returns {number}
+   */
   range(min, max) {
     return min + (max - min) * this.nextFloat();
   }
 
-  /** Pick a value from an array. */
-  /** @template T @param {T[]} arr @returns {T} */
+  /**
+   * Uniformly pick an element from an array.
+   * @template T
+   * @param {T[]} arr Non-empty array.
+   * @returns {T}
+   */
   pick(arr) {
     return arr[this.nextInt(arr.length)];
   }
 
-  /** Returns -1 or 1 with equal probability. */
+  /**
+   * Return -1 or 1 with 50% probability each.
+   * @returns {1|-1}
+   */
   sign() {
     return this.nextFloat() < 0.5 ? -1 : 1;
   }
 
-  /** Replace the seed. */
-  /** @param {number} seed */
+  /**
+   * Replace the current seed, restarting the sequence.
+   * @param {number} seed New numeric seed.
+   */
   reseed(seed) {
     this._s = RNG._seed32(seed);
   }
 
-  /** @param {any} seed */
+  /**
+   * Internal 32-bit seed normalization helper.
+   * @param {any} seed
+   * @returns {number}
+   * @private
+   */
   static _seed32(seed) {
     if (typeof seed === "number" && Number.isFinite(seed)) return seed >>> 0;
     // Try crypto if available for non-deterministic default

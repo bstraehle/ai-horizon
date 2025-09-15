@@ -1,35 +1,59 @@
 /**
- * ObjectPool – allocation avoidance for short‑lived, homogeneous game objects.
+ * ObjectPool – allocation avoidance & lifecycle reuse for short‑lived, homogeneous game objects.
  *
- * Responsibilities:
- * - Recycle objects to minimize garbage collector interruptions during gameplay.
- * - Support optional warm‑up to preallocate a baseline set (reduces first‑interaction stutter).
- * - Enforce a soft cap (`maxSize`) so memory growth remains bounded under load bursts.
+ * Purpose
+ * -------
+ * Centralizes object reuse to keep GC pauses negligible during peak gameplay. Particularly useful
+ * for frequently spawned ephemeral entities (bullets, particles, explosions) whose construction
+ * cost and garbage churn would otherwise accumulate.
  *
- * Reset precedence (highest first):
- *   1. Instance method `obj.reset(...args)` if present.
- *   2. Pool‑level `resetFn(obj, ...args)` fallback.
+ * Behavior & API
+ * --------------
+ * - acquire(...args): Returns a recycled or freshly created instance and reinitializes it using:
+ *     1) Instance method obj.reset(...args) if present.
+ *     2) Provided pool resetFn(obj, ...args) otherwise.
+ * - release(obj): Returns an object to the free list if capacity allows; optionally disposes overflow.
+ * - warmUp(n, ...args): Pre-fills pool with up to n reset objects.
+ * - clear(disposeAll): Drops free objects, optionally disposing each.
+ * - Introspection getters (freeCount, hasFree, createdCount, remainingCapacity) support metrics / tests.
  *
- * Error handling:
- * - Throws if factory returns a falsy value so misuse is surfaced early.
- * - Silently swallows dispose errors (best‑effort cleanup path).
+ * Performance
+ * -----------
+ * - acquire: Amortized O(1) (single pop or factory call + optional reset).
+ * - release: O(1) push; disposal path only for overflow.
+ * - warmUp: O(n) upfront to reduce first-use spikes.
+ * - Memory bounded by maxSize + live in‑use objects.
  *
- * @template T
- * @example
+ * Determinism
+ * -----------
+ * Deterministic state reinitialization depends entirely on reset logic supplied; pool itself adds no
+ * randomness. Ordering of recycled objects is LIFO (stack semantics) to favor cache locality.
+ *
+ * Failure Modes / Defensive Notes
+ * -------------------------------
+ * - Throws if createFn returns a falsy value (prevents silent invalid objects entering circulation).
+ * - Swallows disposer exceptions to avoid cascading failures during cleanup.
+ * - Passing null/undefined to release is ignored (guard fast path).
+ *
+ * Usage Example
+ * -------------
  * const bulletPool = new ObjectPool(
  *   (x, y) => new Bullet(x, y),
  *   (b, x, y) => { b.x = x; b.y = y; b.alive = true; },
  *   { maxSize: 512 }
  * );
  * const b = bulletPool.acquire(10, 20);
- * // ...use bullet
+ * // ... use bullet ...
  * bulletPool.release(b);
+ *
+ * @template T
  */
 export class ObjectPool {
   /**
-   * @param {(...args:any[])=>T} createFn - Creates a new object when pool is empty.
-   * @param {(obj:T, ...args:any[])=>void} [resetFn] - Optional: Resets an object to a fresh state when acquired.
-   * @param {{ maxSize?: number, dispose?: (obj:T)=>void }} [opts] - Optional pool options.
+   * Construct a new ObjectPool.
+   * @param {(...args:any[])=>T} createFn Factory for new objects when the pool is empty.
+   * @param {(obj:T, ...args:any[])=>void} [resetFn] Optional fallback reset logic when instance lacks its own reset.
+   * @param {{ maxSize?: number, dispose?: (obj:T)=>void }} [opts] Configuration: maxSize soft cap & optional disposer.
    */
   constructor(createFn, resetFn, opts) {
     this._create = createFn;
@@ -43,10 +67,10 @@ export class ObjectPool {
   }
 
   /**
-   * Acquire an object; creates new when free list empty.
-   * Forwards `...args` to factory on creation and to reset logic.
-   * @param {...any} args Init arguments (shape defined by caller / factory).
-   * @returns {T} Recycled or newly created instance.
+   * Acquire an object (recycle or create) and reinitialize it.
+   * Contract: Always returns a valid object or throws (never null/undefined).
+   * @param {...any} args Initialization args forwarded to reset path.
+   * @returns {T}
    */
   acquire(...args) {
     let obj;
@@ -74,7 +98,8 @@ export class ObjectPool {
   }
 
   /**
-   * Return an object to the pool for reuse.
+   * Return an object to the pool. If capacity exceeded, optionally disposes instead.
+   * No-op for null/undefined inputs.
    * @param {T} obj
    */
   release(obj) {
@@ -114,10 +139,10 @@ export class ObjectPool {
   }
 
   /**
-   * Pre-allocate up to N instances (subject to remaining capacity).
-   * Created objects are placed on the free list already reset.
-   * @param {number} n Target number to add (may allocate fewer due to maxSize).
-   * @param {...any} args Arguments passed to factory for initial construction.
+   * Pre-allocate (and reset) up to N instances, bounded by remaining capacity.
+   * Useful to eliminate first-interaction spikes in latency-critical artifacts.
+   * @param {number} n Desired number of objects to provision.
+   * @param {...any} args Args forwarded to factory for construction (not reset path here by design).
    */
   warmUp(n, ...args) {
     const count = Math.max(0, n | 0);
@@ -134,9 +159,9 @@ export class ObjectPool {
   }
 
   /**
-   * Clear pooled (free) objects. When `disposeAll` and a disposer is set, invokes it on each.
-   * Does NOT affect objects currently in use by callers.
-   * @param {boolean} [disposeAll=false] Also dispose each free object.
+   * Clear the free list. Optionally dispose each freed object (best-effort; disposer errors ignored).
+   * In-use objects remain untouched and can later be released into an empty pool.
+   * @param {boolean} [disposeAll=false]
    */
   clear(disposeAll = false) {
     if (disposeAll && this._dispose) {

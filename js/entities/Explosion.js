@@ -1,8 +1,25 @@
 import { CONFIG, PI2 } from "../constants.js";
 
-/** Animated explosion effect. */
+/**
+ * Explosion – radial expanding energy effect.
+ *
+ * Visual Model:
+ *  - Life decays linearly; alpha derived from life/maxLife.
+ *  - Scale grows using (1 + (1 - alpha) * SCALE_GAIN) for ease-out like expansion.
+ *  - Multi-stop radial gradient provides hot core -> cooler edge fade.
+ *
+ * Pool Friendly: purely numeric state; reset overwrites all fields.
+ */
 export class Explosion {
-  /** @param {number} x @param {number} y @param {number} width @param {number} height @param {number} life @param {number} maxLife */
+  /**
+   * Construct explosion instance.
+   * @param {number} x Top-left x
+   * @param {number} y Top-left y
+   * @param {number} width Base width (pre-scale)
+   * @param {number} height Base height (pre-scale)
+   * @param {number} life Initial remaining life (seconds)
+   * @param {number} maxLife Full duration (seconds)
+   */
   constructor(x, y, width, height, life, maxLife) {
     this.x = x;
     this.y = y;
@@ -12,13 +29,17 @@ export class Explosion {
     this.maxLife = maxLife;
   }
 
-  /** Decrement remaining life. */
+  /**
+   * Age explosion toward expiry.
+   * @param {number} [dtSec=CONFIG.TIME.DEFAULT_DT] Delta seconds.
+   */
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
     this.life -= dtSec;
   }
 
-  /** Draw explosion.
-   * @param {CanvasRenderingContext2D} ctx
+  /**
+   * Render expanding radial gradient circle.
+   * @param {CanvasRenderingContext2D} ctx 2D context.
    */
   draw(ctx) {
     ctx.save();
@@ -39,13 +60,14 @@ export class Explosion {
     ctx.restore();
   }
 
-  /** Reset to a fresh state for pooling.
-   * @param {number} x
-   * @param {number} y
-   * @param {number} width
-   * @param {number} height
-   * @param {number} life
-   * @param {number} maxLife
+  /**
+   * Reinitialize for reuse (object pool).
+   * @param {number} x New x
+   * @param {number} y New y
+   * @param {number} width Base width
+   * @param {number} height Base height
+   * @param {number} life Remaining life
+   * @param {number} maxLife Max life
    */
   reset(x, y, width, height, life, maxLife) {
     this.x = x;

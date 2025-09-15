@@ -1,8 +1,23 @@
 import { CONFIG } from "../constants.js";
 
-/** Background collectible/pulsing star. */
+/**
+ * Star – falling collectible / background glow with optional red variant.
+ *
+ * Features:
+ *  - Optional pulse scaling (CONFIG.STAR.PULSE) using sinus wave.
+ *  - Two color palettes (normal vs red) for rarity or scoring differentiation.
+ *  - Pool ready; state is primitive & resettable.
+ */
 export class Star {
-  /** @param {number} x @param {number} y @param {number} width @param {number} height @param {number} speed @param {boolean} [isRed=false] */
+  /**
+   * Construct star instance.
+   * @param {number} x Spawn x
+   * @param {number} y Spawn y
+   * @param {number} width Visual width (used for size calc)
+   * @param {number} height Visual height
+   * @param {number} speed Downward speed (px/sec)
+   * @param {boolean} [isRed=false] Red palette flag
+   */
   constructor(x, y, width, height, speed, isRed = false) {
     this.x = x;
     this.y = y;
@@ -13,13 +28,18 @@ export class Star {
     this.isRed = !!isRed;
   }
 
-  /** Move downward. */
+  /**
+   * Advance star vertically.
+   * @param {number} [dtSec=CONFIG.TIME.DEFAULT_DT] Delta seconds.
+   */
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
     this.y += this.speed * dtSec;
   }
 
-  /** Draw star (with optional pulse).
-   * @param {CanvasRenderingContext2D} ctx @param {number} timeSec
+  /**
+   * Render star with radial gradient & optional pulse scale modulation.
+   * @param {CanvasRenderingContext2D} ctx 2D context.
+   * @param {number} timeSec Elapsed time (seconds) for pulse animation.
    */
   draw(ctx, timeSec) {
     ctx.save();
@@ -55,20 +75,22 @@ export class Star {
     ctx.restore();
   }
 
-  /** Returns the axis-aligned bounding box for collisions.
+  /**
+   * Provide AABB for collision detection / collection.
    * @returns {import('../types.js').Rect}
    */
   getBounds() {
     return { x: this.x, y: this.y, width: this.width, height: this.height };
   }
 
-  /** Reset to a fresh state for pooling.
-   * @param {number} x
-   * @param {number} y
-   * @param {number} width
-   * @param {number} height
-   * @param {number} speed
-   * @param {boolean} [isRed=false]
+  /**
+   * Reinitialize star for reuse (object pool).
+   * @param {number} x New x
+   * @param {number} y New y
+   * @param {number} width Width
+   * @param {number} height Height
+   * @param {number} speed Downward speed
+   * @param {boolean} [isRed=false] Red palette flag
    */
   reset(x, y, width, height, speed, isRed = false) {
     this.x = x;
@@ -79,11 +101,12 @@ export class Star {
     this.isRed = !!isRed;
   }
 
-  /** Draw raw star polygon.
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {number} x
-   * @param {number} y
-   * @param {number} size
+  /**
+   * Low-level polygon fill for 5-point star (outer/inner alternating vertices).
+   * @param {CanvasRenderingContext2D} ctx 2D context.
+   * @param {number} x Center x.
+   * @param {number} y Center y.
+   * @param {number} size Outer radius.
    */
   static drawStar(ctx, x, y, size) {
     ctx.beginPath();

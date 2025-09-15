@@ -7,8 +7,34 @@ const docClient = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = "ai-horizon-leaderboard";
 
 /**
- * Lambda handler
- * @param {{httpMethod:string,queryStringParameters?:Record<string,string>,body?:string}} event
+ * Leaderboard Lambda HTTP handler (GET / PUT) with optimistic concurrency.
+ *
+ * Responsibilities:
+ * - GET: Fetch the leaderboard record by numeric id; ensure a numeric `version` field exists (default 0).
+ * - PUT: Conditionally update the record using a version check (if client supplies `version`) and atomically increment version.
+ * - Emits 409 Conflict with latest item when version mismatch to allow client merge + retry.
+ * - Adds permissive CORS headers for browser invocation.
+ *
+ * Request Shapes:
+ * - GET  /?id=1
+ * - PUT  /?id=1  body: { scores: [...], version?: number, ...extraMetadata }
+ *   (Client should include the last observed version for optimistic concurrency; omitted means unconditional update.)
+ *
+ * Response Shapes:
+ * - 200 OK: { ...item } (GET) or { message, item } (PUT success)
+ * - 409 Conflict (PUT): { conflict:true, message:"Version mismatch", item:{...latest} }
+ * - 400: { message } for validation errors
+ * - 405: { message } unsupported method
+ * - 500: { message, error }
+ *
+ * Environment / Config:
+ * - Hard-coded region 'us-west-2' and table name TABLE_NAME; adapt via env vars in production if needed.
+ *
+ * Error Handling:
+ * - All top-level errors caught; internal conditional check failures downgraded to 409 logic in updateItem.
+ *
+ * @param {{httpMethod:string,queryStringParameters?:Record<string,string>,body?:string}} event Lambda proxy event.
+ * @returns {Promise<{statusCode:number, headers?:Record<string,string>, body:string}>}
  */
 export const handler = async (event) => {
   try {
@@ -79,7 +105,11 @@ export const handler = async (event) => {
 };
 
 /**
- * @param {number} id
+ * Fetch leaderboard item by id.
+ * Ensures a numeric `version` property for clients performing optimistic concurrency.
+ * @param {number} id Partition key.
+ * @returns {Promise<any>} Item object with guaranteed version field.
+ * @throws {Error} When item not found.
  */
 async function getItem(id) {
   const params = {
@@ -102,10 +132,22 @@ async function getItem(id) {
 }
 
 /**
- * Update an item in the leaderboard table.
- * @param {number} id
- * @param {{[key:string]: any}} updateData
- * @returns {Promise<{message:string,item:any,conflict?:boolean}>}
+ * Update leaderboard record with optimistic concurrency and automatic version increment.
+ *
+ * Behavior:
+ * - Strips client-supplied id/version from dynamic attribute update set; uses id as key; handles version separately.
+ * - Adds/updates arbitrary fields provided in updateData (scores, metadata, timestamps, etc.).
+ * - Always sets updatedAt ISO timestamp.
+ * - Increments `version` atomically (if absent initializes to 0 then increments to 1) using if_not_exists.
+ * - If client supplies `version` and it mismatches current value, returns conflict object (no throw) including latest item.
+ *
+ * DynamoDB Details:
+ * - ConditionExpression enforces existence of id and optional version equality to detect lost update.
+ * - Returns ALL_NEW attributes on success.
+ *
+ * @param {number} id Partition key.
+ * @param {{[key:string]: any}} updateData Arbitrary fields including optional `version` (for concurrency) and `scores` array.
+ * @returns {Promise<{message:string,item:any,conflict?:boolean}>} Success or conflict payload.
  */
 async function updateItem(id, updateData) {
   /** @type {{[key:string]: any}} */
