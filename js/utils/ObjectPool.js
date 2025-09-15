@@ -75,18 +75,15 @@ export class ObjectPool {
   acquire(...args) {
     let obj;
     if (this._free.length > 0) {
-      // pop should be defined because length > 0
       // @ts-ignore - known non-null after length check
       obj = this._free.pop();
     } else {
       obj = this._create(...args);
       this._created++;
     }
-    // Ensure a valid object was produced
     if (!obj) {
       throw new Error("ObjectPool: createFn returned falsy value");
     }
-    // Prefer instance reset if available, otherwise fallback to pool-level reset
     // @ts-ignore - duck-typed reset method
     if (typeof obj.reset === "function") {
       // @ts-ignore
@@ -103,12 +100,10 @@ export class ObjectPool {
    * @param {T} obj
    */
   release(obj) {
-    // Guard against null or undefined without using loose equality
     if (obj === null || obj === undefined) return;
     if (this._free.length < this._maxSize) {
       this._free.push(obj);
     } else if (this._dispose) {
-      // Drop overflow object and optionally dispose
       try {
         this._dispose(obj);
       } catch {
@@ -146,7 +141,6 @@ export class ObjectPool {
    */
   warmUp(n, ...args) {
     const count = Math.max(0, n | 0);
-    // Respect maxSize: only create up to available capacity
     const capacity = Math.max(
       0,
       Math.min(count, this._maxSize === Infinity ? count : this._maxSize - this._free.length)

@@ -37,8 +37,8 @@ export class GameLoop {
     this._shouldUpdate = opts.shouldUpdate || null;
     this._stepMs = opts.stepMs || CONFIG.TIME.STEP_MS;
     this._maxSubSteps = Math.max(1, opts.maxSubSteps || CONFIG.TIME.MAX_SUB_STEPS);
-    this._acc = 0; // ms accumulated toward next fixed step
-    this._last = 0; // last frame timestamp
+    this._acc = 0;
+    this._last = 0;
     this._running = false;
     this._rafId = 0;
     this._tick = this._tick.bind(this);

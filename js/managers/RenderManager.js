@@ -156,24 +156,20 @@ export class RenderManager {
    * @param {any} game Aggregate game object exposing ctx + entity arrays.
    */
   static draw(game) {
-    // Background
     if (typeof game.drawBackground === "function") {
       game.drawBackground();
     }
-    // Entities
     RenderManager.drawAsteroids(game.ctx, game.asteroids);
     RenderManager.drawBullets(game.ctx, game.bullets, game.sprites);
     RenderManager.drawCollectibleStars(game.ctx, game.stars, game.sprites, game.timeSec);
     RenderManager.drawExplosions(game.ctx, game.explosions);
     RenderManager.drawParticles(game.ctx, game.particles);
-    // Player + engine trail
     if (game.player && typeof game.player.draw === "function") {
       game.player.draw(game.ctx);
     }
     if (game.engineTrail && typeof game.engineTrail.draw === "function") {
       game.engineTrail.draw(game.ctx);
     }
-    // Score popups (transient text)
     if (game.scorePopups && game.scorePopups.length > 0) {
       const ctx = game.ctx;
       for (let i = game.scorePopups.length - 1; i >= 0; i--) {

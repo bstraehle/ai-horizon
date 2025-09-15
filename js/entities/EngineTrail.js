@@ -40,7 +40,6 @@ export class EngineTrail {
       y: trailY,
       life: maxLife,
       maxLife,
-      // rng.range is optional on RNGLike — guard before invoking
       size:
         (rng && typeof rng.range === "function" ? rng.range(0, sizeMax) : Math.random() * sizeMax) +
         sizeMin,
@@ -73,9 +72,7 @@ export class EngineTrail {
       const denom = particle.maxLife || CONFIG.ENGINE_TRAIL.LIFE;
       const alpha = Math.max(0, Math.min(1, particle.life / denom));
       ctx.globalAlpha = alpha;
-      // Make the trail look like a tapered flame: elongated ellipse + warm flame gradient
       const r = particle.size * CONFIG.ENGINE_TRAIL.DRAW_SIZE_MULT;
-      // radial gradient anchored slightly above the particle so the bright core sits near the nozzle
       const trailGradient = ctx.createRadialGradient(
         particle.x,
         particle.y - r * 0.25,
@@ -84,15 +81,11 @@ export class EngineTrail {
         particle.y + r * 0.75,
         r * 1.25
       );
-      // Make the trail whiter and more realistic: a bright white-hot core with
-      // paler, less-saturated edges instead of strong orange/red.
-      trailGradient.addColorStop(0, "rgba(255,255,245,0.98)"); // bright, near-white core
-      trailGradient.addColorStop(0.35, "rgba(255,220,170,0.85)"); // warm, pale transition
-      trailGradient.addColorStop(1, "rgba(255,180,120,0)"); // very soft faded edge
+      trailGradient.addColorStop(0, "rgba(255,255,245,0.98)");
+      trailGradient.addColorStop(0.35, "rgba(255,220,170,0.85)");
+      trailGradient.addColorStop(1, "rgba(255,180,120,0)");
       ctx.fillStyle = trailGradient;
       ctx.beginPath();
-      // Draw an elongated ellipse to simulate a flame blob
-      // scale on Y for tapering effect
       ctx.ellipse(particle.x, particle.y, r * 0.6, r * 1.4, 0, 0, PI2);
       ctx.fill();
     });

@@ -89,9 +89,6 @@ export class Nebula {
         return {
           baseOx,
           baseOy,
-          // Initialize current offsets to the base values so the first
-          // rendered frame (before any update) matches the generated layout
-          // and doesn't visually jump when animation starts.
           ox: baseOx,
           oy: baseOy,
           r,
@@ -175,7 +172,6 @@ export class Nebula {
    * @param {NebulaConfig[]} nebulaConfigs Array from init().
    */
   static draw(ctx, nebulaConfigs) {
-    // Third argument (previously theme progress) is now ignored; transition to red removed.
     ctx.save();
     for (const nebula of nebulaConfigs) {
       const blobs = nebula.blobs || [

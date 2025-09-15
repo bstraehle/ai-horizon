@@ -90,7 +90,6 @@ export class BackgroundManager {
     const newH = view.height || 0;
     if (!background) return null;
     const out = {};
-    // Scale nebula positions/radii
     if (background.nebulaConfigs) {
       try {
         out.nebulaConfigs = Nebula.resize(background.nebulaConfigs, prevW, prevH, newW, newH);
@@ -137,14 +136,11 @@ export class BackgroundManager {
       background: { nebulaConfigs, starField },
     } = ctxObj;
     Background.draw(ctx, width, height);
-    // Draw nebula during gameplay, pause, and game over screens (hide only on initial menu)
     if (nebulaConfigs && (ctxObj.running || ctxObj.paused || ctxObj.gameOver)) {
-      // Nebula no longer transitions to a red theme; draw with base colors only.
       Nebula.draw(ctx, nebulaConfigs);
     }
     const timeSec = typeof ctxObj.timeSec === "number" ? ctxObj.timeSec : (animTime || 0) / 1000;
     const dtSec = typeof ctxObj.dtSec === "number" ? ctxObj.dtSec : CONFIG.TIME.DEFAULT_DT;
-    // Freeze stars while paused
     StarField.draw(ctx, width, height, starField, timeSec, paused, dtSec, ctxObj.rng);
   }
 }

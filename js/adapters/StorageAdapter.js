@@ -34,7 +34,6 @@ export class StorageAdapter {
     if (!this._storage) return fallback ?? null;
     try {
       const raw = this._storage.getItem(key);
-      // getItem returns either a string or null (never undefined); use strict equality for ESLint eqeqeq rule
       if (raw === null) return fallback ?? null;
       return JSON.parse(raw);
     } catch {

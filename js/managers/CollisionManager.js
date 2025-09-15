@@ -20,7 +20,6 @@
  */
 /** @typedef {import('../types.js').Rect} Rect */
 
-// Module-scoped array pool for spatial grid buckets
 /** @type {any[][]} */
 const ARR_POOL = [];
 const ARR_POOL_MAX = 256;
@@ -152,7 +151,6 @@ export class CollisionManager {
    * @returns {void}
    */
   static check(game) {
-    // Spatial hash grid maps cell keys ("cx,cy") to arrays of asteroids for fast neighborhood queries.
     /** @type {Map<string, any[]>} */
     const grid = new Map();
     const cs = game.cellSize | 0;
@@ -216,7 +214,6 @@ export class CollisionManager {
       return res;
     };
 
-    // Bullet vs Asteroid
     /**
      * Emit bulletHitAsteroid event.
      * @param {{ x:number,y:number,width:number,height:number,isIndestructible?:boolean,onBulletHit?:(game:any)=>boolean,onShieldHit?:()=>void }} a
@@ -237,15 +234,9 @@ export class CollisionManager {
           const a = group[k];
           if (toRemoveAsteroids.has(a)) continue;
           if (CollisionManager.intersects(b, a)) {
-            // Bullet removed on impact
             toRemoveBullets.add(b);
-            // For regular asteroids, remove immediately. For indestructible asteroids,
-            // allow the asteroid to track hits and only remove when its internal
-            // threshold is reached. Also emit the same event when an asteroid is
-            // actually destroyed so other systems react the same way.
             try {
               if (a && a.isIndestructible) {
-                // Indestructible asteroids should manage their own destruction via onBulletHit.
                 if (typeof a.onBulletHit === "function") {
                   const shouldDestroy = a.onBulletHit(game);
                   if (shouldDestroy) {
@@ -253,33 +244,29 @@ export class CollisionManager {
                     emitBulletHit(a, b);
                   }
                 } else if (typeof a.onShieldHit === "function") {
-                  // If only a shield handler exists (test mocks), call it but don't destroy.
                   try {
                     a.onShieldHit();
                   } catch {
-                    /* noop */
+                    /* intentionally empty */
                   }
                 } else {
-                  // No handlers: respect indestructible flag and do nothing.
+                  /* intentionally empty */
                 }
               } else {
-                // Regular asteroid: destroy immediately
                 toRemoveAsteroids.add(a);
                 emitBulletHit(a, b);
               }
             } catch {
-              /* noop */
+              /* intentionally empty */
             }
             hit = true;
             break;
           }
         }
       }
-      // Release neighbors container
       CollisionManager._releaseArr(groups);
     }
 
-    // Remove marked bullets and asteroids
     if (toRemoveBullets.size > 0) {
       for (let i = game.bullets.length - 1; i >= 0; i--) {
         const b = game.bullets[i];
@@ -298,7 +285,6 @@ export class CollisionManager {
       }
     }
 
-    // Player vs Asteroid
     for (let i = game.asteroids.length - 1; i >= 0; i--) {
       const asteroid = game.asteroids[i];
       if (CollisionManager.intersects(game.player, asteroid)) {
@@ -307,7 +293,6 @@ export class CollisionManager {
       }
     }
 
-    // Player vs Star
     for (let i = game.stars.length - 1; i >= 0; i--) {
       const star = game.stars[i];
       if (CollisionManager.intersects(game.player, star)) {
@@ -317,9 +302,6 @@ export class CollisionManager {
       }
     }
 
-    // Score UI handled by EventBus subscribers
-
-    // Release all grid arrays back into the pool
     if (grid.size > 0) {
       for (const arr of grid.values()) CollisionManager._releaseArr(arr);
       grid.clear();

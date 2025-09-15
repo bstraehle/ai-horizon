@@ -46,7 +46,6 @@ export class StarField {
     /** @type {LayerDef[] | null} */
     const layerDefs = Array.isArray(CONFIG.STARFIELD.LAYERS) ? CONFIG.STARFIELD.LAYERS : null;
     if (!layerDefs || layerDefs.length === 0) {
-      // Legacy single-layer behavior: return flat array
       return Array.from({ length: baseCount }, () => ({
         x: rand.nextFloat() * width,
         y: rand.nextFloat() * height,
@@ -57,7 +56,6 @@ export class StarField {
       }));
     }
 
-    // Layered behavior: return an object with ordered layers
     /** @typedef {{name:string, stars:StarData[], config:{twinkleRate:number, twinkleXFactor:number}}} LayerRuntime */
     /** @type {LayerRuntime[]} */
     const layers = layerDefs.map((ld /** @type {LayerDef} */) => {
@@ -139,10 +137,8 @@ export class StarField {
     };
 
     if (Array.isArray(starField)) {
-      // Legacy flat array
       drawStars(starField, CONFIG.STARFIELD.TWINKLE_RATE, CONFIG.STARFIELD.TWINKLE_X_FACTOR);
     } else if (starField && /** @type {any} */ (starField).layers) {
-      // Draw in order: assume earlier layers are farther (already ordered in config)
       for (let i = 0; i < /** @type {any} */ (starField).layers.length; i++) {
         const layer = /** @type {any} */ (starField).layers[i];
         drawStars(
@@ -174,7 +170,6 @@ export class StarField {
     const sx = newW / prevW;
     const sy = newH / prevH;
     const sAvg = (sx + sy) / 2;
-    // Legacy flat array
     if (Array.isArray(starField)) {
       return starField.map((s) => ({
         x: s.x * sx,

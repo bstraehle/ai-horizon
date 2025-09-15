@@ -37,7 +37,6 @@ export class SpriteManager {
    * @returns {import('../types.js').SpriteAtlas} Sprite atlas object consumed by RenderManager.
    */
   static createSprites() {
-    // Bullet sprite (includes trail)
     const trail = CONFIG.BULLET.TRAIL;
     const bw = CONFIG.BULLET.WIDTH;
     const bh = CONFIG.BULLET.HEIGHT + trail;
@@ -47,25 +46,21 @@ export class SpriteManager {
     {
       const c = bulletCanvas.getContext("2d");
       if (c) {
-        // Glow shadow
         c.save();
         c.shadowColor = CONFIG.COLORS.BULLET.SHADOW;
         c.shadowBlur = 8;
-        // Main bullet body gradient
         const grad = c.createLinearGradient(0, 0, 0, CONFIG.BULLET.HEIGHT);
         grad.addColorStop(0, CONFIG.COLORS.BULLET.GRAD_TOP);
         grad.addColorStop(0.5, CONFIG.COLORS.BULLET.GRAD_MID);
         grad.addColorStop(1, CONFIG.COLORS.BULLET.GRAD_BOTTOM);
         c.fillStyle = grad;
         c.fillRect(0, 0, bw, CONFIG.BULLET.HEIGHT);
-        // Trail
         c.fillStyle = CONFIG.COLORS.BULLET.TRAIL;
         c.fillRect(0, CONFIG.BULLET.HEIGHT, bw, trail);
         c.restore();
       }
     }
 
-    // Star sprite (square) - yellow
     const starBaseSize = 64;
     const starCanvas = document.createElement("canvas");
     starCanvas.width = starBaseSize;
@@ -73,18 +68,16 @@ export class SpriteManager {
     {
       const c = starCanvas.getContext("2d");
       if (!c) {
-        // If context unavailable (e.g., non-DOM test env), skip drawing
+        /* intentionally empty */
       } else {
         const cx = starBaseSize / 2;
         const cy = starBaseSize / 2;
         const size = starBaseSize * 0.45;
-        // Outer glow via radial gradient
         const grad = c.createRadialGradient(cx, cy, 0, cx, cy, size);
         grad.addColorStop(0, CONFIG.COLORS.STAR.GRAD_IN);
         grad.addColorStop(0.3, CONFIG.COLORS.STAR.GRAD_MID);
         grad.addColorStop(1, CONFIG.COLORS.STAR.GRAD_OUT);
         c.fillStyle = grad;
-        // Draw 5-point star path
         c.beginPath();
         for (let i = 0; i < 5; i++) {
           const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
@@ -102,14 +95,13 @@ export class SpriteManager {
       }
     }
 
-    // Red star sprite
     const starRedCanvas = document.createElement("canvas");
     starRedCanvas.width = starBaseSize;
     starRedCanvas.height = starBaseSize;
     {
       const c = starRedCanvas.getContext("2d");
       if (!c) {
-        // skip if no ctx
+        /* intentionally empty */
       } else {
         const cx = starBaseSize / 2;
         const cy = starBaseSize / 2;

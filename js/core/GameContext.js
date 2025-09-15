@@ -45,11 +45,9 @@ import { CONFIG } from "../constants.js";
  */
 export function getGameContext(game) {
   return {
-    // Canvas & drawing
     ctx: game.ctx,
     view: game.view,
 
-    // State & time
     running: game.state.isRunning(),
     paused: game.state.isPaused(),
     gameOver: typeof game.state.isGameOver === "function" && game.state.isGameOver(),
@@ -59,13 +57,10 @@ export function getGameContext(game) {
     timerRemaining: typeof game.timerRemaining === "number" ? game.timerRemaining : undefined,
     timerSeconds: typeof game.timerSeconds === "number" ? game.timerSeconds : undefined,
 
-    // Platform
     isMobile: game._isMobile,
 
-    // Deterministic randomness
     rng: game.rng,
 
-    // Background-related state used by BackgroundManager.draw
     background: {
       nebulaConfigs: game.nebulaConfigs,
       starField: game.starField,

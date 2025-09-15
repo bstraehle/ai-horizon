@@ -92,11 +92,6 @@ export class Player {
    * @param {CanvasRenderingContext2D} ctx 2D context.
    */
   draw(ctx) {
-    // Draw a rounded rocket that resembles the 🚀 emoji:
-    // - white/gray rounded body
-    // - red side fins
-    // - blue circular cockpit/window
-    // - small engine flame and glow at the bottom
     ctx.save();
     const cx = this.x + this.width / 2;
     const topY = this.y;
@@ -105,16 +100,13 @@ export class Player {
     const bodyX = cx - bodyW / 2;
     const bodyY = topY + (this.height - bodyH) / 2;
 
-    // Body gradient (white -> light gray) to mimic emoji shading
     const bodyGrad = ctx.createLinearGradient(bodyX, bodyY, bodyX, bodyY + bodyH);
     bodyGrad.addColorStop(0, "#ffffff");
     bodyGrad.addColorStop(0.6, "#f0f0f0");
     bodyGrad.addColorStop(1, "#d9d9d9");
 
-    // Rocket body (rounded symmetrical shape)
     ctx.beginPath();
-    ctx.moveTo(cx, bodyY); // nose
-    // right side curve
+    ctx.moveTo(cx, bodyY);
     ctx.quadraticCurveTo(
       bodyX + bodyW * 1.05,
       bodyY + bodyH * 0.2,
@@ -122,7 +114,6 @@ export class Player {
       bodyY + bodyH * 0.5
     );
     ctx.quadraticCurveTo(bodyX + bodyW * 1.05, bodyY + bodyH * 0.8, cx, bodyY + bodyH);
-    // left side curve
     ctx.quadraticCurveTo(
       bodyX - bodyW * 0.05,
       bodyY + bodyH * 0.8,
@@ -134,23 +125,19 @@ export class Player {
     ctx.fillStyle = bodyGrad;
     ctx.fill();
 
-    // Outline
     ctx.strokeStyle = CONFIG.COLORS.PLAYER.OUTLINE || "#999";
     ctx.lineWidth = CONFIG.PLAYER.DRAW.OUTLINE_WIDTH || 2;
     ctx.stroke();
 
-    // Side fins (red)
     const finW = bodyW * 0.6;
-    ctx.fillStyle = "#d94141"; // emoji-like red
+    ctx.fillStyle = "#d94141";
     ctx.beginPath();
-    // left fin
     ctx.moveTo(bodyX + bodyW * 0.12, bodyY + bodyH * 0.55);
     ctx.lineTo(bodyX - finW * 0.2, bodyY + bodyH * 0.75);
     ctx.lineTo(bodyX + bodyW * 0.18, bodyY + bodyH * 0.78);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    // right fin
     ctx.beginPath();
     ctx.moveTo(bodyX + bodyW * 0.88, bodyY + bodyH * 0.55);
     ctx.lineTo(bodyX + bodyW + finW * 0.2, bodyY + bodyH * 0.75);
@@ -159,7 +146,6 @@ export class Player {
     ctx.fill();
     ctx.stroke();
 
-    // Cockpit/window (blue circle)
     const winR = Math.max(3, Math.min(this.width, this.height) * 0.16);
     const winY = bodyY + bodyH * 0.32;
     const winGrad = ctx.createLinearGradient(cx - winR, winY - winR, cx + winR, winY + winR);
@@ -173,7 +159,6 @@ export class Player {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Small gun / nozzle - keep a subtle rectangle like before but smaller
     ctx.fillStyle = CONFIG.COLORS.PLAYER.GUN || "#b20000";
     ctx.fillRect(
       cx - (CONFIG.PLAYER.DRAW.GUN_WIDTH || 3) / 2,
@@ -182,7 +167,6 @@ export class Player {
       CONFIG.PLAYER.DRAW.GUN_HEIGHT || 8
     );
 
-    // Engine flame (triangle with radial glow)
     const flameY = bodyY + bodyH + 2;
     const flameH = Math.max(8, this.height * 0.25);
     ctx.save();
@@ -209,6 +193,4 @@ export class Player {
   getBounds() {
     return { x: this.x, y: this.y, width: this.width, height: this.height };
   }
-
-  // (engine glow helper removed; visuals provided by EngineTrail)
 }

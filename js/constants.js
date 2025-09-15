@@ -16,7 +16,6 @@
  * - Deep freezing surfaces mistakes early (attempted mutation throws in strict mode) and
  *   allows safe sharing of references without defensive cloning.
  */
-// Core color palettes & visual design tokens. Frozen via deepFreeze to avoid runtime mutation.
 const COLORS = deepFreeze({
   ASTEROID: {
     GRAD_IN: "#d4d4d4",
@@ -53,9 +52,9 @@ const COLORS = deepFreeze({
   },
 
   EXPLOSION: {
-    GRAD_IN: "rgba(255, 255, 255, ", // alpha appended
-    GRAD_MID1: "rgba(255, 200, 100, ", // alpha appended
-    GRAD_MID2: "rgba(255, 100, 50, ", // alpha appended
+    GRAD_IN: "rgba(255, 255, 255, ",
+    GRAD_MID1: "rgba(255, 200, 100, ",
+    GRAD_MID2: "rgba(255, 100, 50, ",
     GRAD_OUT: "rgba(255, 50, 0, 0)",
   },
   NEBULA: {
@@ -325,9 +324,7 @@ export const CONFIG = deepFreeze({
   },
 });
 
-/** Tau-like constant (2π). */
 export const PI2 = Math.PI * 2;
-/** Clamp a number between (min, max). */
 /**
  * @param {number} n
  * @param {number} min

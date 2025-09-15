@@ -25,10 +25,8 @@ export class LeaderboardManager {
   static IS_REMOTE = true;
   static REMOTE_ENDPOINT =
     "https://0p6x6bw6c2.execute-api.us-west-2.amazonaws.com/dev/leaderboard?id=1";
-  // Server-side leaderboard identifier used when posting scores
   static MAX_ENTRIES = 10;
   static KEY_LEADERBOARD = "aiHorizonLeaderboard";
-  // Cooldown to avoid redundant remote refresh immediately after authoritative sync (ms)
   static REMOTE_REFRESH_COOLDOWN_MS = 2500;
   /** @type {{id:string,score:number}[]|null} */
   static _cacheEntries = null;
@@ -40,9 +38,6 @@ export class LeaderboardManager {
   static _version = undefined;
   /** Timestamp (performance.now()/Date.now) of last successful authoritative remote sync */
   static _lastRemoteSync = 0;
-
-  // --- Internal helpers --------------------------------------------------
-  // (Removed deprecated static _normalize helper – use imported normalize() directly.)
 
   /**
    * Determine if a score qualifies for initials entry given current entries.
@@ -106,7 +101,7 @@ export class LeaderboardManager {
     try {
       if (highScoreEl) highScoreEl.textContent = String(high);
     } catch (_) {
-      /* ignore */
+      /* intentionally empty */
     }
     return high;
   }
@@ -132,7 +127,6 @@ export class LeaderboardManager {
    */
   static async load({ remote = this.IS_REMOTE } = {}) {
     if (LeaderboardManager._pendingLoadPromise) return LeaderboardManager._pendingLoadPromise;
-    // Fast path: if cache already populated and caller not forcing remote, return copy.
     if (!remote && Array.isArray(LeaderboardManager._cacheEntries)) {
       return Promise.resolve(LeaderboardManager._cacheEntries.slice());
     }
@@ -143,7 +137,6 @@ export class LeaderboardManager {
     });
     const p = (async () => {
       const entries = remote ? await repo.loadRemote() : await repo.loadLocal();
-      // capture version if repository learned one
       if (typeof repo._version === "number") LeaderboardManager._version = repo._version;
       LeaderboardManager._cacheEntries = entries.slice();
       if (remote) {
@@ -190,7 +183,6 @@ export class LeaderboardManager {
       endpoint: LeaderboardManager.REMOTE_ENDPOINT,
       maxEntries: LeaderboardManager.MAX_ENTRIES,
     });
-    // propagate known version to repository
     if (typeof LeaderboardManager._version === "number")
       repo._version = LeaderboardManager._version;
 
@@ -200,7 +192,6 @@ export class LeaderboardManager {
       return ok;
     }
 
-    // Optimistic update
     LeaderboardManager._cacheEntries = payload.slice();
     try {
       const listEl =
@@ -218,29 +209,24 @@ export class LeaderboardManager {
       lastResult = await repo.saveRemote(payload);
       if (lastResult.ok) break;
       if (lastResult.conflict) {
-        // On conflict: adopt server entries + version, merge and retry
         LeaderboardManager._cacheEntries = lastResult.entries.slice();
         if (typeof repo._version === "number") LeaderboardManager._version = repo._version;
-        // Rebuild payload by merging local desired entries into server snapshot
-        // (We simply take the higher scores per id, then re-sort)
         const map = new Map();
         for (const e of lastResult.entries) map.set(e.id, e.score);
         for (const e of entries) {
           const prev = map.get(e.id);
-          // Accept if prior score missing (undefined/null) or lower than new score
           if (prev === undefined || prev === null || e.score > prev) map.set(e.id, e.score);
         }
         const merged = Array.from(map, ([id, score]) => ({ id, score }))
           .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
           .slice(0, LeaderboardManager.MAX_ENTRIES);
-        payload.splice(0, payload.length, ...merged); // mutate existing array for next attempt
+        payload.splice(0, payload.length, ...merged);
         if (typeof repo._version === "number") {
-          // repo._version already updated; proceed to next attempt
+          /* intentionally empty */
         }
         attempt += 1;
         continue;
       }
-      // network or other failure: break (don't infinite loop)
       break;
     }
     const serverEntries = lastResult.entries;
@@ -250,7 +236,6 @@ export class LeaderboardManager {
       const now = (typeof performance !== "undefined" && performance.now()) || Date.now();
       LeaderboardManager._lastRemoteSync = now;
     }
-    // Dispatch DOM event for backward compatibility
     try {
       if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
         const CE = typeof window.CustomEvent === "function" ? window.CustomEvent : CustomEvent;
@@ -260,7 +245,6 @@ export class LeaderboardManager {
     } catch (_) {
       /* ignore */
     }
-    // Opportunistic DOM refresh
     try {
       const listEl =
         typeof document !== "undefined" ? document.getElementById("leaderboardList") : null;
@@ -335,16 +319,12 @@ export class LeaderboardManager {
       });
     };
 
-    // 1. If entries were provided by the caller, render them and return.
     if (Array.isArray(entries)) {
       doRender(entries);
-      // Option B: caller supplied entries; skip background remote load to avoid duplicate fetch
       return;
     } else if (Array.isArray(LeaderboardManager._cacheEntries)) {
       doRender(LeaderboardManager._cacheEntries);
     }
-    // Potential background refresh (remote only) unless within cooldown window.
-    // Suppress in test environments (Vitest/JSDOM) to avoid unintended network calls and flakiness.
     const g = /** @type {any} */ (typeof globalThis !== "undefined" ? globalThis : {});
     const proc = g.process;
     const isTestEnv = !!(proc && proc.env && (proc.env.NODE_ENV === "test" || proc.env.VITEST));
@@ -366,5 +346,3 @@ export class LeaderboardManager {
     }
   }
 }
-
-// (Removed default export – use named import { LeaderboardManager })

@@ -41,7 +41,7 @@ export function normalize(arr) {
 export function qualifiesForInitials(score, entries, max = MAX_DEFAULT) {
   if (typeof score !== "number" || !Number.isFinite(score) || score <= 0) return false;
   if (!Array.isArray(entries) || entries.length === 0) return true;
-  if (entries.length < 3) return true; // bootstrap threshold
+  if (entries.length < 3) return true;
   try {
     const sorted = entries
       .slice()
@@ -49,7 +49,7 @@ export function qualifiesForInitials(score, entries, max = MAX_DEFAULT) {
       .slice(0, max);
     return sorted.some((e) => score > e.score);
   } catch (_) {
-    return true; // fail open (best effort UI behavior)
+    return true;
   }
 }
 
@@ -70,7 +70,7 @@ export function formatRow(entry, index) {
   const rank = index + 1;
   const medals = ["🥇", "🥈", "🥉"];
   const medal = index < 3 ? medals[index] : "";
-  const thumb = index >= 3; // matches previous visual design
+  const thumb = index >= 3;
   const badge = /^[A-Z]{1,3}$/.test(entry.id) ? entry.id : "???";
   const medalPrefix = medal ? medal + " " : "";
   const thumbPrefix = thumb ? "👍 " : "";
@@ -92,5 +92,3 @@ export function formatRows(entries) {
   if (!Array.isArray(entries) || entries.length === 0) return [];
   return entries.slice(0, 100).map((e, idx) => formatRow(e, idx).text);
 }
-
-// (Removed default export aggregate – tree-shakers can drop unused named exports.)

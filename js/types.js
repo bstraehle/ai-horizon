@@ -52,7 +52,6 @@
  *   clear: (type?: GameEvent)=>void
  * }} EventBusish */
 
-// Re-export common classes purely for typing via JSDoc import()
 /** @typedef {import('./entities/Player.js').Player} Player */
 /** @typedef {import('./entities/Bullet.js').Bullet} Bullet */
 /** @typedef {import('./entities/Asteroid.js').Asteroid} Asteroid */
@@ -179,5 +178,4 @@
  * @property {()=>void} handleScroll
  */
 
-// Make this a module so JSDoc import('...') works without affecting runtime
 export {};

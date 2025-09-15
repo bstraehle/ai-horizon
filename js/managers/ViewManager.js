@@ -46,8 +46,6 @@ export class ViewManager {
       relBottom = bottomOffset / prevH;
     }
     let deviceDpr = window.devicePixelRatio || 1;
-    // Determine a conservative mobile hint: prefer the game's _isMobile flag, else fallback to basic touch check.
-    // Cast to any to avoid static typing errors when checking a runtime-only flag.
     const gAny = /** @type {any} */ (game);
     const hintIsMobile =
       typeof gAny === "object" && typeof gAny._isMobile === "boolean"
@@ -63,7 +61,6 @@ export class ViewManager {
 
     canvas.style.width = view.width + "px";
     canvas.style.height = view.height + "px";
-    // Use rounded pixel sizes for backing store to avoid off-by-one reflows
     canvas.width = Math.round(view.width * dpr);
     canvas.height = Math.round(view.height * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

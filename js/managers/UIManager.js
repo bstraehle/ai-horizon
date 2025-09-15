@@ -3,7 +3,6 @@
  */
 import { LeaderboardManager } from "./LeaderboardManager.js";
 export class UIManager {
-  // When true prefer scroll-preserving focus calls while overlays are visible.
   static _preserveFocus = false;
   /** Safe Element check for non-browser environments. */
   /**
@@ -31,7 +30,6 @@ export class UIManager {
    */
   static setTimer(timerEl, secondsRemaining) {
     if (!timerEl) return;
-    // Format M:SS
     const s = Math.max(0, Math.floor(secondsRemaining));
     const mins = Math.floor(s / 60);
     const secs = s % 60;
@@ -44,7 +42,6 @@ export class UIManager {
    * @param {HTMLElement|null} [highScoreEl]
    * @returns {number}
    */
-  // High score persistence delegated to LeaderboardManager
 
   /** Show pause overlay.
    * @param {HTMLElement|null} pauseScreen
@@ -98,14 +95,11 @@ export class UIManager {
   ) {
     if (finalScoreEl) finalScoreEl.textContent = String(score);
     if (gameOverScreen) gameOverScreen.classList.remove("hidden");
-    // Always ensure the leaderboard (if present) is scrolled to the top when
-    // the Game Over panel is displayed so users see the top entries first.
     try {
       const leaderboard = /** @type {HTMLElement|null} */ (
         document.getElementById("leaderboardList")
       );
       if (leaderboard) {
-        // Prefer native scrollTo when available to avoid layout thrash.
         try {
           if (typeof leaderboard.scrollTo === "function") leaderboard.scrollTo(0, 0);
           else leaderboard.scrollTop = 0;
@@ -121,8 +115,6 @@ export class UIManager {
       /* ignore */
     }
 
-    // Show initials form only if score is >0 AND would place within top MAX_ENTRIES.
-    // If caller explicitly supplies allowInitials boolean, it overrides ranking logic.
     try {
       const initialsEntry = /** @type {HTMLElement|null} */ (
         document.querySelector(".initials-entry")
@@ -163,7 +155,6 @@ export class UIManager {
         }
       };
 
-      // If explicitly overridden just honor it.
       if (typeof allowInitials === "boolean") {
         toggleInitialsUI(allowInitials);
       } else {
@@ -171,16 +162,13 @@ export class UIManager {
         if (!baseline) {
           toggleInitialsUI(false);
         } else {
-          // Determine if score qualifies for top MAX_ENTRIES.
           const max = LeaderboardManager.MAX_ENTRIES || 0;
-          // Use cached entries when available to avoid async flash.
           const cachedEntries = LeaderboardManager.getCached && LeaderboardManager.getCached();
           if (Array.isArray(cachedEntries)) {
             const entries = cachedEntries.slice();
             const qualifies = LeaderboardManager.qualifiesForInitials(score, entries, max);
             toggleInitialsUI(qualifies);
           } else if (LeaderboardManager._pendingLoadPromise) {
-            // Hide until load completes to avoid flicker, then decide.
             toggleInitialsUI(false);
             LeaderboardManager._pendingLoadPromise
               .then(
@@ -200,13 +188,12 @@ export class UIManager {
               )
               .catch(() => {});
           } else {
-            // Trigger a load (respect remote flag) and decide afterwards.
             const maybe = LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
             if (Array.isArray(maybe)) {
               const qualifies = LeaderboardManager.qualifiesForInitials(score, maybe, max);
               toggleInitialsUI(qualifies);
             } else if (maybe && typeof maybe.then === "function") {
-              toggleInitialsUI(false); // hide while loading
+              toggleInitialsUI(false);
               maybe
                 .then(
                   /** @param {{id:string,score:number}[]|any} entries */
@@ -229,7 +216,6 @@ export class UIManager {
                 )
                 .catch(() => {});
             } else {
-              // Fallback: show if baseline positive score.
               toggleInitialsUI(true);
             }
           }
@@ -238,21 +224,12 @@ export class UIManager {
     } catch (_) {
       /* ignore */
     }
-    // Remember caller preference so document-level focus guards use the
-    // scroll-preserving focus method for a short period.
-    // Prefer focusing the initials input when present so users can type
-    // their initials immediately. Respect preserveScroll when choosing
-    // the focus method but always prefer the input over the restart button.
     const initialsInput = /** @type {HTMLElement|null} */ (
       document.getElementById("initialsInput")
     );
     const submitBtn = /** @type {HTMLElement|null} */ (document.getElementById("submitScoreBtn"));
-    // Consider initials input/submission present only when they are visible.
     const visibleInitials =
       initialsInput && !initialsInput.classList.contains("hidden") ? initialsInput : null;
-    // Prefer the initials input so users can type immediately, but if the
-    // final score is zero or the initials UI is hidden prefer focusing
-    // the Play/Restart button so users can immediately play again.
     let preferred = visibleInitials || restartBtn;
     if (typeof score === "number" && score === 0) {
       preferred = restartBtn;
@@ -260,8 +237,6 @@ export class UIManager {
 
     if (preserveScroll) {
       UIManager._preserveFocus = true;
-      // Clear the preference after a longer grace period so slower mobile
-      // browsers have time to accept focus after native prompts.
       /** @type {number|undefined} */
       let preserveTimeout;
       const clearPreserve = () => {
@@ -280,13 +255,7 @@ export class UIManager {
         UIManager._preserveFocus = false;
       }
 
-      // Attempt immediate focus (best-effort) on the preferred element
-      // using the scroll-preserving path.
       UIManager.focusPreserveScroll(preferred);
-      // Also schedule a couple of short retries to handle browsers that
-      // refuse focus initially (some mobile browsers) or that move focus
-      // during overlay show. These retries are best-effort and will be
-      // no-ops if the element is already focused or removed.
       try {
         const target = preferred;
         setTimeout(() => {
@@ -308,8 +277,6 @@ export class UIManager {
       } catch (_) {
         void 0;
       }
-      // If the browser blocks real focus, provide a visible fallback so
-      // users still see the intended target.
       try {
         if (preferred && document.activeElement !== preferred) {
           preferred.classList.add("js-force-focus");
@@ -317,7 +284,6 @@ export class UIManager {
       } catch (_) {
         /* ignore */
       }
-      // Attempt clear visual indicator removal later if focus finally succeeds.
       try {
         const onFocusIn = () => {
           try {
@@ -341,9 +307,6 @@ export class UIManager {
       }
     } else {
       UIManager.focusWithRetry(preferred);
-      // Retry shortly in case the browser steals focus or the element is
-      // not immediately focusable due to rendering. This keeps Play Again
-      // focused reliably for score==0 cases and initials for score>0.
       try {
         const target = preferred;
         setTimeout(() => {
@@ -389,9 +352,7 @@ export class UIManager {
     if (!el) return;
     const tryFocus = () => {
       try {
-        // Prefer focus with options when available to avoid scrolling.
         el.focus({ preventScroll: true });
-        // Some mobile browsers ignore focus(options); try plain focus as fallback.
       } catch (_) {
         try {
           el.focus();
@@ -399,7 +360,6 @@ export class UIManager {
           /* ignore */
         }
       }
-      // If focus with options didn't take effect, try plain focus too.
       try {
         if (document.activeElement !== el) el.focus();
       } catch (_) {
@@ -407,10 +367,6 @@ export class UIManager {
       }
     };
     tryFocus();
-    // Retry focusing a few times. If the browser still doesn't honor focus
-    // (common on some mobile browsers), add a temporary CSS class to give a
-    // visible focus indication so users see the Play/Restart button is the
-    // intended target.
     if (document.activeElement !== el) {
       requestAnimationFrame(() => {
         tryFocus();
@@ -423,7 +379,6 @@ export class UIManager {
                 if (document.activeElement !== el) {
                   setTimeout(() => {
                     tryFocus();
-                    // If focus still failed, add temporary visual indicator
                     if (document.activeElement !== el) {
                       try {
                         el.classList.add("js-force-focus");
@@ -456,12 +411,9 @@ export class UIManager {
     if (!el) return;
     const tryFocus = () => {
       try {
-        // Prefer focus with options when available to avoid scrolling.
         el.focus({ preventScroll: true });
       } catch (_) {
         try {
-          // Save scroll then focus and restore to avoid jumps in browsers
-          // that don't honor preventScroll.
           const scrollX =
             typeof window.scrollX === "number" ? window.scrollX : window.pageXOffset || 0;
           const scrollY =
@@ -478,7 +430,6 @@ export class UIManager {
       }
       try {
         if (document.activeElement !== el) {
-          // Attempt plain focus as last resort then restore scroll.
           const scrollX =
             typeof window.scrollX === "number" ? window.scrollX : window.pageXOffset || 0;
           const scrollY =
@@ -495,8 +446,6 @@ export class UIManager {
       }
     };
 
-    // Run initial attempt and a sequence of retries like focusWithRetry so
-    // mobile browsers that delay focusing still receive focus.
     tryFocus();
     if (document.activeElement !== el) {
       requestAnimationFrame(() => {
@@ -529,7 +478,6 @@ export class UIManager {
    */
   static ensureOverlayFocus(gameInfo, startBtn, gameOverScreen, restartBtn) {
     if (gameOverScreen && !gameOverScreen.classList.contains("hidden")) {
-      // When ensuring overlay focus, prefer the initials input when present.
       const inputEl = /** @type {HTMLElement|null} */ (document.getElementById("initialsInput"));
       const preferredEl = inputEl && !inputEl.classList.contains("hidden") ? inputEl : restartBtn;
       if (UIManager._preserveFocus) UIManager.focusPreserveScroll(preferredEl);
@@ -595,8 +543,6 @@ export class UIManager {
         !submitEl.classList.contains("hidden") &&
         (t === submitEl || (t && typeof t.closest === "function" && t.closest("#submitScoreBtn")));
 
-      // If the user is interacting with the initials input or submit button,
-      // don't yank focus back to the restart button.
       if (!isRestart && !isInitials && !isSubmit) {
         if (UIManager._preserveFocus) UIManager.focusPreserveScroll(restartBtn);
         else UIManager.focusWithRetry(restartBtn);
@@ -604,7 +550,6 @@ export class UIManager {
       return;
     }
     if (overlayStartVisible) {
-      // Allow links (e.g. About) inside the overlay to receive focus via keyboard
       const targetIsLink = t && typeof t.closest === "function" && t.closest("a");
       if (targetIsLink) return;
       const isStart =
@@ -623,32 +568,21 @@ export class UIManager {
   static handleStartScreenFocusGuard(e, gameInfo, startBtn) {
     if (!gameInfo || gameInfo.classList.contains("hidden")) return;
     const t = UIManager.isElement(e && e.target) ? /** @type {Element} */ (e.target) : null;
-    // Allow links (e.g. About) inside the overlay to be activated.
-    // For blur events, the event target is the element losing focus, so
-    // inspect the relatedTarget (or document.activeElement) to determine
-    // where focus moved. If focus moved to an anchor inside the overlay,
-    // don't yank it back.
     const targetIsLink = t && typeof t.closest === "function" && t.closest("a");
     const targetIsStart =
       t === startBtn || (t && typeof t.closest === "function" && t.closest("#startBtn"));
 
     if (e.type === "blur") {
-      // FocusEvent may provide relatedTarget; fall back to document.activeElement
       const related = /** @type {HTMLElement|null} */ (
         (e && /** @type {any} */ (e).relatedTarget) || document.activeElement
       );
       const movedToLink = related && typeof related.closest === "function" && related.closest("a");
       const movedInsideOverlay = gameInfo && related && gameInfo.contains(related);
       if (movedToLink && movedInsideOverlay) {
-        // Allow tab/shift+tab to move focus to anchors inside the overlay.
         return;
       }
     }
 
-    // For non-blur interactions (mousedown/touchstart) allow interaction
-    // with links (e.g. About) inside the overlay. Otherwise prevent
-    // interaction with non-start targets and restore focus to the start
-    // button.
     if (targetIsLink) {
       return;
     }
@@ -670,10 +604,8 @@ export class UIManager {
   static handleGameOverFocusGuard(e, gameOverScreen, restartBtn) {
     if (!gameOverScreen || gameOverScreen.classList.contains("hidden")) return;
     const t = UIManager.isElement(e && e.target) ? /** @type {Element} */ (e.target) : null;
-    // Allow links inside the game over overlay to be activated
     const targetIsLink = t && typeof t.closest === "function" && t.closest("a");
     if (targetIsLink) return;
-    // Allow interaction with leaderboard (for scrolling/touch)
     const leaderboard = document.getElementById("leaderboardList");
     const targetIsLeaderboard =
       leaderboard &&
@@ -693,11 +625,6 @@ export class UIManager {
       !submitEl.classList.contains("hidden") &&
       (t === submitEl || (t && typeof t.closest === "function" && t.closest("#submitScoreBtn")));
 
-    // Do not prevent default or stop propagation here: allow touch/scroll
-    // interactions (e.g. scrolling the leaderboard) to continue. Only
-    // ensure the restart button regains focus when appropriate. If the
-    // user is interacting with the initials input or submit button, or
-    // the restart button itself, do not yank focus.
     if (targetIsRestart || targetIsInitials || targetIsSubmit) return;
 
     if (UIManager._preserveFocus) UIManager.focusPreserveScroll(restartBtn);
@@ -705,9 +632,6 @@ export class UIManager {
   }
 }
 
-// Listen for leaderboard updates (dispatched by LeaderboardManager.save) and
-// re-render the visible leaderboard list if present. Guarded so it only runs
-// when a browser-like window/document exists.
 try {
   if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
     window.addEventListener("leaderboard:updated", () => {

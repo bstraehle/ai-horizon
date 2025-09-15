@@ -70,14 +70,13 @@ export class EventBus {
    */
   emit(type, payload) {
     const set = this._handlers.get(type);
-    if (!set || set.size === 0) return; // Fast path: no listeners
-    // Snapshot to ensure all handlers at emit start run even if some unsubscribe
+    if (!set || set.size === 0) return;
     const handlers = Array.from(set);
     for (const fn of handlers) {
       try {
         fn(payload);
       } catch (_) {
-        // Swallow handler errors so one bad listener doesn't break the loop
+        /* intentionally empty */
       }
     }
   }

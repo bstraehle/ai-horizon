@@ -442,14 +442,11 @@ export class Asteroid {
       const ang = rng.nextFloat() * Math.PI * 2;
       const baseSp = cfg.PUFF_SPEED || 120;
       const sp = baseSp + (rng.nextFloat() - 0.5) * (cfg.PUFF_SPEED_VAR || 0);
-      // Upward visibility bias: compress downward hemisphere probability
       let vx = Math.cos(ang) * sp;
       let vy = Math.sin(ang) * sp;
-      // Flatten less (0.8 instead of 0.6) and bias upward (if vy > 0 reduce slightly, if vy < 0 boost)
       vy *= 0.8;
       if (vy > 0) vy *= 0.6;
       else vy *= 1.2;
-      // Slight outward scale so particles separate sooner
       vx *= 1.05;
       vy *= 1.05;
       const life = (cfg.PUFF_LIFE || 0.4) + (rng.nextFloat() - 0.5) * (cfg.PUFF_LIFE_VAR || 0);

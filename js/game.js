@@ -15,18 +15,13 @@
  */
 
 // @ts-nocheck - The file contains extensive JSDoc-driven types that produce
-// transient type errors under strict TS checking in this repo. Disabling
-// checking here keeps runtime behavior intact while the codebase migrates
-// to stronger typing. See issue tracking for incremental fixes.
 
 import { CONFIG } from "./constants.js";
 
-// Core
 import { GameLoop } from "./core/GameLoop.js";
 import { getGameContext } from "./core/GameContext.js";
 import { InputState } from "./core/InputState.js";
 
-// Entities
 import { Asteroid } from "./entities/Asteroid.js";
 import { Bullet } from "./entities/Bullet.js";
 import { EngineTrail } from "./entities/EngineTrail.js";
@@ -36,7 +31,6 @@ import { Particle } from "./entities/Particle.js";
 import { Player } from "./entities/Player.js";
 import { Star } from "./entities/Star.js";
 
-// Managers
 import { BackgroundManager } from "./managers/BackgroundManager.js";
 import { CollisionManager } from "./managers/CollisionManager.js";
 import { InputManager } from "./managers/InputManager.js";
@@ -47,7 +41,6 @@ import { UIManager } from "./managers/UIManager.js";
 import { LeaderboardManager } from "./managers/LeaderboardManager.js";
 import { ViewManager } from "./managers/ViewManager.js";
 
-// Utils
 import { ObjectPool } from "./utils/ObjectPool.js";
 import { RateLimiter } from "./utils/RateLimiter.js";
 import { RNG } from "./utils/RNG.js";
@@ -81,10 +74,6 @@ class AIHorizon {
    * Sets up UI, game variables, and event listeners.
    */
   constructor() {
-    // Idempotent constructor: if an instance already exists, return it.
-    // Note: we still allow constructing via `new` for tests, but prefer
-    // using AIHorizon.getInstance() in app code. This pattern prevents
-    // double-instantiation when scripts are included twice.
     if (typeof AIHorizon._instance !== "undefined" && AIHorizon._instance) {
       return AIHorizon._instance;
     }
@@ -97,9 +86,6 @@ class AIHorizon {
       this.canvas.getContext("2d", { alpha: false })
     );
     this.view = { width: 0, height: 0, dpr: 1 };
-    // Track current orientation (portrait|landscape) so we can suppress expensive
-    // resize handling on mobile for transient viewport changes (e.g. soft keyboard,
-    // URL bar show/hide). We compute after first resize below; initialize neutral.
     this._lastOrientation = null;
     this.gameInfo = /** @type {HTMLElement} */ (document.getElementById("gameInfo"));
     this.gameOverScreen = /** @type {HTMLElement} */ (document.getElementById("gameOverScreen"));
@@ -114,22 +100,16 @@ class AIHorizon {
     );
     this.timerEl = /** @type {HTMLElement|null} */ (document.getElementById("timer"));
 
-    // Initialize highScore to a sensible default and load leaderboard entries
-    // once below (may be sync or async depending on remote configuration).
     this.highScore = 0;
     this.score = 0;
-    // Update display immediately with default high score (0) and then
-    // re-render/update when leaderboard load completes.
     try {
       this.updateHighScore();
     } catch (_e) {
       /* ignore */
     }
 
-    // Timer configuration
     this.timerSeconds = CONFIG.GAME.TIMER_SECONDS || 60;
     this.timerRemaining = this.timerSeconds;
-    // Ensure UI shows initial timer
     try {
       UIManager.setTimer(this.timerEl, this.timerRemaining);
     } catch (_e) {
@@ -147,7 +127,6 @@ class AIHorizon {
     this.bulletSpeed = CONFIG.SPEEDS.BULLET;
     this.starSpeed = CONFIG.SPEEDS.STAR;
 
-    // Initialize RNG with optional seed from URL (?seed=...) for reproducible runs
     let seed = undefined;
     try {
       const url = new URL(window.location.href);
@@ -156,21 +135,17 @@ class AIHorizon {
         const n = Number(s);
         seed = Number.isFinite(n) ? n : undefined;
         if (seed === undefined) {
-          // Fallback to string hashing for non-numeric seeds
           this.rng = RNG.fromString(s);
         }
       }
     } catch {
-      // non-browser envs (tests) may lack URL; ignore
+      /* intentionally empty */
     }
     this.rng = this.rng || new RNG(seed);
     this.fireLimiter = new RateLimiter(CONFIG.GAME.SHOT_COOLDOWN, () => this.timeMs);
 
-    // State machine controls high-level flow
     this.state = new GameStateMachine();
     this._pausedFrameRendered = false;
-    // Suppress automatic fullReset triggered by transient resizes (e.g. native prompt/keyboard)
-    // This is toggled around user prompts to avoid reverting to the start screen on mobile.
     this._suppressFullResetOnResize = false;
 
     this.fireLimiter.reset();
@@ -182,11 +157,10 @@ class AIHorizon {
     this.engineTrail = new EngineTrail();
 
     this.resizeCanvas();
-    // Establish initial orientation after first canvas measurement
     try {
       this._lastOrientation = window.innerWidth > window.innerHeight ? "landscape" : "portrait";
     } catch {
-      /* non-browser/test env */
+      /* intentionally empty */
     }
     this.initBackground();
     this.drawBackground();
@@ -207,7 +181,6 @@ class AIHorizon {
     /** @type {Star[]} */
     this.stars = [];
 
-    // @__PURE__ object pool factories (side-effect free constructors)
     this.bulletPool = /* @__PURE__ */ new ObjectPool(
       (x, y, w, h, speed) => new Bullet(x, y, w, h, speed),
       undefined,
@@ -238,20 +211,14 @@ class AIHorizon {
       { maxSize: 256 }
     );
 
-    // Pre-allocate common objects to reduce first-use jank
     this._warmUpPools();
 
     this.bindEventHandlers();
     this.setupEventListeners();
-    // Register EventBus handlers centrally
     this._unsubscribeEvents = EventHandlers.register(this);
 
     this.startBtn.focus();
 
-    // Load leaderboard entries once and use the result to set the
-    // displayed high score and render the leaderboard. LeaderboardManager
-    // may return either an array (sync) or a Promise (remote), so handle
-    // both paths.
     try {
       const maybeEntries = LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
       /**
@@ -291,7 +258,6 @@ class AIHorizon {
       stepMs: CONFIG.TIME.STEP_MS,
       maxSubSteps: CONFIG.TIME.MAX_SUB_STEPS,
     });
-    // Cache singleton instance after construction completes
     AIHorizon._instance = this;
   }
 
@@ -367,21 +333,17 @@ class AIHorizon {
    * @returns {boolean} True if mobile device detected; false otherwise.
    */
   isMobile() {
-    // Prefer User-Agent Client Hints when available
-    // Access UA Client Hints via loose cast to support older lib.dom typings
     const uaData = /** @type {any} */ (navigator).userAgentData;
     if (uaData && typeof uaData.mobile === "boolean") {
       return uaData.mobile;
     }
 
-    // Feature/media-query based detection
     const hasTouch = (navigator.maxTouchPoints || 0) > 0;
     const supportsMQ = typeof window.matchMedia === "function";
     const coarse = supportsMQ && window.matchMedia("(any-pointer: coarse)").matches;
     const noHover = supportsMQ && window.matchMedia("(any-hover: none)").matches;
     if (hasTouch && (coarse || noHover)) return true;
 
-    // Last-resort fallback (legacy browsers)
     return /Mobi|Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
   }
 
@@ -496,11 +458,9 @@ class AIHorizon {
     if (e.repeat) return false;
     const codeOrKey = e.code || e.key;
     const isPauseOrConfirm = AIHorizon.PAUSE_CONFIRM_CODES.has(codeOrKey);
-    // Only allow confirm keys to resume if paused
     if (this.state.isPaused()) {
       return isPauseOrConfirm;
     }
-    // Otherwise, allow pause keys/codes to pause
     return isPauseOrConfirm;
   }
 
@@ -698,10 +658,6 @@ class AIHorizon {
     this._resizeScheduled = true;
     requestAnimationFrame(() => {
       this._resizeScheduled = false;
-      // If on a mobile device, ignore resizes that do not correspond to an
-      // orientation change (portrait <-> landscape). This avoids triggering
-      // background regeneration or full resets when the soft keyboard appears,
-      // URL bar hides, PWA chrome animates, etc.
       if (this._isMobile) {
         let currentOrientation = this._lastOrientation;
         try {
@@ -711,20 +667,14 @@ class AIHorizon {
           /* non-browser env */
         }
         if (this._lastOrientation && currentOrientation === this._lastOrientation) {
-          return; // skip non-orientation resize on mobile
+          return;
         }
         this._lastOrientation = currentOrientation;
       }
-      // Recompute size first
       const prevWidth = this.view.width || 0;
       const prevHeight = this.view.height || 0;
       this.resizeCanvas();
 
-      // Detect platform (mobile/desktop) change and perform a full reset when
-      // either the `isMobile()` heuristic toggles or the layout crosses a
-      // desktop/mobile width breakpoint (e.g. 768px). Some browsers don't
-      // change UA/hints during resizes, so breakpoint detection is a pragmatic
-      // fallback.
       const currentlyMobile = this.isMobile();
       const newWidth = this.view.width || 0;
       const BREAKPOINT = 768;
@@ -732,31 +682,17 @@ class AIHorizon {
         (prevWidth < BREAKPOINT && newWidth >= BREAKPOINT) ||
         (prevWidth >= BREAKPOINT && newWidth < BREAKPOINT);
 
-      // If platform hint changed or layout breakpoint crossed, perform a
-      // full reset so the start/menu overlay ("Launch Mission") is shown.
-      // NOTE: we intentionally do NOT trigger a full reset merely because
-      // the user is at Game Over and the viewport resized. That behavior
-      // previously returned players to the start screen on transient
-      // resizes (e.g. native prompts or keyboard), which is undesirable.
       if (currentlyMobile !== this._isMobile || crossedBreakpoint) {
         this.fullReset();
       }
-      // Prefer to update existing background state to match new canvas
-      // dimensions instead of fully reinitializing it. This preserves
-      // nebula and star positions and avoids visible jumps on resize.
       try {
-        // Use BackgroundManager.resize to adapt existing background state.
-        // Pass previous view so helper can scale positions/sizes correctly.
         const prevView = { width: prevWidth, height: prevHeight };
         const ctx = getGameContext(this);
         const resized = BackgroundManager.resize(ctx, prevView);
         if (resized) {
-          // When the view size has changed, regenerate the nebula so it
-          // matches the new dimensions instead of scaling the old one.
           const widthChanged = (prevView.width || 0) !== (this.view.width || 0);
           const heightChanged = (prevView.height || 0) !== (this.view.height || 0);
           if (widthChanged || heightChanged) {
-            // Force nebula regeneration on resize
             this.nebulaConfigs = undefined;
             this.initBackground();
           } else {
@@ -764,11 +700,9 @@ class AIHorizon {
             if (resized.starField) this.starField = resized.starField;
           }
         } else {
-          // Fallback to init if resize helper couldn't run (e.g., no prior state)
           this.initBackground();
         }
       } catch (_e) {
-        // ignore in non-DOM/test envs
         try {
           this.initBackground();
         } catch (_err) {
@@ -790,20 +724,15 @@ class AIHorizon {
    */
   softReinitForPlatformChange(nowMobile) {
     this._isMobile = nowMobile;
-    // Update speeds that depend on platform
     this.asteroidSpeed = this._isMobile
       ? CONFIG.SPEEDS.ASTEROID_MOBILE
       : CONFIG.SPEEDS.ASTEROID_DESKTOP;
     this.starSpeed = CONFIG.SPEEDS.STAR;
 
-    // Reset spawn counters so cadence aligns with new platform expectations
     SpawnManager.reset(this);
-    // Force nebula regeneration on next init so each new game gets a fresh background.
     this.nebulaConfigs = undefined;
 
-    // Re-warm pools for likely smaller/larger entities (cheap, optional)
     try {
-      // warmup counts are heuristic and intentionally small to avoid jank
       if (this.starPool && typeof this.starPool.warmUp === "function") {
         this.starPool.warmUp(16, 0, 0, 0, 0, this.starSpeed, false);
       }
@@ -819,16 +748,13 @@ class AIHorizon {
         );
       }
     } catch (_e) {
-      // Ignore warmup failures - optional optimization
       void 0;
     }
 
-    // Recreate sprites if necessary for DPI/platform differences
     if (SpriteManager && typeof SpriteManager.createSprites === "function") {
       try {
         this.sprites = SpriteManager.createSprites();
       } catch (_e) {
-        // ignore
         void 0;
       }
     }
@@ -841,10 +767,8 @@ class AIHorizon {
    * and re-evaluates platform-dependent parameters.
    */
   fullReset() {
-    // Stop the loop if running
     if (this.loop) this.loop.stop();
 
-    // Release pooled entities back to pools
     /**
      * @param {Array<any>} arr
      * @param {{ release: (obj: any) => void } | undefined} pool
@@ -859,7 +783,6 @@ class AIHorizon {
     releaseAll(this.particles, this.particlePool);
     releaseAll(this.stars, this.starPool);
 
-    // Clear runtime arrays
     this.asteroids = [];
     this.bullets = [];
     this.explosions = [];
@@ -867,10 +790,8 @@ class AIHorizon {
     this.stars = [];
     this.scorePopups = [];
 
-    // Reset scores and timers
     this.score = 0;
     this.updateScore();
-    // reset countdown timer
     this.timerRemaining = this.timerSeconds;
     try {
       UIManager.setTimer(this.timerEl, this.timerRemaining);
@@ -882,30 +803,24 @@ class AIHorizon {
     this.fireLimiter.reset();
     this.input = new InputState();
 
-    // Reset spawn counters and RNG remains the same for reproducibility
     SpawnManager.reset(this);
 
-    // Recompute platform flags and speeds
     this._isMobile = this.isMobile();
     this.asteroidSpeed = this._isMobile
       ? CONFIG.SPEEDS.ASTEROID_MOBILE
       : CONFIG.SPEEDS.ASTEROID_DESKTOP;
     this.starSpeed = CONFIG.SPEEDS.STAR;
 
-    // Warm up pools again (best-effort)
     this._warmUpPools();
 
-    // Recreate sprites and background to match fresh state
     try {
       this.sprites = SpriteManager.createSprites();
     } catch (_e) {
-      // ignore in tests/non-DOM
       void 0;
     }
     this.initBackground();
     this.drawBackground();
 
-    // Ensure UI overlays are reset: hide game over / pause, show start/info overlay
     try {
       UIManager.hideGameOver(this.gameOverScreen);
       UIManager.hidePause(this.pauseScreen);
@@ -913,13 +828,9 @@ class AIHorizon {
         this.gameInfo.classList.remove("hidden");
       }
     } catch (_e) {
-      // ignore in non-DOM environments
       void 0;
     }
 
-    // Preserve existing nebula/starField state but do not force-generate
-    // nebula for the start/menu screen. Nebula will be generated when the
-    // game starts so it only appears during gameplay.
     try {
       const bg = BackgroundManager.init({
         view: this.view,
@@ -930,22 +841,17 @@ class AIHorizon {
       if (bg && bg.nebulaConfigs) this.nebulaConfigs = bg.nebulaConfigs;
       this.starField = bg && bg.starField ? bg.starField : this.starField;
     } catch (_e) {
-      // ignore in tests/non-DOM
       void 0;
     }
 
-    // Focus the Launch Mission / Start button for accessibility and immediate keyboard usage
     try {
       UIManager.focusWithRetry(this.startBtn);
     } catch (_e) {
-      // ignore in non-DOM environments
       void 0;
     }
 
-    // Reset FSM to menu
     this.state = new GameStateMachine();
 
-    // Re-register event handlers to ensure no duplicates
     if (this._unsubscribeEvents) {
       try {
         this._unsubscribeEvents();
@@ -960,11 +866,6 @@ class AIHorizon {
    * Start or restart the game, reset scores and state.
    */
   startGame() {
-    // Reset runtime game state, ensure canvas/view metrics are up-to-date
-    // and position the player at the initial spawn before starting.
-    // If we're starting from Game Over (Play Again), force nebula regeneration.
-    // For the initial "Launch Mission" flow we want to preserve the nebula
-    // that was generated on page load, so do not force regeneration.
     let wasGameOver = false;
     try {
       wasGameOver = !!(
@@ -976,13 +877,8 @@ class AIHorizon {
       wasGameOver = false;
     }
     this.resetGameState(wasGameOver);
-    // resizeCanvas uses ViewManager.resize which will place the player
-    // at the spawn position when the game is not yet running.
     this.resizeCanvas();
     this.hideGameInfo();
-    // Now mark the state as running and then initialize background so
-    // nebula generation (which runs only when ctx.running === true) will
-    // occur. This ensures nebula appears only during gameplay.
     this.state.start();
     this.initBackground();
     this.loop.start();
@@ -1008,7 +904,6 @@ class AIHorizon {
     releaseAll(this.stars, this.starPool);
     this.score = 0;
     this.updateScore();
-    // reset countdown timer for new game
     this.timerRemaining = this.timerSeconds;
     try {
       UIManager.setTimer(this.timerEl, this.timerRemaining);
@@ -1022,18 +917,10 @@ class AIHorizon {
     this.stars = [];
     this.scorePopups = [];
     this.fireLimiter.reset();
-    // Clear input state (mouse/touch and keys) so a lingering touch doesn't
-    // cause the player to immediately move away from the spawn position on restart.
-    // FullReset creates a fresh InputState; mirror that behaviour here.
     this.input = new InputState();
-    // Reset spawn cadence counters managed by SpawnManager
     SpawnManager.reset(this);
-    // Only force nebula regeneration and create a fresh nebula RNG when
-    // explicitly requested (Play Again). Preserve existing nebula for the
-    // initial "Launch Mission" so the background stays the same as on page load.
     if (forceNebula) {
       this.nebulaConfigs = undefined;
-      // Fresh nebula RNG seeding previously occurred here but was unused; assignments removed as dead code.
     }
   }
 
@@ -1057,24 +944,13 @@ class AIHorizon {
   gameOver() {
     this.state.end();
     this.updateHighScore();
-    // Ensure pause overlay is hidden if game ends while paused
     UIManager.hidePause(this.pauseScreen);
-    // Submit score to local leaderboard and then show game over UI.
-    // Use a DOM input/submit button (no native prompt). Track whether the
-    // user submitted a valid 3-letter ID so we can preserve scroll when
-    // focusing the Play Again button.
     let submittedScore = false;
     try {
       if (this.score > 0) {
-        // Suppress fullReset triggered by transient viewport/resize changes
-        // while any native prompt replacement UI is active on some mobile browsers.
         this._suppressFullResetOnResize = true;
-        // Ensure leaderboard element exists for rendering below.
-        // Prefer existing cached element, otherwise look it up without
-        // assigning null to the instance field.
         const lbEl = this.leaderboardListEl || document.getElementById("leaderboardList");
 
-        // Wire up initials input + submit button if present in DOM.
         const initialsEntry = document.querySelector(".initials-entry");
         const initialsInput = /** @type {HTMLInputElement|null} */ (
           document.getElementById("initialsInput")
@@ -1083,7 +959,6 @@ class AIHorizon {
           document.getElementById("submitScoreBtn")
         );
 
-        // Do not force-show initials here; UIManager.showGameOver will decide based on leaderboard rank.
         if (initialsEntry) initialsEntry.classList.add("hidden");
 
         const _trySubmit = () => {
@@ -1091,19 +966,16 @@ class AIHorizon {
           const raw = String(initialsInput.value || "")
             .trim()
             .toUpperCase();
-          // Allow 1 to 3 letters
           if (/^[A-Z]{1,3}$/.test(raw)) {
             try {
               LeaderboardManager.submit(this.score, raw, { remote: LeaderboardManager.IS_REMOTE });
               submittedScore = true;
-              // clear input to indicate success
               initialsInput.value = "";
             } catch (_e) {
               /* ignore */
             }
             return true;
           }
-          // simple inline feedback: briefly add an invalid class
           try {
             if (initialsInput) {
               initialsInput.classList.add("invalid");
@@ -1117,40 +989,30 @@ class AIHorizon {
         };
 
         if (submitBtn && initialsInput) {
-          // Normalize input to uppercase as the user types while preserving caret
-          // position. This provides immediate visual feedback and keeps the
-          // underlying value consistent for submission.
           /** @type {(e: Event) => void | undefined} */
           let onInput;
           try {
             /** @param {Event} e */
-            // Normalize input live: strip any non-letter characters, uppercase,
-            // and cap to 3 characters while preserving the caret position.
             onInput = (e) => {
               try {
                 const el = /** @type {HTMLInputElement} */ (e.target);
                 const raw = String(el.value || "");
                 const start = el.selectionStart || 0;
                 const end = el.selectionEnd || 0;
-                // Filter to letters A-Z only, then uppercase and limit to 3 chars
                 const filtered = raw
                   .replace(/[^a-zA-Z]/g, "")
                   .toUpperCase()
                   .slice(0, 3);
                 if (el.value !== filtered) {
-                  // Compute new caret position: move left by the number of removed
-                  // chars before the original caret. This is a best-effort that
-                  // handles common editing scenarios.
                   const removedBeforeCaret = raw.slice(0, start).replace(/[a-zA-Z]/g, "").length;
                   const newPos = Math.max(0, start - removedBeforeCaret);
                   el.value = filtered;
                   try {
                     el.setSelectionRange(newPos, newPos);
                   } catch (_) {
-                    // ignore if selection can't be set
+                    /* intentionally empty */
                   }
                 } else {
-                  // Value unchanged except maybe case; ensure uppercase and restore selection
                   el.value = filtered;
                   try {
                     if (typeof start === "number" && typeof end === "number") {
@@ -1168,10 +1030,7 @@ class AIHorizon {
           } catch (_e) {
             /* ignore */
           }
-          // Prevent double-binding if gameOver called repeatedly
           /** @param {MouseEvent} e */
-          // Shared cleanup and hide helpers so both click and Enter can hide
-          // the initials UI consistently.
           /** @type {((ev: FocusEvent) => void)|null} */
           let onFocusOut = null;
           const cleanupInput = () => {
@@ -1208,11 +1067,9 @@ class AIHorizon {
 
           /** @param {MouseEvent} e */
           const onClick = (e) => {
-            // Prevent double submission if a pointerdown already submitted
             if (submittedScore) return;
             e.preventDefault();
             try {
-              // Read raw initials and submit only if valid (1-3 A-Z)
               const raw = initialsInput
                 ? String(initialsInput.value || "")
                     .trim()
@@ -1232,23 +1089,16 @@ class AIHorizon {
             } catch (_e) {
               /* ignore */
             }
-            // Re-render leaderboard. Hide initials UI only when the Submit
-            // button was clicked (don't hide on other interactions like
-            // focusout so the input remains visible until an explicit
-            // submit via the button).
             try {
               if (lbEl) LeaderboardManager.render(lbEl);
             } catch (_e) {
               /* ignore */
             }
             try {
-              // Hide the UI and cleanup listeners when the user explicitly
-              // clicked the Submit button.
               hideInitialsUI();
             } catch (_e) {
               /* ignore */
             }
-            // Focus Play Again button so user can restart quickly
             try {
               UIManager.focusWithRetry(this.restartBtn);
             } catch (_e) {
@@ -1256,10 +1106,6 @@ class AIHorizon {
             }
           };
           submitBtn.addEventListener("click", onClick);
-          // Some browsers/firefox may fire focusout before click when the user
-          // taps the submit button. Attach a pointerdown handler that submits
-          // earlier in the event order to avoid a race where the input is
-          // hidden before the click handler runs.
           try {
             submitBtn.addEventListener("pointerdown", (ev) => {
               if (submittedScore) return;
@@ -1278,9 +1124,6 @@ class AIHorizon {
             /* ignore */
           }
 
-          // Also allow Enter key on the input to submit. When Enter is
-          // pressed and submission succeeds, hide the initials UI like a
-          // click submission so the Play Again button can be focused.
           /** @param {KeyboardEvent} ev */
           const onKey = (ev) => {
             if (ev.key === "Enter") {
@@ -1310,9 +1153,6 @@ class AIHorizon {
               } catch (_e) {
                 /* ignore */
               }
-              // Hide the initials UI on Enter (match click behavior) so
-              // the Play Again button can be focused and the UI is cleaned
-              // up after a successful submit.
               try {
                 hideInitialsUI();
               } catch (_e) {
@@ -1326,15 +1166,10 @@ class AIHorizon {
             }
           };
           initialsInput.addEventListener("keydown", onKey);
-          // Hide the initials UI when the input loses focus unless focus
-          // moved to the submit button (user clicked Submit). Use focusout
-          // which bubbles and provides relatedTarget on modern browsers.
           /** @param {FocusEvent} ev */
           onFocusOut = (ev) => {
             try {
               const related = /** @type {HTMLElement|null} */ (
-                // relatedTarget may be null in some environments; fall back
-                // to document.activeElement for best-effort detection.
                 (ev && /** @type {any} */ (ev).relatedTarget) || document.activeElement
               );
               const movedToSubmit =
@@ -1347,14 +1182,8 @@ class AIHorizon {
                 (related &&
                   typeof related.closest === "function" &&
                   related.closest("#initialsInput"));
-              // If focus moved away from the input and didn't go to the
-              // submit button or back to the input itself, don't hide the
-              // UI automatically; instead remove focus handlers to avoid
-              // leaks and keep the controls visible until the user clicks
-              // Submit explicitly.
               if (!movedToSubmit && !movedToInitials) {
                 try {
-                  // Remove input listeners to avoid leaks but keep UI visible
                   cleanupInput();
                 } catch (_err) {
                   /* ignore */
@@ -1375,12 +1204,8 @@ class AIHorizon {
           } catch (_e) {
             /* ignore */
           }
-          // Ensure cleanup when submit is clicked and succeeds. The shared
-          // cleanupInput declared earlier is used; schedule a final cleanup
-          // after click handlers run.
           const _originalOnClick = submitBtn.onclick;
           submitBtn.addEventListener("click", () => {
-            // small timeout to allow other handlers to run then cleanup
             setTimeout(() => {
               try {
                 cleanupInput();
@@ -1395,7 +1220,6 @@ class AIHorizon {
       /* ignore */
     }
 
-    // Render leaderboard first so the list is present before we show Game Over
     try {
       const lbEl = this.leaderboardListEl || document.getElementById("leaderboardList");
       if (lbEl) LeaderboardManager.render(lbEl);
@@ -1403,7 +1227,6 @@ class AIHorizon {
       /* ignore */
     }
 
-    // Allow UIManager to compute gating; pass undefined so it evaluates leaderboard rank.
     let allowInitials = undefined;
 
     UIManager.showGameOver(
@@ -1415,13 +1238,6 @@ class AIHorizon {
       allowInitials
     );
 
-    // Defensive: if we decided initials must not be shown, ensure all
-    // initials-related elements are hidden so other UI code can't reveal
-    // them unexpectedly.
-    // UIManager now controls initials visibility; no extra defensive hide needed.
-
-    // Clear the suppression after the Game Over UI is shown — allow a short
-    // grace period so any prompt-induced resizes don't trigger a fullReset.
     try {
       setTimeout(() => {
         this._suppressFullResetOnResize = false;
@@ -1429,7 +1245,6 @@ class AIHorizon {
     } catch (_e) {
       this._suppressFullResetOnResize = false;
     }
-    // (leaderboard already rendered above)
     if (this.loop) this.loop.stop();
   }
 
@@ -1472,9 +1287,6 @@ class AIHorizon {
    * Update all game objects and check collisions.
    */
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
-    // Only animate nebula when the game is actively running. This keeps the
-    // nebula static on the start/menu screen (Launch Mission) while still
-    // allowing motion during active gameplay.
     if (
       this.nebulaConfigs &&
       this.state &&
@@ -1496,14 +1308,12 @@ class AIHorizon {
     this.checkCollisions();
     this.player.update(this.input.keys, this.input.mouse, this.view, dtSec);
 
-    // Countdown timer -- only while running
     try {
       if (this.state.isRunning()) {
         this.timerRemaining -= dtSec;
         if (this.timerRemaining <= 0) {
           this.timerRemaining = 0;
           UIManager.setTimer(this.timerEl, this.timerRemaining);
-          // Force game over when timer expires
           this.gameOver();
         } else {
           UIManager.setTimer(this.timerEl, this.timerRemaining);
@@ -1615,10 +1425,8 @@ class AIHorizon {
    */
   _warmUpPools() {
     try {
-      // Bullets
       this.bulletPool.warmUp(64, 0, 0, CONFIG.BULLET.WIDTH, CONFIG.BULLET.HEIGHT, this.bulletSpeed);
 
-      // Asteroids
       const aW = CONFIG.ASTEROID.MIN_SIZE + CONFIG.ASTEROID.SIZE_VARIATION * 0.5;
       const aH = aW;
       this.asteroidPool.warmUp(
@@ -1632,11 +1440,9 @@ class AIHorizon {
         false
       );
 
-      // Stars
       const sSize = CONFIG.STAR.MIN_SIZE + CONFIG.STAR.SIZE_VARIATION * 0.5;
       this.starPool.warmUp(32, 0, CONFIG.STAR.SPAWN_Y, sSize, sSize, this.starSpeed, false);
 
-      // Particles (explosion-like)
       this.particlePool.warmUp(
         256,
         0,
@@ -1649,7 +1455,6 @@ class AIHorizon {
         "#999"
       );
 
-      // Explosions
       this.explosionPool.warmUp(
         16,
         0,
@@ -1660,7 +1465,7 @@ class AIHorizon {
         CONFIG.EXPLOSION.LIFE
       );
     } catch (_) {
-      // warm-up is best-effort; ignore in non-DOM or test envs
+      /* intentionally empty */
     }
   }
 
@@ -1673,7 +1478,6 @@ class AIHorizon {
         this.drawFrame();
         this._pausedFrameRendered = true;
       }
-      // Pause text now shown via DOM overlay, not canvas
       return;
     }
 
@@ -1688,25 +1492,14 @@ class AIHorizon {
     RenderManager.draw(this);
   }
 
-  // Removed unused drawPauseOverlayText() (legacy canvas-based pause overlay)
-
   /**
    * Init the background.
    */
   initBackground() {
-    // Build a game context for the background manager. If we don't yet have
-    // any nebulaConfigs (initial load / menu), force nebula generation so the
-    // start screen has a visible nebula even when the game isn't running.
     const ctx = getGameContext(this);
-    // Prefer a fresh, time-seeded RNG for nebula generation on init (Play Again)
-    // when the user hasn't provided a deterministic seed via URL. This avoids
-    // reusing the main game RNG state which can produce identical nebula across
-    // restarts. If a URL seed is present, keep reproducible behavior by not
-    // overriding the RNG.
     try {
       const url = new URL(window.location.href);
       if (!url.searchParams.has(CONFIG.RNG.SEED_PARAM)) {
-        // create a small time-derived seed
         let seed = (Date.now() >>> 0) ^ 0;
         try {
           if (typeof performance !== "undefined" && typeof performance.now === "function") {
@@ -1719,13 +1512,9 @@ class AIHorizon {
         ctx.rng = new RNG(seed);
       }
     } catch (_e) {
-      // Non-browser/test envs: fall back to fresh RNG
       ctx.rng = new RNG();
     }
-    // Do not force nebula creation for the menu/start screen. Nebula will be
-    // created when the game is started (running == true).
     const { nebulaConfigs, starField } = BackgroundManager.init(ctx);
-    // Preserve existing nebula when not re-generated (e.g., paused/gameover)
     if (nebulaConfigs) this.nebulaConfigs = nebulaConfigs;
     this.starField = starField;
   }
@@ -1774,17 +1563,15 @@ class AIHorizon {
 }
 
 export { AIHorizon };
-// Backwards-compatible export name expected by the test suite
 export { AIHorizon as DarkHorizon };
 
 window.addEventListener(
   "load",
   () => {
-    // Use the factory to ensure singleton/idempotent instantiation.
     try {
       AIHorizon.getInstance();
     } catch (_e) {
-      // ignore in non-DOM/test envs
+      /* intentionally empty */
     }
   },
   { once: true }

@@ -126,7 +126,6 @@ async function getItem(id) {
     throw new Error(`Item with id ${id} not found`);
   }
 
-  // ensure version property exists for clients implementing optimistic concurrency
   if (typeof result.Item.version !== "number") result.Item.version = 0;
   return result.Item;
 }
@@ -155,9 +154,7 @@ async function updateItem(id, updateData) {
   const nowIso = new Date().toISOString();
   updateData.updatedAt = nowIso;
 
-  // Optimistic concurrency: expect caller to send 'version'. If absent, treat as unconditional create of version (0 -> 1).
   const providedVersion = typeof updateData.version === "number" ? updateData.version : undefined;
-  // version is not directly updated in the dynamic loop below; we increment explicitly.
   delete updateData.version;
 
   /** @type {string[]} */
@@ -176,15 +173,13 @@ async function updateItem(id, updateData) {
     expressionAttributeValues[attributeValue] = updateData[key];
   });
 
-  // Always increment version atomically; add to update expression.
   updateExpressions.push("#ver = if_not_exists(#ver, :zero) + :one");
   expressionAttributeNames["#ver"] = "version";
   expressionAttributeValues[":one"] = 1;
   expressionAttributeValues[":zero"] = 0;
 
-  let condition = "attribute_exists(id)"; // ensure item exists
+  let condition = "attribute_exists(id)";
   if (providedVersion !== undefined) {
-    // Only match if current version equals providedVersion
     condition += " AND #ver = :expectedVersion";
     expressionAttributeValues[":expectedVersion"] = providedVersion;
   }
@@ -213,7 +208,6 @@ async function updateItem(id, updateData) {
       "name" in err &&
       err.name === "ConditionalCheckFailedException"
     ) {
-      // Fetch current item so we can return latest version + scores for client to merge
       const current = await getItem(id);
       return { conflict: true, message: "Version mismatch", item: current };
     }

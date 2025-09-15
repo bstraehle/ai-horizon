@@ -54,7 +54,7 @@ export class RNG {
    * @returns {RNG}
    */
   static fromString(str) {
-    let h = 2166136261 >>> 0; // FNV-1a
+    let h = 2166136261 >>> 0;
     for (let i = 0; i < str.length; i++) {
       h ^= str.charCodeAt(i);
       h = Math.imul(h, 16777619);
@@ -126,13 +126,11 @@ export class RNG {
    */
   static _seed32(seed) {
     if (typeof seed === "number" && Number.isFinite(seed)) return seed >>> 0;
-    // Try crypto if available for non-deterministic default
     if (typeof crypto !== "undefined" && crypto.getRandomValues) {
       const buf = new Uint32Array(1);
       crypto.getRandomValues(buf);
       return buf[0] >>> 0;
     }
-    // Fallback: hash time sources
     const t = (Date.now() ^ (performance && performance.now ? performance.now() : 0)) >>> 0;
     return Math.imul(t ^ 0x9e3779b9, 0x85ebca6b) >>> 0;
   }

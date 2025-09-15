@@ -77,7 +77,6 @@ export const EventHandlers = {
     /** @type {Array<() => void>} */
     const unsubs = [];
 
-    // bulletHitAsteroid → score, explosion, optional popup
     unsubs.push(
       // @ts-ignore
       /**
@@ -93,19 +92,13 @@ export const EventHandlers = {
        */
       events.on("bulletHitAsteroid", function (/** @type {{ asteroid:any }} */ payload) {
         const { asteroid } = payload;
-        // Award points (special-case indestructible asteroids)
         const add =
           asteroid && asteroid.isIndestructible
             ? CONFIG.GAME.ASTEROID_SCORE_INDESTRUCTIBLE
             : CONFIG.GAME.ASTEROID_SCORE;
         game.score += add;
-        // Create explosion and a colored score popup
         game.createExplosion(asteroid.x + asteroid.width / 2, asteroid.y + asteroid.height / 2);
-        // Only show a score popup for indestructible asteroids
         if (asteroid && asteroid.isIndestructible && typeof game.createScorePopup === "function") {
-          // Dramatic +100 popup: use asteroid's palette color when available (keeps theme consistent),
-          // otherwise fall back to gold. Prefer a mid gradient color for good contrast.
-          // Unified danger red color for +100 popup
           const baseColor = CONFIG.COLORS.SCORE.DANGER_RED;
           const opts = {
             color: baseColor,
@@ -128,14 +121,12 @@ export const EventHandlers = {
       })
     );
 
-    // playerHitAsteroid → game over
     unsubs.push(
       events.on("playerHitAsteroid", () => {
         game.gameOver();
       })
     );
 
-    // collectedStar → score + optional popup
     unsubs.push(
       // @ts-ignore
       /**
@@ -152,12 +143,7 @@ export const EventHandlers = {
         const add = star && star.isRed ? CONFIG.GAME.STAR_SCORE_RED : CONFIG.GAME.STAR_SCORE;
         game.score += add;
         game.updateScore();
-        // Show a +50 popup for red bonus stars using the SAME styling logic as +100 (indestructible asteroid)
-        // for visual consistency. We reuse the dynamic palette extraction, falling back to neutral star base.
         if (star && star.isRed && typeof game.createScorePopup === "function") {
-          // Use the same visual tone as +100: prefer mid tone from MONO_DARK asteroid palette for consistency.
-          // Fallback chain mirrors +100 logic (mid -> in -> crater -> neutral star base).
-          // Use unified danger red color for +50 popup
           const baseColor = CONFIG.COLORS.SCORE.DANGER_RED;
           const opts = {
             color: baseColor,
@@ -174,7 +160,6 @@ export const EventHandlers = {
       })
     );
 
-    // collectedStar → particle burst
     unsubs.push(
       // @ts-ignore
       /**
