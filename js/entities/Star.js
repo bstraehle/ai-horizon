@@ -38,9 +38,8 @@ export class Star {
   /**
    * Render star with radial gradient & optional pulse scale modulation.
    * @param {CanvasRenderingContext2D} ctx 2D context.
-   * @param {number} timeSec Elapsed time (seconds) for pulse animation.
    */
-  draw(ctx, timeSec) {
+  draw(ctx) {
     ctx.save();
     const centerX = this.x + this.width / 2;
     const centerY = this.y + this.height / 2;
