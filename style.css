@@ -108,7 +108,6 @@ body {
   left: 0;
   right: 0;
   padding: var(--space-5);
-  /* Use the shared vertical value for bottom padding as well */
   padding-bottom: max(var(--page-vertical), env(safe-area-inset-bottom));
   position: fixed;
   transform: translateZ(0);
