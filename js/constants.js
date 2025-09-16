@@ -133,7 +133,6 @@ export const CONFIG = deepFreeze({
     INDESTRUCTIBLE_HITS: 10,
     SHIELD_FLASH_EXTRA_ALPHA: 0.4,
     CRATER_EMBOSS: {
-      ENABLE: true,
       COUNT_BASE: 3,
       COUNT_VAR: 2,
       SIZE_MIN: 2,
@@ -147,7 +146,6 @@ export const CONFIG = deepFreeze({
       HIGHLIGHT_FADE_SCALE: 0.4,
       REVEAL_TIME: 0.25,
       REVEAL_EASE: "outQuad",
-      PUFF_ENABLE: true,
       PUFF_COUNT: 9,
       PUFF_LIFE: 0.55,
       PUFF_LIFE_VAR: 0.2,

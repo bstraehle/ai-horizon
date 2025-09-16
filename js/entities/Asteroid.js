@@ -63,24 +63,22 @@ export class Asteroid {
     const maxR = radius * sizeFactor;
     /** @type {Crater[]} */ this._craters = [];
     /** @type {Crater[]} */ this._reserveCraters = [];
-    if (craterCfg.ENABLE) {
-      this._craters = Array.from({ length: count }, () => ({
-        dx: (rand.nextFloat() - 0.5) * radius * 0.8,
-        dy: (rand.nextFloat() - 0.5) * radius * 0.8,
-        r: rand.nextFloat() * maxR + sizeMin,
-        grow: 1,
-      }));
-      const extraMax = craterCfg.EXTRA_MAX || 0;
-      this._reserveCraters = extraMax
-        ? Array.from({ length: extraMax }, () => ({
-            dx: (rand.nextFloat() - 0.5) * radius * 0.85,
-            dy: (rand.nextFloat() - 0.5) * radius * 0.85,
-            r: rand.nextFloat() * maxR + sizeMin,
-            grow: 1,
-          }))
-        : [];
-      this._initialCraterCount = this._craters.length;
-    }
+    this._craters = Array.from({ length: count }, () => ({
+      dx: (rand.nextFloat() - 0.5) * radius * 0.8,
+      dy: (rand.nextFloat() - 0.5) * radius * 0.8,
+      r: rand.nextFloat() * maxR + sizeMin,
+      grow: 1,
+    }));
+    const extraMax = craterCfg.EXTRA_MAX || 0;
+    this._reserveCraters = extraMax
+      ? Array.from({ length: extraMax }, () => ({
+          dx: (rand.nextFloat() - 0.5) * radius * 0.85,
+          dy: (rand.nextFloat() - 0.5) * radius * 0.85,
+          r: rand.nextFloat() * maxR + sizeMin,
+          grow: 1,
+        }))
+      : [];
+    this._initialCraterCount = this._craters.length;
     this._palette = CONFIG.COLORS.ASTEROID;
     if (this.isIndestructible) {
       if (paletteOverride && typeof paletteOverride === "object") this._palette = paletteOverride;
@@ -115,7 +113,7 @@ export class Asteroid {
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
     this.y += this.speed * dtSec;
     const cfg = CONFIG.ASTEROID.CRATER_EMBOSS;
-    if (cfg && cfg.ENABLE && cfg.REVEAL_TIME > 0 && this._craters.length) {
+    if (cfg && cfg.REVEAL_TIME > 0 && this._craters.length) {
       const rt = cfg.REVEAL_TIME;
       for (let i = 0; i < this._craters.length; i++) {
         const cr = this._craters[i];
@@ -160,7 +158,7 @@ export class Asteroid {
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, PI2);
     ctx.fill();
-    if (CONFIG.ASTEROID.CRATER_EMBOSS.ENABLE && this._craters.length) {
+    if (this._craters.length) {
       const cfg = CONFIG.ASTEROID.CRATER_EMBOSS;
       const light = cfg.LIGHT_DIR || { x: -0.7, y: -0.7 };
       const lightAngle = Math.atan2(light.y, light.x);
@@ -323,26 +321,22 @@ export class Asteroid {
     const maxR = radius * sizeFactor;
     this._craters = [];
     this._reserveCraters = [];
-    if (cfg.ENABLE) {
-      this._craters = Array.from({ length: count }, () => ({
-        dx: (rand.nextFloat() - 0.5) * radius * 0.8,
-        dy: (rand.nextFloat() - 0.5) * radius * 0.8,
-        r: rand.nextFloat() * maxR + sizeMin,
-        grow: 1,
-      }));
-      const extraMax = cfg.EXTRA_MAX || 0;
-      this._reserveCraters = extraMax
-        ? Array.from({ length: extraMax }, () => ({
-            dx: (rand.nextFloat() - 0.5) * radius * 0.85,
-            dy: (rand.nextFloat() - 0.5) * radius * 0.85,
-            r: rand.nextFloat() * maxR + sizeMin,
-            grow: 1,
-          }))
-        : [];
-      this._initialCraterCount = this._craters.length;
-    } else {
-      this._initialCraterCount = undefined;
-    }
+    this._craters = Array.from({ length: count }, () => ({
+      dx: (rand.nextFloat() - 0.5) * radius * 0.8,
+      dy: (rand.nextFloat() - 0.5) * radius * 0.8,
+      r: rand.nextFloat() * maxR + sizeMin,
+      grow: 1,
+    }));
+    const extraMax = cfg.EXTRA_MAX || 0;
+    this._reserveCraters = extraMax
+      ? Array.from({ length: extraMax }, () => ({
+          dx: (rand.nextFloat() - 0.5) * radius * 0.85,
+          dy: (rand.nextFloat() - 0.5) * radius * 0.85,
+          r: rand.nextFloat() * maxR + sizeMin,
+          grow: 1,
+        }))
+      : [];
+    this._initialCraterCount = this._craters.length;
     this._palette = CONFIG.COLORS.ASTEROID;
     if (this.isIndestructible) {
       if (paletteOverride && typeof paletteOverride === "object") this._palette = paletteOverride;
@@ -391,7 +385,7 @@ export class Asteroid {
     const newCraters = [];
     try {
       const cfg = CONFIG.ASTEROID.CRATER_EMBOSS;
-      if (cfg && cfg.ENABLE && this._reserveCraters && this._reserveCraters.length) {
+      if (cfg && this._reserveCraters && this._reserveCraters.length) {
         const maxHits = CONFIG.ASTEROID.INDESTRUCTIBLE_HITS || 10;
         const severity = Math.min(1, this._hits / maxHits);
         const extraMax = cfg.EXTRA_MAX || 0;
@@ -413,7 +407,7 @@ export class Asteroid {
     } catch {
       /* ignore */
     }
-    if (newCraters.length && game && CONFIG.ASTEROID.CRATER_EMBOSS.PUFF_ENABLE) {
+    if (newCraters.length && game) {
       for (const c of newCraters) this._spawnCraterDust(c, game);
     }
     return this._hits >= (CONFIG.ASTEROID.INDESTRUCTIBLE_HITS || 10);
