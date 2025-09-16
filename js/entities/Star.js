@@ -4,7 +4,6 @@ import { CONFIG } from "../constants.js";
  * Star – falling collectible / background glow with optional red variant.
  *
  * Features:
- *  - Optional pulse scaling (CONFIG.STAR.PULSE) using sinus wave.
  *  - Two color palettes (normal vs red) for rarity or scoring differentiation.
  *  - Pool ready; state is primitive & resettable.
  */
@@ -47,12 +46,6 @@ export class Star {
     const centerY = this.y + this.height / 2;
     const size = this.width / 2;
     let scaledSize = size;
-    if (CONFIG.STAR.PULSE) {
-      const amp = CONFIG.STAR.PULSE_AMPLITUDE;
-      const speedHz = CONFIG.STAR.PULSE_SPEED;
-      const pulse = Math.sin(timeSec * speedHz * 2 * Math.PI) * amp + (1 - amp);
-      scaledSize = size * pulse;
-    }
 
     const colors = this.isRed ? CONFIG.COLORS.STAR_RED : CONFIG.COLORS.STAR;
     ctx.shadowColor = colors.BASE;

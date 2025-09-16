@@ -90,13 +90,6 @@ export class RenderManager {
         const baseSize = Math.max(1, Math.min(s.width, s.height));
         let dw = baseSize,
           dh = baseSize;
-        if (CONFIG.STAR.PULSE) {
-          const amp = CONFIG.STAR.PULSE_AMPLITUDE;
-          const speedHz = CONFIG.STAR.PULSE_SPEED;
-          const pulse = Math.sin(timeSec * speedHz * CONFIG.TWO_PI) * amp + (1 - amp);
-          dw = baseSize * pulse;
-          dh = baseSize * pulse;
-        }
         const cx = s.x + s.width / 2;
         const cy = s.y + s.height / 2;
         const spr = s.isRed && starRedSpr ? starRedSpr : starSpr;
