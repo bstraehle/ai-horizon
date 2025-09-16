@@ -77,6 +77,30 @@ Dev dependencies: esbuild, vitest, jsdom, eslint (flat), prettier, husky, lint-s
 
 Git hooks: `prepare` installs husky; pre-commit runs lint-staged (ESLint + Prettier on staged files).
 
+### Local CI parity & Git hooks
+
+GitHub Actions (see `.github/workflows/ci.yml`) runs these steps on every push / PR:
+
+1. `npm run lint:ci` (no warnings permitted)
+2. `npm run format:check`
+3. `npm run typecheck`
+4. `npm test`
+
+Run them locally in one shot:
+
+```
+npm run ci:local
+```
+
+Hooks configured via Husky:
+
+| Hook       | Action                                      |
+| ---------- | ------------------------------------------- |
+| pre-commit | `lint-staged` (ESLint --fix + Prettier)     |
+| pre-push   | `npm run ci:local` full gate before pushing |
+
+Bypass (rare, last resort) with `--no-verify` on commit or push.
+
 ---
 
 ## 4. Features overview

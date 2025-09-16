@@ -184,6 +184,7 @@ async function updateItem(id, updateData) {
     expressionAttributeValues[":expectedVersion"] = providedVersion;
   }
 
+  /** @type {import('@aws-sdk/lib-dynamodb').UpdateCommandInput} */
   const params = {
     TableName: TABLE_NAME,
     Key: { id },

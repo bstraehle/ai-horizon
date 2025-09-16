@@ -18,7 +18,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepare": "husky"
+    "ci:local": "npm run lint:ci && npm run format:check && npm run typecheck && npm test",
+    "prepare": "husky || echo 'husky skipped'"
   },
   "devDependencies": {
     "esbuild": "^0.25.9",
@@ -32,7 +33,9 @@
     "husky": "^9.1.6",
     "lint-staged": "^15.2.10",
     "typescript": "^5.5.4",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@aws-sdk/client-dynamodb": "^3.617.0",
+    "@aws-sdk/lib-dynamodb": "^3.617.0"
   },
   "lint-staged": {
     "**/*.{js,mjs,cjs}": [
