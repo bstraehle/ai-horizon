@@ -78,8 +78,7 @@ class CognitoAPIClient {
 
       try {
         const signed = await this._buildSignedHeaders(url, method);
-        // Do not set 'host' explicitly in browser; the UA sets it. Keep it for signing but omit on send.
-        const { host, Host, ...restSigned } = signed.headers || {};
+        const { host: _host, Host: _Host, ...restSigned } = signed.headers || {};
         const mergedHeaders = { ...(init.headers || {}), ...restSigned };
         return await this._fetch(url.toString(), { ...init, headers: mergedHeaders });
       } catch (err) {
