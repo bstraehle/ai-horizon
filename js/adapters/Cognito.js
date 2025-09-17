@@ -68,15 +68,12 @@ class CognitoAPIClient {
       const url = new URL(urlStr);
       const method = (init.method || "GET").toUpperCase();
       try {
-        // Normalize headers to lowercase single entries to avoid duplicate header names
         const normalizedInitHeaders = this._normalizeHeaderObject(init.headers);
-        const contentType = normalizedInitHeaders["content-type"]; // may be undefined
-        // Include body for signing only on methods with payload
+        const contentType = normalizedInitHeaders["content-type"];
         const bodyForSigning =
           method === "GET" || method === "HEAD" ? undefined : this._extractSigningBody(init.body);
         const signed = await this._buildSignedHeaders(url, method, bodyForSigning, contentType);
         const { host: _host, Host: _Host, ...restSigned } = signed.headers || {};
-        // Merge (signed last) while maintaining lowercase normalization
         const mergedHeaders = { ...normalizedInitHeaders };
         for (const [k, v] of Object.entries(restSigned)) {
           mergedHeaders[k.toLowerCase()] = v;
@@ -90,17 +87,6 @@ class CognitoAPIClient {
   }
 
   /**
-   * @private Build SigV4-signed headers for a given URL/method.
-   * @param {URL} url
-   * @param {string} method
-   */
-  /**
-   * @private
-   * @param {URL} url
-   * @param {string} method
-   * @param {string|Uint8Array|undefined} body
-   */
-  /**
    * @private
    * @param {URL} url
    * @param {string} method
@@ -108,11 +94,10 @@ class CognitoAPIClient {
    * @param {string|undefined} contentType
    */
   _buildSignedHeaders(url, method, body, contentType) {
-    // Build request in the shape expected by SigV4 signer
     /** @type {{ method: string; protocol: string; hostname: string; path: string; query: Record<string, string | string[]>; headers: Record<string,string>; body?: string|Uint8Array }} */
     const requestToSign = {
       method: method,
-      protocol: url.protocol, // e.g., 'https:'
+      protocol: url.protocol,
       hostname: url.hostname,
       path: url.pathname,
       query: {},
@@ -120,8 +105,6 @@ class CognitoAPIClient {
         host: url.host,
       },
     };
-
-    // Collect query params
     for (const [k, v] of url.searchParams.entries()) {
       if (requestToSign.query[k] === undefined) {
         requestToSign.query[k] = v;
@@ -131,7 +114,6 @@ class CognitoAPIClient {
         requestToSign.query[k] = [/** @type {string} */ (requestToSign.query[k]), v];
       }
     }
-
     if (contentType) requestToSign.headers["content-type"] = contentType;
     if (method !== "GET" && body !== undefined && body !== null) requestToSign.body = body;
     return this.signer.sign(requestToSign);
@@ -145,11 +127,10 @@ class CognitoAPIClient {
   _extractSigningBody(body) {
     if (body === null) return undefined;
     if (typeof body === "string" || body instanceof Uint8Array) return body;
-    // If caller passed a plain object (rare – fetch normally expects string/Blob)
     try {
       return JSON.stringify(body);
     } catch {
-      return undefined; // Fail open (signature will be for empty body – may 403 but better than throwing here)
+      return undefined;
     }
   }
 
@@ -162,7 +143,6 @@ class CognitoAPIClient {
     /** @type {Record<string,string>} */
     const out = {};
     if (!headers) return out;
-    // Plain object case
     if (
       typeof headers === "object" &&
       !Array.isArray(headers) &&
@@ -175,12 +155,10 @@ class CognitoAPIClient {
       }
       return out;
     }
-    // Headers instance
     if (typeof Headers !== "undefined" && headers instanceof Headers) {
       for (const [k, v] of headers.entries()) out[k.toLowerCase()] = v;
       return out;
     }
-    // Array of tuples
     if (Array.isArray(headers)) {
       for (const pair of headers) {
         if (!pair || pair.length < 2) continue;
@@ -197,7 +175,6 @@ class CognitoAPIClient {
    * @returns {Promise<any>} Parsed JSON response
    */
   async callLeaderboardAPI(id) {
-    // Build URL with query
     const url = new URL(this.apiEndpoint);
     if (id !== undefined && id !== null) url.searchParams.set("id", String(id));
     const res = await this.buildSignedFetch()(url.toString(), { method: "GET" });
@@ -216,14 +193,11 @@ class CognitoAPIClient {
    * @returns {Promise<void>}
    */
   async authenticateUser(loginToken, provider) {
-    // Update credentials with login information
     this.credentials = fromCognitoIdentityPool({
       identityPoolId: this.identityPoolId,
       clientConfig: { region: this.region },
       logins: { [provider]: loginToken },
     });
-
-    // Update signer with new credentials
     this.signer = new SignatureV4MultiRegion({
       service: "execute-api",
       region: this.region,
@@ -233,7 +207,6 @@ class CognitoAPIClient {
   }
 }
 
-// Usage example
 async function main() {
   const apiClient = new CognitoAPIClient();
   try {
@@ -244,5 +217,4 @@ async function main() {
   }
 }
 
-// Export for programmatic usage
 export { CognitoAPIClient, main };

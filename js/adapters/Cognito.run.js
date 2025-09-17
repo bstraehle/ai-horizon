@@ -69,7 +69,7 @@ async function testPut(id) {
   const version = current.version;
   const existingScores = Array.isArray(current.scores) ? current.scores.slice(0) : [];
   const newEntry = {
-    id: "TST", // marker so you can filter these out server-side later if desired
+    id: "TST",
     score: Math.floor(Math.random() * 500) + 1,
   };
   const merged = [...existingScores, newEntry].sort((a, b) => b.score - a.score).slice(0, 50); // keep a reasonable cap locally
@@ -92,7 +92,7 @@ async function testPut(id) {
   try {
     const parsed = JSON.parse(text);
     if (res.status === 200) {
-      const serverItem = parsed.item || parsed; // Lambda returns {message,item} structure
+      const serverItem = parsed.item || parsed;
       log(
         "PUT success. newVersion=",
         serverItem?.version,
@@ -110,7 +110,6 @@ async function testPut(id) {
   }
 }
 
-// Main runner dispatcher
 (async () => {
   try {
     const id = Number(process.env.LEADERBOARD_ID || 1);

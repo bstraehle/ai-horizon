@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "AI Horizon browser game",
+  "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "scripts": {

@@ -2,7 +2,7 @@
 
 Fast, responsive HTML5 Canvas space shooter written in modern (native ESM) vanilla JavaScript. Collect stars, survive escalating asteroid waves (including indestructible "planet" variants), and chase a local + optional remote leaderboard.
 
-For player‑facing controls & scoring details see `about.html`. This document is for developers: setup, architecture, extension points, and contribution standards.
+For player‑facing controls & scoring details see `about.html`. This document is for developers: setup, architecture, configuration surface, extension points, and contribution standards.
 
 ---
 
@@ -16,14 +16,16 @@ For player‑facing controls & scoring details see `about.html`. This document i
 6. Architecture (loops, states, entities, managers, systems)
 7. Leaderboard (async + conflict handling)
 8. Determinism & seeding
-9. Types & JSDoc conventions
-10. Commenting style
-11. Testing strategy
-12. Performance notes
-13. Deployment
-14. Extending the game
-15. Contributing & code quality
-16. Troubleshooting FAQ
+9. Configuration (`CONFIG`) & tuning
+10. Types & JSDoc conventions
+11. Commenting style
+12. Testing strategy
+13. Performance & profiling notes
+14. Deployment
+15. Extending the game
+16. Contributing & code quality
+17. Troubleshooting FAQ
+18. Windows specific tips
 
 ---
 
@@ -222,13 +224,40 @@ Use query parameter: `?seed=12345` or `?seed=myPhrase`. Non-numeric seeds are ha
 
 ---
 
-## 9. Types & JSDoc conventions
+## 9. Configuration (`CONFIG`) & tuning
+
+All gameplay + visual tuning lives centrally in `js/constants.js` exporting a deeply frozen `CONFIG` object. High‑level namespaces (ASTEROID, GAME, PLAYER, STAR, STARFIELD, NEBULA, INPUT, TIME, SPEEDS, COLORS, etc.) group related parameters.
+
+Guidelines:
+
+- Never sprinkle magic numbers in feature code—add or reuse a named constant.
+- Favor ratios / factors (e.g. `INDESTRUCTIBLE_SPEED_FACTOR`) over repeating absolute speeds so balance changes cascade predictably.
+- Document rationale inline for non-obvious numbers (spawn pacing thresholds, performance caps) so future adjustments remain intentional.
+- Use existing variation keys (`*_VAR`, `*_VARIATION`) to express randomness bounds; keep naming consistent.
+
+Common adjustments:
+
+| Goal                                  | Knobs                                                                                              |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Increase difficulty ramp              | Decrease `GAME.ASTEROID_NORMAL_BEFORE_INDESTRUCTIBLE`, increase `GAME.ASTEROID_SPAWN_RATE_DESKTOP` |
+| Shorter session                       | Lower `GAME.TIMER_SECONDS`                                                                         |
+| More red stars                        | Decrease `GAME.STAR_YELLOW_BEFORE_RED`                                                             |
+| Cap visual density on low-end devices | Reduce `GAME.STARFIELD_COUNT_MOBILE`, `NEBULA.COUNT_MOBILE`, adjust `VIEW.DPR_MOBILE_MAX`          |
+| Faster player                         | Increase `SPEEDS.PLAYER` (watch collision balance)                                                 |
+
+Adding a new constant: add under the appropriate namespace, maintain UPPER_SNAKE_CASE, and ensure tests referencing balance still pass. Because `CONFIG` is deeply frozen, attempts to mutate at runtime will throw in strict mode, surfacing mistakes early.
+
+Seeded determinism: Many rates combine deterministic scheduling with RNG variation; reproducibility depends on keeping ordering stable. When inserting a new system that consumes randomness, consider whether it shifts sequence for existing systems (update tests or isolate RNG usage if necessary).
+
+---
+
+## 10. Types & JSDoc conventions
 
 Shared typedefs in `js/types.js`. Reference via `import('./types.js').TypeName` for structural types; avoids circular deps and enables editor IntelliSense with `// @ts-check` files. Prefer documenting intent & shape over repeating trivial param docs.
 
 ---
 
-## 10. Commenting style
+## 11. Commenting style
 
 See `docs/COMMENTING_GUIDE.md` for rationale and examples. Highlights:
 
@@ -240,7 +269,7 @@ See `docs/COMMENTING_GUIDE.md` for rationale and examples. Highlights:
 
 ---
 
-## 11. Testing strategy
+## 12. Testing strategy
 
 Tests (Vitest + jsdom where DOM required) cover:
 
@@ -260,7 +289,7 @@ CI reliability: remote leaderboard calls are suppressed in tests (environment de
 
 ---
 
-## 12. Performance notes
+## 13. Performance & profiling notes
 
 - Object pooling eliminates the majority of GC churn during peak spawn waves.
 - Precomputed gradients & sprites drastically reduce per-frame canvas state churn.
@@ -275,7 +304,19 @@ Potential future optimizations (not yet implemented):
 
 ---
 
-## 13. Deployment
+### Lightweight profiling
+
+Use a fixed seed (e.g. `?seed=bench`) when profiling to eliminate run‑to‑run variance. Capture performance in Chrome Performance panel during a consistent time slice (e.g. first 30s). Compare flame charts across changes while holding seed + window size constant. Avoid enabling DevTools throttling unless evaluating worst‑case scenarios.
+
+Micro‑alloc tracking: Enable the Allocation instrumentation on timeline; object pooling should yield stable low churn after warmup. Unexpected spikes typically indicate: forgotten pool reuse, creation inside hot loops, or inadvertent array growth.
+
+Canvas overdraw: Toggle paint flashing to ensure large fills (background gradients) are not redrawn more than necessary. `RenderManager` batches layered draws intentionally; keep new effects similarly batched.
+
+Potential next optimizations (tracked): OffscreenCanvas for background, Worker for collision partition, sprite atlas if moving toward bitmap sprites.
+
+---
+
+## 14. Deployment
 
 Any static host works:
 
@@ -287,7 +328,7 @@ No server logic required except optional remote leaderboard Lambda.
 
 ---
 
-## 14. Extending the game
+## 15. Extending the game
 
 Adding a new entity:
 
@@ -309,7 +350,7 @@ Remote leaderboard customization:
 
 ---
 
-## 15. Contributing & code quality
+## 16. Contributing & code quality
 
 Style & linting:
 
@@ -332,7 +373,7 @@ PR expectations:
 
 ---
 
-## 16. Troubleshooting FAQ
+## 17. Troubleshooting FAQ
 
 | Symptom                                  | Likely cause                    | Fix                                                   |
 | ---------------------------------------- | ------------------------------- | ----------------------------------------------------- |
@@ -347,10 +388,12 @@ PR expectations:
 
 ---
 
-## License
+## 18. Windows specific tips
 
-Currently no explicit OSS license file is present. Until one is added, treat the project as "All rights reserved" for distribution. (Recommendation: add an MIT LICENSE file if open contribution is desired.)
+- PowerShell execution policy errors with Husky scripts: run `Set-ExecutionPolicy -Scope LocalMachine RemoteSigned` (or Bypass at session scope) if hooks fail to execute.
+- Use `py -m http.server` instead of `python` if only launcher installed.
+- Terminal rendering slow in some emulators? Use Windows Terminal or VS Code integrated terminal for best ANSI performance.
 
 ---
 
-Happy hacking — explore, profile with a fixed seed, and iterate quickly!
+Happy hacking!
