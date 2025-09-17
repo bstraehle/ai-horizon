@@ -21,10 +21,12 @@
  */
 import { qualifiesForInitials, formatRow, formatRows } from "./leaderboard/LeaderboardFormatter.js";
 import { LeaderboardRepository } from "./leaderboard/LeaderboardRepository.js";
+import { RemoteAdapter } from "../adapters/RemoteAdapter.js";
+import { CognitoAPIClient } from "../adapters/Cognito.js";
 export class LeaderboardManager {
   static IS_REMOTE = true;
-  static REMOTE_ENDPOINT =
-    "https://0p6x6bw6c2.execute-api.us-west-2.amazonaws.com/dev/leaderboard?id=1";
+  // Identifier for leaderboard partition; appended as query param `?id=...` to the Cognito API endpoint
+  static REMOTE_ID = 1;
   static MAX_ENTRIES = 10;
   static KEY_LEADERBOARD = "aiHorizonLeaderboard";
   static REMOTE_REFRESH_COOLDOWN_MS = 2500;
@@ -38,6 +40,44 @@ export class LeaderboardManager {
   static _version = undefined;
   /** Timestamp (performance.now()/Date.now) of last successful authoritative remote sync */
   static _lastRemoteSync = 0;
+
+  /**
+   * Internal: lazily create a repository with appropriate remote adapter.
+   * In test environments, avoid Cognito to prevent network/credential resolution.
+   * @returns {LeaderboardRepository}
+   */
+  static _createRepository() {
+    const g = /** @type {any} */ (typeof globalThis !== "undefined" ? globalThis : {});
+    const proc = g.process;
+    const isTestEnv = !!(proc && proc.env && (proc.env.NODE_ENV === "test" || proc.env.VITEST));
+
+    // Build endpoint from Cognito client defaults (even in tests),
+    // but only attach a signed fetch in non-test environments.
+    let endpoint = "";
+    /** @type {RemoteAdapter|undefined} */
+    let remoteAdapter = undefined;
+
+    try {
+      const api = new CognitoAPIClient();
+      // Base endpoint (no query) + id param
+      endpoint = `${api.getApiEndpoint()}?id=${encodeURIComponent(LeaderboardManager.REMOTE_ID)}`;
+      if (!isTestEnv && LeaderboardManager.IS_REMOTE) {
+        remoteAdapter = new RemoteAdapter({ fetchFn: api.buildSignedFetch() });
+      }
+    } catch (_) {
+      // If Cognito initialization fails entirely, leave endpoint empty to imply local-only mode
+      endpoint = "";
+      remoteAdapter = undefined;
+    }
+
+    return new LeaderboardRepository({
+      key: LeaderboardManager.KEY_LEADERBOARD,
+      endpoint,
+      maxEntries: LeaderboardManager.MAX_ENTRIES,
+      // Only pass remoteAdapter when we actually created a signed one; default handles tests
+      ...(remoteAdapter ? { remoteAdapter } : {}),
+    });
+  }
 
   /**
    * Determine if a score qualifies for initials entry given current entries.
@@ -130,11 +170,7 @@ export class LeaderboardManager {
     if (!remote && Array.isArray(LeaderboardManager._cacheEntries)) {
       return Promise.resolve(LeaderboardManager._cacheEntries.slice());
     }
-    const repo = new LeaderboardRepository({
-      key: LeaderboardManager.KEY_LEADERBOARD,
-      endpoint: LeaderboardManager.REMOTE_ENDPOINT,
-      maxEntries: LeaderboardManager.MAX_ENTRIES,
-    });
+    const repo = LeaderboardManager._createRepository();
     const p = (async () => {
       const entries = remote ? await repo.loadRemote() : await repo.loadLocal();
       if (typeof repo._version === "number") LeaderboardManager._version = repo._version;
@@ -178,11 +214,7 @@ export class LeaderboardManager {
    */
   static async save(entries, { remote = this.IS_REMOTE } = {}) {
     const payload = entries.slice(0, LeaderboardManager.MAX_ENTRIES);
-    const repo = new LeaderboardRepository({
-      key: LeaderboardManager.KEY_LEADERBOARD,
-      endpoint: LeaderboardManager.REMOTE_ENDPOINT,
-      maxEntries: LeaderboardManager.MAX_ENTRIES,
-    });
+    const repo = LeaderboardManager._createRepository();
     if (typeof LeaderboardManager._version === "number")
       repo._version = LeaderboardManager._version;
 
