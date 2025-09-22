@@ -1,5 +1,4 @@
 :root {
-  /* Colors */
   --color-bg: #111;
   --color-border: #333;
   --color-text: #fff;
@@ -11,7 +10,6 @@
   --color-btn-gradient-hover-end: #777;
   --color-btn-focus-outline: #b20000;
 
-  /* Spacing scale */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -21,20 +19,18 @@
   --space-7: 28px;
   --space-8: 40px;
 
-  /* Radii */
   --radius-1: 4px;
   --radius-2: 12px;
   --radius-3: 20px;
   --btn-radius: 999px;
 
-  /* Shared button backgrounds */
   --btn-bg: linear-gradient(45deg, var(--color-btn-gradient-start), var(--color-btn-gradient-end));
   --btn-bg-hover: linear-gradient(
     45deg,
     var(--color-btn-gradient-hover-start),
     var(--color-btn-gradient-hover-end)
   );
-  /* Page-vertical padding shared across game and standalone pages. */
+
   --page-vertical: var(--space-6);
 }
 * {
@@ -76,7 +72,6 @@ body {
   right: 0;
   top: 0;
   padding: var(--space-2) var(--space-5);
-  /* Use a shared, responsive vertical padding so top and bottom match across pages */
   padding-top: max(var(--page-vertical), env(safe-area-inset-top));
   position: absolute;
   transform: translateZ(0);
@@ -108,7 +103,9 @@ body {
   left: 0;
   right: 0;
   padding: var(--space-5);
-  padding-bottom: max(var(--page-vertical), env(safe-area-inset-bottom));
+  /*padding-bottom: max(var(--page-vertical), env(safe-area-inset-bottom));*/
+  padding-bottom: var(--space-5) !important;
+  padding-top: var(--space-6) !important;
   position: fixed;
   transform: translateZ(0);
   z-index: 10;
@@ -133,7 +130,6 @@ body {
   inset: 0;
   justify-content: center;
   position: fixed;
-  /* Ensure Game Over overlay appears above fixed headers / score displays (which use z-index up to 999) */
   z-index: 2000;
 }
 .game-over-content {
@@ -141,11 +137,11 @@ body {
   border: 2px solid var(--color-border);
   border-radius: var(--radius-3);
   padding: var(--space-5);
+  padding-top: var(--space-6) !important;
   text-align: center;
 }
 .game-over-content h2 {
   color: var(--color-text);
-  /* Match the responsive sizing used by the page h1 titles */
   font-size: clamp(1.5rem, 3vw + 1rem, 2.5rem);
   margin-bottom: var(--space-6);
   text-shadow: 0 0 20px var(--color-title-shadow);
@@ -155,10 +151,7 @@ body {
   font-size: clamp(1.1rem, 1.2vw + 0.9rem, 1.5rem);
   margin-bottom: var(--space-6);
 }
-
-/* Space below the initials input and its submit button inside the Game Over card */
 .initials-entry {
-  /* Stack label, input and button vertically and center them */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -172,19 +165,14 @@ body {
 .initials-entry .action-button {
   margin-bottom: var(--space-5);
 }
-
-/* Make the initials input visually compact but wide enough for three letters.
-   Use ch units so width tracks character width and center the text. Use
-   text-transform to display uppercase; additionally JS will normalize the
-   underlying value to uppercase on input for consistency. */
 .initials-entry .initials-input {
-  width: 8ch; /* fits three uppercase letters plus a bit of padding */
+  width: 8ch;
   max-width: 12rem;
   padding: 6px 8px;
   text-align: center;
   font-weight: 700;
   letter-spacing: 0.06em;
-  text-transform: uppercase; /* display uppercase even when user types lowercase */
+  text-transform: uppercase;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-1);
   background: rgba(255, 255, 255, 0.01);
@@ -226,7 +214,6 @@ body {
   display: block;
   text-align: center;
 }
-
 .action-link {
   color: var(--color-text-secondary);
   display: inline-block;
@@ -239,15 +226,10 @@ body {
   outline: 3px solid var(--color-btn-focus-outline);
   outline-offset: -3px;
 }
-
-/* Fallback visual focus indicator applied by JS when programmatic focus is
-   ignored by the browser (mobile fallback). Kept transient (2s) in JS. */
 .js-force-focus {
   outline: 3px solid var(--color-btn-focus-outline) !important;
   outline-offset: -3px !important;
 }
-/* Mobile-only hint shown when programmatic focus is blocked; invites user to tap.
-   Visible only when the device is touch/coarse pointer via .mobile-only. */
 .mobile-focus-hint {
   margin-top: 12px;
   color: var(--color-text-secondary);
@@ -270,7 +252,6 @@ body {
 .mobile-only {
   display: none;
 }
-
 @media (max-width: 480px) {
   .desktop-only {
     display: none !important;
@@ -285,8 +266,6 @@ body {
     padding: 6px 10px;
   }
 }
-
-/* Input-modality-based hints */
 @media (hover: hover) and (pointer: fine) {
   .desktop-only {
     display: block;
@@ -303,8 +282,6 @@ body {
     display: block;
   }
 }
-
-/* Respect user motion preferences */
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;
@@ -312,8 +289,6 @@ body {
     transition: none !important;
   }
 }
-
-/* Accessibility utilities */
 .sr-only {
   border: 0;
   clip: rect(0 0 0 0);
@@ -325,10 +300,7 @@ body {
   white-space: nowrap;
   width: 1px;
 }
-
-/* Leaderboard styles: match game-over card aesthetics and stay compact */
 .leaderboard {
-  /* match spacing below the leaderboard to the game-over card padding */
   margin-bottom: var(--space-5);
   text-align: center;
   color: var(--color-text-secondary);
@@ -344,9 +316,7 @@ body {
   margin: 0 auto;
   padding-left: 0;
   max-width: 18rem;
-  /* Make the scrollable area a hair smaller so exactly three entries are visible
-    across common font/line-height combinations. */
-  max-height: calc(3 * 2.3em + 2 * var(--space-2)); /* 3 items + padding */
+  max-height: calc(3 * 2.3em + 2 * var(--space-2));
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -359,7 +329,7 @@ body {
   font-weight: 600;
   font-size: 0.95rem;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch; /* smooth momentum scrolling on iOS */
+  -webkit-overflow-scrolling: touch;
   justify-content: flex-start;
   text-align: left;
   margin-bottom: var(--space-2);
@@ -368,12 +338,10 @@ body {
 #leaderboardList li:last-child {
   margin-bottom: 0;
 }
-/* Top entry: no red highlight — keep standard border and no heavy shadow */
 #leaderboardList li:first-child {
   border-color: var(--color-border);
   box-shadow: none;
 }
-
 @media (max-width: 480px) {
   #leaderboardList {
     max-width: 100%;
@@ -386,14 +354,11 @@ body {
     text-align: center;
   }
 }
-
 #leaderboardList {
   list-style-position: inside;
   margin: 0 auto;
   padding-left: 0;
   max-width: 18rem;
-  /* Pixel-perfect: 3 rows visible. Each row is 48px tall and there are two gaps (between 3 items)
-     of var(--space-2) each. */
   max-height: calc(3 * 48px + 2 * var(--space-2));
   overflow-y: auto;
   scrollbar-width: thin;
@@ -410,19 +375,15 @@ body {
   font-size: 0.95rem;
   text-align: left;
   margin-bottom: var(--space-2);
-  /* Fixed height for pixel-perfect 3-row layout. Keep horizontal padding only. */
   height: 48px;
   padding: 0 var(--space-3);
 }
-/* Restore normal page scrolling and layout for the standalone about page. */
 .about-page {
   display: block;
-  /* Let height flow naturally instead of forcing 100vh */
-  /* Use symmetric padding that also respects the larger safe-area inset so
-    top and bottom remain visually equal on notched devices. */
-  /* Use the same shared vertical padding so the about page matches the game UI */
-  padding-top: max(var(--page-vertical), env(safe-area-inset-top), env(safe-area-inset-bottom));
-  padding-bottom: max(var(--page-vertical), env(safe-area-inset-top), env(safe-area-inset-bottom));
+  /*padding-top: max(var(--page-vertical), env(safe-area-inset-top), env(safe-area-inset-bottom));*/
+  padding-top: var(--space-6) !important;
+  /*padding-bottom: max(var(--page-vertical), env(safe-area-inset-top), env(safe-area-inset-bottom));*/
+  padding-bottom: var(--space-5) !important;
   padding-left: var(--space-5);
   padding-right: var(--space-5);
   box-sizing: border-box;
@@ -432,27 +393,20 @@ body {
   max-width: 920px;
   text-align: center;
 }
-
-/* Allow the standalone about page to scroll and permit text selection.
-   The global `body { overflow: hidden }` rule is used for the game UI, so
-   override it specifically for pages that add `class="about-body"` on the
-   <body> element. */
 body.about-body,
 .about-body {
   overflow: auto;
   height: auto;
   user-select: text;
-  -webkit-overflow-scrolling: touch; /* smooth momentum scrolling on iOS */
+  -webkit-overflow-scrolling: touch;
 }
 .about-content h1 {
-  /* Reduce h1 margins and rely on the container's padding for vertical spacing */
   margin-top: 0;
   margin-bottom: var(--space-5);
   font-size: clamp(1.5rem, 3vw + 1rem, 2.5rem);
   text-align: center;
   text-shadow: 0 0 20px var(--color-title-shadow);
 }
-
 .about-content h3 {
   font-size: 1.5rem;
   margin-top: var(--space-4);
@@ -460,11 +414,7 @@ body.about-body,
   font-weight: 700;
   letter-spacing: -0.01em;
 }
-
-/* Ensure paragraphs and lists inside the about content align uniformly */
 .about-content .instructions {
-  /* Left-align instructional blocks and give extra bottom spacing so
-     their content breathes from the sections that follow. */
   text-align: left;
   max-width: 720px;
   margin: 8px auto 0;
@@ -483,22 +433,14 @@ body.about-body,
   margin: 8px auto 0;
   padding-left: 1.2em;
 }
-
-/* Left-align the Back link in the about page */
 .about-content p.about-back {
-  /* Align the Back link with the main content column */
   text-align: center;
   max-width: 720px;
-  margin: 8px auto 0; /* same as other content blocks */
+  margin: 8px auto 0;
   padding-left: 0;
 }
-
-/* Remove horizontal padding for the Back link so it lines up with text */
 .about-content p.about-back .action-link {
-  /* Match the same vertical/horizontal padding used by the site-wide .action-link
-     so the Back link visually matches the About link on the index page. */
   padding: var(--space-2) var(--space-3);
-  /* Keep the top margin override so the link sits flush with surrounding text */
   margin-top: 0;
 }
 .about-header svg {
@@ -516,6 +458,3 @@ body.about-body,
   fill: currentColor;
   opacity: 0.95;
 }
-
-/* Mobile-specific about-page overrides removed so the about page uses the
-  same styling as desktop on small screens. */

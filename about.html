@@ -22,35 +22,33 @@
         <h3>How to play</h3>
         <p class="instructions">
           Your goal is to score as many points as possible before the timer runs out. Move your ship
-          to collect glowing stars and shoot incoming asteroids. Some asteroids are indestructible
-          and take many hits. The game lasts one minute per run.
+          to collect glowing stars and shoot incoming asteroids. Some asteroids are armored and take
+          many hits.
         </p>
 
         <h3>Controls</h3>
-        <div class="instructions">
-          <p>
-            <strong>Move:</strong> Arrow keys or WASD — or point/touch the canvas to have the ship
-            smoothly follow the cursor.
-          </p>
-          <p>
-            <strong>Fire:</strong> Spacebar, mouse button, or touch and hold — hold to continuously
-            fire (rate-limited).
-          </p>
-          <p><strong>Pause / Resume:</strong> Esc (or the Pause button on-screen).</p>
-        </div>
+        <ul class="instructions">
+          <li>
+            Move: Arrow keys or WASD — or point/touch the canvas to have the ship smoothly follow
+            the cursor.
+          </li>
+          <li>
+            Fire: Spacebar, mouse button, or touch and hold — hold to continuously fire
+            (rate-limited).
+          </li>
+          <li>Pause / Resume: Esc (or the Pause button on-screen).</li>
+        </ul>
 
         <h3>Scoring</h3>
         <div class="instructions">
           <p>Points are awarded for:</p>
           <ul>
-            <li>Regular asteroid: +10 points</li>
-            <li>Indestructible asteroid: +100 points</li>
-            <li>Regular star: +20 points</li>
-            <li>Bonus star: +50 points</li>
+            <li>Regular asteroid: 10</li>
+            <li>Armored asteroid: 100</li>
+            <li>Regular star: 20</li>
+            <li>Bonus star: 50</li>
           </ul>
-          <p>
-            The game tracks high scores and displays a small leaderboard at the end of each run.
-          </p>
+          <p>A leaderboard is displayed.</p>
         </div>
 
         <h3>Tips</h3>
@@ -66,17 +64,20 @@
           </li>
           <li>
             Aim for tight clusters of asteroids to get more points quickly, but avoid collisions —
-            indestructible asteroids block bullets and take many hits.
+            armored asteroids block bullets and take ten hits.
           </li>
-          <li>Watch the timer — each run is short, so focus on high-value targets early.</li>
+          <li>Watch the timer — each run is one minute, so focus on high-value targets early.</li>
         </ul>
 
-        <h3>About</h3>
-        <p class="instructions">
-          100% AI-generated using VS Code & GitHub Copilot in Agent Mode (GPT-5). AI-assisted by
-          Amazon Q, hosted using an AWS serverless architecture comprised of Cognito, CloudFront &
-          S3 (frontend) and API Gateway, Lambda & DynamoDB (backend). — Bernd Straehle
-        </p>
+        <h3>Credits</h3>
+        <div class="instructions">
+          <p>
+            100% AI-generated using VS Code & GitHub Copilot in Agent Mode. AI-assisted by Amazon Q,
+            hosted using an AWS serverless architecture comprised of Cognito, CloudFront & S3
+            (frontend) and API Gateway, Lambda & DynamoDB (backend).
+          </p>
+          <p>Enjoy the flight 🚀 Bernd Straehle</p>
+        </div>
 
         <p class="about-back">
           <a href="/" class="action-link">Back</a>
