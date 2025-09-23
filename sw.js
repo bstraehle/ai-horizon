@@ -2,7 +2,7 @@
  * Provides offline-first caching for core assets and a network-first strategy for API calls.
  * Increment CACHE_VERSION to force an update after deploys that change cached assets.
  */
-const CACHE_VERSION = "v3-2025-09-23";
+const CACHE_VERSION = "v4-2025-09-23";
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
@@ -87,16 +87,45 @@ async function cacheFirst(request) {
   }
 }
 
-// Helper: network-first (fallback to cache) for navigations
-async function networkFirstNavigation(request) {
+// Helper: small timeout wrapper for fetch to avoid long hangs on flaky/offline mobile networks
+function fetchWithTimeout(request, { timeoutMs = 900 } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(request, { signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
+// Helper: cache-first + background update for navigations (fast offline)
+async function navigationCacheFirst(request, event) {
+  const cache = await caches.open(STATIC_CACHE);
+  const cached = await cache.match(request, { ignoreSearch: true });
+  if (cached) {
+    // Update in the background when possible, but don't block the response
+    if (event) {
+      event.waitUntil(
+        (async () => {
+          try {
+            const fresh = await fetchWithTimeout(request);
+            if (fresh && fresh.ok) {
+              await cache.put(request, fresh.clone());
+            }
+          } catch (_) {
+            // likely offline/timeout; keep cached version
+          }
+        })()
+      );
+    }
+    return cached;
+  }
+
+  // No cached version yet: try a quick network fetch, then fall back to app shell
   try {
-    const response = await fetch(request);
-    const cache = await caches.open(STATIC_CACHE);
-    cache.put(request, response.clone());
-    return response;
+    const fresh = await fetchWithTimeout(request);
+    if (fresh && fresh.ok) {
+      await cache.put(request, fresh.clone());
+    }
+    return fresh;
   } catch (_) {
-    const cache = await caches.open(STATIC_CACHE);
-    return (await cache.match(request)) || (await cache.match("/index.html"));
+    return (await cache.match("/index.html")) || new Response("Offline", { status: 503 });
   }
 }
 
@@ -131,7 +160,7 @@ self.addEventListener("fetch", (event) => {
   const isSameOrigin = url.origin === self.location.origin;
 
   if (request.mode === "navigate") {
-    event.respondWith(networkFirstNavigation(request));
+    event.respondWith(navigationCacheFirst(request, event));
     return;
   }
 
