@@ -220,7 +220,27 @@ export class LeaderboardManager {
 
     if (!remote) {
       const ok = await repo.saveLocal(payload);
-      if (ok) LeaderboardManager._cacheEntries = payload.slice();
+      if (ok) {
+        LeaderboardManager._cacheEntries = payload.slice();
+        try {
+          if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+            const CE = typeof window.CustomEvent === "function" ? window.CustomEvent : CustomEvent;
+            if (CE)
+              window.dispatchEvent(
+                new CE("leaderboard:updated", { detail: LeaderboardManager._cacheEntries.slice() })
+              );
+          }
+        } catch (_) {
+          /* ignore */
+        }
+        try {
+          const listEl =
+            typeof document !== "undefined" ? document.getElementById("leaderboardList") : null;
+          if (listEl) LeaderboardManager.render(listEl, LeaderboardManager._cacheEntries);
+        } catch (_) {
+          /* ignore */
+        }
+      }
       return ok;
     }
 
