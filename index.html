@@ -16,12 +16,13 @@
     />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://0p6x6bw6c2.execute-api.us-west-2.amazonaws.com https://cognito-identity.us-west-2.amazonaws.com; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; upgrade-insecure-requests"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://0p6x6bw6c2.execute-api.us-west-2.amazonaws.com https://cognito-identity.us-west-2.amazonaws.com; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types ai-horizon-sw; upgrade-insecure-requests"
     />
     <title>AI HORIZON</title>
     <link rel="shortcut icon" href="favicon.png?v=2" type="image/png" />
     <link rel="icon" href="favicon.png?v=2" type="image/png" />
     <link rel="apple-touch-icon" href="favicon.png?v=2" />
+    <link rel="manifest" href="/manifest.webmanifest" crossorigin="anonymous" />
     <link rel="stylesheet" href="style.css" />
     <link rel="preload" href="dist/bundle.js" as="script" />
   </head>
@@ -125,5 +126,6 @@
     </div>
 
     <script defer src="dist/bundle.js"></script>
+    <script defer src="pwa-register.js"></script>
   </body>
 </html>

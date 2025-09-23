@@ -1,0 +1,155 @@
+/* AI Horizon Service Worker
+ * Provides offline-first caching for core assets and a network-first strategy for API calls.
+ * Increment CACHE_VERSION to force an update after deploys that change cached assets.
+ */
+const CACHE_VERSION = "v3-2025-09-23";
+const STATIC_CACHE = `static-${CACHE_VERSION}`;
+const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
+
+// Core assets required for the app shell / offline play
+// Base list of core assets (bundle injected dynamically once detected).
+const PRECACHE_CORE = [
+  "/",
+  "/index.html",
+  "/about.html",
+  "/style.css",
+  "/favicon.png",
+  "/manifest.webmanifest",
+  "/pwa-register.js",
+];
+
+// Detect which bundle path exists (dev vs prod) without logging expected 404 noise.
+async function detectBundlePath() {
+  const candidates = ["/dist/bundle.js", "/bundle.js"];
+  for (const c of candidates) {
+    try {
+      const resp = await fetch(c, { method: "HEAD", cache: "no-cache" });
+      if (resp.ok) return c; // Use the first that responds 2xx
+    } catch (_) {
+      // Ignore network errors here; we'll try next candidate.
+    }
+  }
+  return null;
+}
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(STATIC_CACHE);
+      const finalList = [...PRECACHE_CORE];
+      const bundlePath = await detectBundlePath();
+      if (bundlePath) finalList.push(bundlePath);
+
+      for (const url of finalList) {
+        try {
+          const response = await fetch(url, { cache: "no-cache" });
+          if (response.ok) {
+            await cache.put(url, response.clone());
+          } else {
+            console.warn("[SW] Skip precache (status)", url, response.status);
+          }
+        } catch (err) {
+          console.warn("[SW] Skip precache (error)", url, err);
+        }
+      }
+      await self.skipWaiting();
+    })()
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key.startsWith("static-") || key.startsWith("runtime-"))
+            .filter((key) => key !== STATIC_CACHE && key !== RUNTIME_CACHE)
+            .map((key) => caches.delete(key))
+        )
+      )
+      .then(() => self.clients.claim())
+  );
+});
+
+// Helper: cache-first for static assets
+async function cacheFirst(request) {
+  const cache = await caches.open(STATIC_CACHE);
+  const cached = await cache.match(request, { ignoreSearch: true });
+  if (cached) return cached;
+  try {
+    const response = await fetch(request);
+    if (response.ok) cache.put(request, response.clone());
+    return response;
+  } catch (err) {
+    return cached || Promise.reject(err);
+  }
+}
+
+// Helper: network-first (fallback to cache) for navigations
+async function networkFirstNavigation(request) {
+  try {
+    const response = await fetch(request);
+    const cache = await caches.open(STATIC_CACHE);
+    cache.put(request, response.clone());
+    return response;
+  } catch (_) {
+    const cache = await caches.open(STATIC_CACHE);
+    return (await cache.match(request)) || (await cache.match("/index.html"));
+  }
+}
+
+// Helper: network-first for API (with graceful offline fallback)
+async function networkFirstAPI(request) {
+  const cache = await caches.open(RUNTIME_CACHE);
+  try {
+    const fresh = await fetch(request.clone());
+    if (request.method === "GET" && fresh.ok) {
+      cache.put(request, fresh.clone());
+    }
+    return fresh;
+  } catch (err) {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    if (/execute-api/.test(request.url)) {
+      return new Response(
+        JSON.stringify({ offline: true, message: "Offline mode: leaderboard unavailable." }),
+        {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+    throw err;
+  }
+}
+
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+  const isSameOrigin = url.origin === self.location.origin;
+
+  if (request.mode === "navigate") {
+    event.respondWith(networkFirstNavigation(request));
+    return;
+  }
+
+  if (/execute-api/.test(url.hostname)) {
+    event.respondWith(networkFirstAPI(request));
+    return;
+  }
+
+  if (isSameOrigin) {
+    if (/\.(?:js|css|png|webmanifest)$/.test(url.pathname)) {
+      event.respondWith(cacheFirst(request));
+      return;
+    }
+  }
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data === "skipWaiting") {
+    self.skipWaiting();
+  }
+});
