@@ -2,7 +2,7 @@
  * Provides offline-first caching for core assets and a network-first strategy for API calls.
  * Increment CACHE_VERSION to force an update after deploys that change cached assets.
  */
-const CACHE_VERSION = "v4-2025-09-23";
+const CACHE_VERSION = "v5-2025-09-23";
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
@@ -158,6 +158,34 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
   const isSameOrigin = url.origin === self.location.origin;
+
+  // Intercept HTML document requests that are NOT navigations (e.g., <link rel="prefetch" as="document">)
+  // to provide a cache-first strategy and avoid noisy errors when offline.
+  if (
+    isSameOrigin &&
+    request.method === "GET" &&
+    request.mode !== "navigate" &&
+    (url.pathname.endsWith(".html") || request.destination === "document")
+  ) {
+    event.respondWith(
+      (async () => {
+        const cache = await caches.open(STATIC_CACHE);
+        const cached = await cache.match(request, { ignoreSearch: true });
+        if (cached) return cached;
+        try {
+          const fresh = await fetchWithTimeout(request);
+          if (fresh && fresh.ok) {
+            await cache.put(request, fresh.clone());
+          }
+          return fresh;
+        } catch (_) {
+          // Silent no-op response prevents console errors on prefetch when offline
+          return new Response("", { status: 204 });
+        }
+      })()
+    );
+    return;
+  }
 
   if (request.mode === "navigate") {
     event.respondWith(navigationCacheFirst(request, event));

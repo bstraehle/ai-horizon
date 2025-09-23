@@ -219,6 +219,17 @@ class AIHorizon {
 
     this.startBtn.focus();
 
+    // If the browser is currently offline, force leaderboard into local-only mode
+    try {
+      if (typeof navigator !== "undefined" && navigator && navigator.onLine === false) {
+        LeaderboardManager.IS_REMOTE = false;
+      }
+    } catch (_) {
+      /* ignore */
+    }
+
+    console.log("Remote " + LeaderboardManager.IS_REMOTE);
+
     try {
       const maybeEntries = LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
       /**
