@@ -236,87 +236,23 @@ class AIHorizon {
       }
     };
 
-    try {
-      // Initial guess based on current signal (treat undefined as online)
-      LeaderboardManager.IS_REMOTE = !(
-        typeof navigator !== "undefined" &&
-        navigator &&
-        navigator.onLine === false
-      );
-
-      // Keep mode updated on runtime changes
-      try {
-        window.addEventListener("offline", () => {
+    // Detect connectivity via a third-party endpoint; start async without blocking constructor.
+    LeaderboardManager.detectRemote({ timeoutMs: 1200 })
+      .then((isRemote) => {
+        LeaderboardManager.IS_REMOTE = !!isRemote;
+        return LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
+      })
+      .then((entries) => handleEntries(entries))
+      .catch(async () => {
+        // Fall back to local-only load
+        try {
           LeaderboardManager.IS_REMOTE = false;
-        });
-        window.addEventListener("online", () => {
-          LeaderboardManager.IS_REMOTE = true;
-        });
-      } catch (_) {
-        /* ignore */
-      }
-
-      // Enhanced online check: attempt a fast remote load once, with a short timeout.
-      // We do not abort the underlying request to avoid console noise; a late success will still warm the cache.
-      const probeRemote = async (timeoutMs = 1200) => {
-        // Respect explicit offline signal from the browser.
-        try {
-          if (typeof navigator !== "undefined" && navigator && navigator.onLine === false) {
-            return { online: false, entries: null };
-          }
-        } catch (_) {
-          /* ignore */
-        }
-        // Race a remote load against a timeout so we don't hang the UI on slow networks.
-        const timeout = new Promise((resolve) => {
-          try {
-            setTimeout(() => resolve({ online: false, entries: null, timeout: true }), timeoutMs);
-          } catch (_) {
-            resolve({ online: false, entries: null, timeout: true });
-          }
-        });
-        const attempt = LeaderboardManager.load({ remote: true })
-          .then((arr) => ({ online: true, entries: Array.isArray(arr) ? arr : [] }))
-          .catch(() => ({ online: false, entries: null }));
-        const result = await Promise.race([attempt, timeout]);
-        return result;
-      };
-
-      (async () => {
-        /** @type {{online:boolean, entries:{id:string,score:number}[]|null}} */
-        let initial = { online: LeaderboardManager.IS_REMOTE, entries: null };
-        try {
-          initial = await probeRemote().catch(() => ({ online: false, entries: null }));
-        } catch (_) {
-          initial = { online: false, entries: null };
-        }
-        LeaderboardManager.IS_REMOTE = !!initial.online;
-        try {
-          if (initial.entries) {
-            handleEntries(initial.entries);
-          } else {
-            const entries = await LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
-            handleEntries(entries);
-          }
+          const localEntries = await LeaderboardManager.load({ remote: false });
+          handleEntries(localEntries);
         } catch (_e) {
           /* ignore */
         }
-      })();
-    } catch (_e) {
-      // Fallback: local-only load
-      try {
-        const maybeLocal = LeaderboardManager.load({ remote: false });
-        if (maybeLocal && typeof maybeLocal.then === "function") {
-          maybeLocal.then(handleEntries).catch(() => {});
-        } else if (Array.isArray(maybeLocal)) {
-          handleEntries(maybeLocal);
-        }
-      } catch (_) {
-        /* ignore */
-      }
-    }
-
-    console.log("Leaderboard remote mode:", LeaderboardManager.IS_REMOTE);
+      });
 
     this.loop = new GameLoop({
       update: (dtMs, dtSec) => {

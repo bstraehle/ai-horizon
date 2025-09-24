@@ -394,4 +394,52 @@ export class LeaderboardManager {
       }
     }
   }
+
+  /**
+   * Detect whether we should operate in remote mode by probing a third-party endpoint.
+   * We only care about basic network reachability; use `no-cors` so CORS doesn't block the signal.
+   * Conservative: returns false in tests/SSR/file:// contexts and when fetch is unavailable.
+   * @param {{urls?: string[], timeoutMs?: number}} [opts]
+   * @returns {Promise<boolean>}
+   */
+  static async detectRemote(opts = {}) {
+    try {
+      const g = /** @type {any} */ (typeof globalThis !== "undefined" ? globalThis : {});
+      const proc = g.process;
+      const isTestEnv = !!(proc && proc.env && (proc.env.NODE_ENV === "test" || proc.env.VITEST));
+      if (isTestEnv) return false;
+      if (typeof window === "undefined") return false;
+      if (typeof fetch !== "function") return false;
+      /** @type {string[]} */
+      const urls =
+        Array.isArray(opts.urls) && opts.urls.length
+          ? opts.urls
+          : ["https://www.gstatic.com/generate_204"];
+      const timeoutMs = typeof opts.timeoutMs === "number" ? opts.timeoutMs : 1500;
+
+      // Probe each candidate until one appears reachable.
+      for (const url of urls) {
+        const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+        const to = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+        try {
+          const res = await fetch(url, {
+            method: "GET",
+            cache: "no-store",
+            redirect: "follow",
+            mode: "no-cors", // avoid CORS failures; opaque success still indicates reachability
+            signal: controller?.signal,
+          });
+          // If we got a Response (even opaque), consider network reachable.
+          if (res) return true;
+        } catch (_) {
+          // ignore and try next
+        } finally {
+          if (to) clearTimeout(to);
+        }
+      }
+    } catch (_) {
+      // fall through to false
+    }
+    return false;
+  }
 }
