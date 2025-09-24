@@ -256,28 +256,48 @@ class AIHorizon {
         /* ignore */
       }
 
-      // Quick cross-origin reachability probe to avoid SW-cache masking offline state
-      // Implemented without aborting the request to prevent noisy console errors in some browsers.
-      const confirmOnline = async (_timeoutMs = 800) => {
-        // If the browser explicitly reports offline, don't attempt any network request.
+      // Enhanced online check: attempt a fast remote load once, with a short timeout.
+      // We do not abort the underlying request to avoid console noise; a late success will still warm the cache.
+      const probeRemote = async (timeoutMs = 1200) => {
+        // Respect explicit offline signal from the browser.
         try {
           if (typeof navigator !== "undefined" && navigator && navigator.onLine === false) {
-            return false;
+            return { online: false, entries: null };
           }
         } catch (_) {
-          // ignore and fall through to probe
+          /* ignore */
         }
-        // To avoid console noise while offline or behind flaky networks, skip active network probes.
-        // Trust navigator.onLine (with runtime online/offline events keeping IS_REMOTE updated).
-        return true;
+        // Race a remote load against a timeout so we don't hang the UI on slow networks.
+        const timeout = new Promise((resolve) => {
+          try {
+            setTimeout(() => resolve({ online: false, entries: null, timeout: true }), timeoutMs);
+          } catch (_) {
+            resolve({ online: false, entries: null, timeout: true });
+          }
+        });
+        const attempt = LeaderboardManager.load({ remote: true })
+          .then((arr) => ({ online: true, entries: Array.isArray(arr) ? arr : [] }))
+          .catch(() => ({ online: false, entries: null }));
+        const result = await Promise.race([attempt, timeout]);
+        return result;
       };
 
       (async () => {
-        const reachable = await confirmOnline().catch(() => false);
-        if (!reachable) LeaderboardManager.IS_REMOTE = false;
+        /** @type {{online:boolean, entries:{id:string,score:number}[]|null}} */
+        let initial = { online: LeaderboardManager.IS_REMOTE, entries: null };
         try {
-          const entries = await LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
-          handleEntries(entries);
+          initial = await probeRemote().catch(() => ({ online: false, entries: null }));
+        } catch (_) {
+          initial = { online: false, entries: null };
+        }
+        LeaderboardManager.IS_REMOTE = !!initial.online;
+        try {
+          if (initial.entries) {
+            handleEntries(initial.entries);
+          } else {
+            const entries = await LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
+            handleEntries(entries);
+          }
         } catch (_e) {
           /* ignore */
         }
@@ -295,6 +315,8 @@ class AIHorizon {
         /* ignore */
       }
     }
+
+    console.log("Leaderboard remote mode:", LeaderboardManager.IS_REMOTE);
 
     this.loop = new GameLoop({
       update: (dtMs, dtSec) => {
