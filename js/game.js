@@ -258,7 +258,7 @@ class AIHorizon {
 
       // Quick cross-origin reachability probe to avoid SW-cache masking offline state
       // Implemented without aborting the request to prevent noisy console errors in some browsers.
-      const confirmOnline = async (timeoutMs = 800) => {
+      const confirmOnline = async (_timeoutMs = 800) => {
         // If the browser explicitly reports offline, don't attempt any network request.
         try {
           if (typeof navigator !== "undefined" && navigator && navigator.onLine === false) {
