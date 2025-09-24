@@ -219,42 +219,81 @@ class AIHorizon {
 
     this.startBtn.focus();
 
-    // If the browser is currently offline, force leaderboard into local-only mode
-    try {
-      if (typeof navigator !== "undefined" && navigator && navigator.onLine === false) {
-        LeaderboardManager.IS_REMOTE = false;
+    /**
+     * @param {{id:string,score:number}[]} entries
+     */
+    const handleEntries = (entries) => {
+      try {
+        const high = Array.isArray(entries)
+          ? entries.reduce((max, e) => Math.max(max, Number(e.score || 0)), 0)
+          : 0;
+        this.highScore = high;
+        this.updateHighScore();
+        const el = this.leaderboardListEl || document.getElementById("leaderboardList");
+        if (el) LeaderboardManager.render(el, entries);
+      } catch (_e) {
+        /* ignore */
       }
-    } catch (_) {
-      /* ignore */
-    }
-
-    console.log("Remote " + LeaderboardManager.IS_REMOTE);
+    };
 
     try {
-      const maybeEntries = LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
-      /**
-       * @param {{id:string,score:number}[]} entries
-       */
-      const handleEntries = (entries) => {
+      // Initial guess based on current signal (treat undefined as online)
+      LeaderboardManager.IS_REMOTE = !(
+        typeof navigator !== "undefined" &&
+        navigator &&
+        navigator.onLine === false
+      );
+
+      // Keep mode updated on runtime changes
+      try {
+        window.addEventListener("offline", () => {
+          LeaderboardManager.IS_REMOTE = false;
+        });
+        window.addEventListener("online", () => {
+          LeaderboardManager.IS_REMOTE = true;
+        });
+      } catch (_) {
+        /* ignore */
+      }
+
+      // Quick cross-origin reachability probe to avoid SW-cache masking offline state
+      // Implemented without aborting the request to prevent noisy console errors in some browsers.
+      const confirmOnline = async (timeoutMs = 800) => {
+        // If the browser explicitly reports offline, don't attempt any network request.
         try {
-          const high = Array.isArray(entries)
-            ? entries.reduce((max, e) => Math.max(max, Number(e.score || 0)), 0)
-            : 0;
-          this.highScore = high;
-          this.updateHighScore();
-          const el = this.leaderboardListEl || document.getElementById("leaderboardList");
-          if (el) LeaderboardManager.render(el, entries);
+          if (typeof navigator !== "undefined" && navigator && navigator.onLine === false) {
+            return false;
+          }
+        } catch (_) {
+          // ignore and fall through to probe
+        }
+        // To avoid console noise while offline or behind flaky networks, skip active network probes.
+        // Trust navigator.onLine (with runtime online/offline events keeping IS_REMOTE updated).
+        return true;
+      };
+
+      (async () => {
+        const reachable = await confirmOnline().catch(() => false);
+        if (!reachable) LeaderboardManager.IS_REMOTE = false;
+        try {
+          const entries = await LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
+          handleEntries(entries);
         } catch (_e) {
           /* ignore */
         }
-      };
-      if (Array.isArray(maybeEntries)) {
-        handleEntries(maybeEntries);
-      } else if (maybeEntries && typeof maybeEntries.then === "function") {
-        maybeEntries.then(handleEntries).catch(() => {});
-      }
+      })();
     } catch (_e) {
-      /* ignore */
+      // Fallback: local-only load
+      try {
+        const maybeLocal = LeaderboardManager.load({ remote: false });
+        if (maybeLocal && typeof maybeLocal.then === "function") {
+          maybeLocal.then(handleEntries).catch(() => {});
+        } else if (Array.isArray(maybeLocal)) {
+          handleEntries(maybeLocal);
+        }
+      } catch (_) {
+        /* ignore */
+      }
     }
 
     this.loop = new GameLoop({
