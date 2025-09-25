@@ -285,7 +285,7 @@ body {
 #leaderboardList {
   list-style-position: inside;
   margin: 0 auto;
-  max-height: calc(3 * 2.3em + 2 * var(--space-3));
+  max-height: calc(3 * 2.3em + 2 * var(--space-3) - 3px);
   max-width: 18rem;
   overflow-y: auto;
   padding-left: 0;
