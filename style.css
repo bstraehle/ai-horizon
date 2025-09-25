@@ -44,6 +44,16 @@
   --space-6: 24px;
   --space-7: 28px;
   --space-8: 40px;
+  --leaderboard-rows-desktop: 3;
+  --leaderboard-rows-mobile: 3;
+  --leaderboard-row-gap: var(--space-2);
+  --leaderboard-row-padding-block: var(--space-2);
+  --leaderboard-row-border: 1px;
+  --leaderboard-line-height: 20px;
+  --leaderboard-row-block: calc(
+    var(--leaderboard-line-height) + (2 * var(--leaderboard-row-padding-block)) +
+      (2 * var(--leaderboard-row-border))
+  );
 }
 /* 2. Base / Reset ---------------------------------------- */
 * {
@@ -286,16 +296,20 @@ body {
   text-shadow: 0 0 8px var(--color-title-shadow);
 }
 #leaderboardList {
+  -webkit-overflow-scrolling: touch;
   list-style-position: inside;
   margin: 0 auto;
-  max-height: calc(3 * 2.3em + 2 * var(--space-3) - 3px);
+  max-height: calc(
+    var(--leaderboard-rows-desktop) * var(--leaderboard-row-block) +
+      (var(--leaderboard-rows-desktop) - 1) * var(--leaderboard-row-gap)
+  );
   max-width: 18rem;
   overflow-y: auto;
   padding-left: 0;
+  scrollbar-gutter: stable both-edges;
   scrollbar-width: thin;
 }
 #leaderboardList li {
-  -webkit-overflow-scrolling: touch;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-1);
@@ -304,10 +318,13 @@ body {
   font-size: 0.95rem;
   font-weight: 600;
   justify-content: flex-start;
+  line-height: var(--leaderboard-line-height);
   margin-bottom: var(--space-2);
-  overflow-y: auto;
+  overflow: hidden;
   padding: var(--space-2) var(--space-3);
   text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 #leaderboardList li:last-child {
   margin-bottom: 0;
@@ -393,6 +410,12 @@ body.about-body,
   }
   .score {
     padding: 6px 10px;
+  }
+  #leaderboardList {
+    max-height: calc(
+      var(--leaderboard-rows-mobile) * var(--leaderboard-row-block) +
+        (var(--leaderboard-rows-mobile) - 1) * var(--leaderboard-row-gap)
+    );
   }
 }
 @media (hover: hover) and (pointer: fine) {
