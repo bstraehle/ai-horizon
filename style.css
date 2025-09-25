@@ -377,9 +377,6 @@ body.about-body,
   margin-top: 0;
   padding: var(--space-2) var(--space-3);
 }
-.about-content .text-center {
-  text-align: center;
-}
 /* 10. Media Queries (responsive/adaptive) ---------------- */
 @media (max-width: 480px) {
   .desktop-only {
