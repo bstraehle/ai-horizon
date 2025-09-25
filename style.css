@@ -270,6 +270,9 @@ body {
   white-space: nowrap;
   width: 1px;
 }
+.text-center {
+  text-align: center !important;
+}
 /* 7. Leaderboard ----------------------------------------- */
 .leaderboard {
   color: var(--color-text-secondary);
