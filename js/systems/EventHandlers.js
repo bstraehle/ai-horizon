@@ -175,15 +175,24 @@ export const EventHandlers = {
       events.on("collectedStar", function (/** @type {{ star:any }} */ payload) {
         const { star } = payload;
         const rng = game.rng;
-        for (let p = 0; p < CONFIG.STAR.PARTICLE_BURST; p++) {
+        const particleMult =
+          typeof game._performanceParticleMultiplier === "number"
+            ? Math.max(0.1, Math.min(1, game._performanceParticleMultiplier))
+            : 1;
+        const burstCount = Math.max(1, Math.round(CONFIG.STAR.PARTICLE_BURST * particleMult));
+        const budget = Number.isFinite(game._particleBudget)
+          ? game._particleBudget
+          : Number.POSITIVE_INFINITY;
+        for (let p = 0; p < burstCount; p++) {
+          if (game.particles.length >= budget) break;
           game.particles.push(
             game.particlePool.acquire(
               star.x + star.width / 2,
               star.y + star.height / 2,
-              Math.cos((CONFIG.TWO_PI * p) / CONFIG.STAR.PARTICLE_BURST) *
+              Math.cos((CONFIG.TWO_PI * p) / burstCount) *
                 (rng.range(0, CONFIG.STAR.PARTICLE_BURST_SPEED_VAR) +
                   CONFIG.STAR.PARTICLE_BURST_SPEED_MIN),
-              Math.sin((CONFIG.TWO_PI * p) / CONFIG.STAR.PARTICLE_BURST) *
+              Math.sin((CONFIG.TWO_PI * p) / burstCount) *
                 (rng.range(0, CONFIG.STAR.PARTICLE_BURST_SPEED_VAR) +
                   CONFIG.STAR.PARTICLE_BURST_SPEED_MIN),
               CONFIG.STAR.PARTICLE_LIFE,

@@ -418,21 +418,30 @@ export class Asteroid {
    *
    * Side Effects: pushes new particles (if pool acquire succeeds) into game.particles.
    * @param {Crater} crater Activated crater descriptor.
-   * @param {{particlePool:any,particles:any[],rng?:any}} game Game particle context.
+   * @param {{particlePool:any,particles:any[],rng?:any,_particleBudget?:number,_performanceParticleMultiplier?:number}} game Game particle context.
    */
   _spawnCraterDust(crater, game) {
     if (!game || !game.particlePool || !game.particles) return;
     if (crater._puffed) return;
     crater._puffed = true;
     const cfg = CONFIG.ASTEROID.CRATER_EMBOSS;
-    const count = cfg.PUFF_COUNT || 4;
+    const baseCount = cfg.PUFF_COUNT || 4;
+    const particleMult =
+      typeof game._performanceParticleMultiplier === "number"
+        ? Math.max(0.1, Math.min(1, game._performanceParticleMultiplier))
+        : 1;
+    const total = Math.max(1, Math.round(baseCount * particleMult));
     const rng =
       game.rng && typeof game.rng.nextFloat === "function"
         ? game.rng
         : { nextFloat: Math.random.bind(Math) };
     const cx = this.x + this.width / 2 + crater.dx;
     const cy = this.y + this.height / 2 + crater.dy;
-    for (let i = 0; i < count; i++) {
+    const budget = Number.isFinite(game._particleBudget)
+      ? Number(game._particleBudget)
+      : Number.POSITIVE_INFINITY;
+    for (let i = 0; i < total; i++) {
+      if (game.particles.length >= budget) break;
       const ang = rng.nextFloat() * Math.PI * 2;
       const baseSp = cfg.PUFF_SPEED || 120;
       const sp = baseSp + (rng.nextFloat() - 0.5) * (cfg.PUFF_SPEED_VAR || 0);

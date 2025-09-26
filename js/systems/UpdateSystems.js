@@ -95,7 +95,18 @@ export function updateBullets(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
  */
 export function updateEngineTrail(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
   if (game.state && typeof game.state.isRunning === "function" && game.state.isRunning()) {
-    game.engineTrail.add(game.player, game.rng);
+    const rawModulo = typeof game._engineTrailModulo === "number" ? game._engineTrailModulo : 1;
+    const modulo = rawModulo > 1 ? Math.max(1, Math.floor(rawModulo)) : 1;
+    if (modulo > 1) {
+      const step = typeof game._engineTrailStep === "number" ? game._engineTrailStep + 1 : 1;
+      game._engineTrailStep = step;
+      if (step % modulo === 0) {
+        game.engineTrail.add(game.player, game.rng);
+      }
+    } else {
+      game._engineTrailStep = 0;
+      game.engineTrail.add(game.player, game.rng);
+    }
   }
   game.engineTrail.update(dtSec);
 }

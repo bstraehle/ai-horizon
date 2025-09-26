@@ -51,10 +51,20 @@ export class ViewManager {
       typeof gAny === "object" && typeof gAny._isMobile === "boolean"
         ? gAny._isMobile
         : (navigator.maxTouchPoints || 0) > 0;
+    const perfDprOverride =
+      typeof gAny === "object" && typeof gAny._dprOverride === "number" && gAny._dprOverride > 0
+        ? gAny._dprOverride
+        : null;
     if (hintIsMobile && CONFIG.VIEW.DPR_MOBILE_MAX) {
       deviceDpr = Math.min(deviceDpr, CONFIG.VIEW.DPR_MOBILE_MAX);
     }
-    const dpr = Math.max(CONFIG.VIEW.DPR_MIN, Math.min(CONFIG.VIEW.DPR_MAX, deviceDpr));
+    if (perfDprOverride) {
+      deviceDpr = Math.min(deviceDpr, perfDprOverride);
+    }
+    const maxDpr = perfDprOverride
+      ? Math.min(CONFIG.VIEW.DPR_MAX, perfDprOverride)
+      : CONFIG.VIEW.DPR_MAX;
+    const dpr = Math.max(CONFIG.VIEW.DPR_MIN, Math.min(maxDpr, deviceDpr));
     view.dpr = dpr;
     view.width = Math.round(window.innerWidth);
     view.height = Math.round(window.innerHeight);

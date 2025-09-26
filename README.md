@@ -295,6 +295,7 @@ CI reliability: remote leaderboard calls are suppressed in tests (environment de
 - Precomputed gradients & sprites drastically reduce per-frame canvas state churn.
 - Fixed upper bound on nebula blobs & particle counts keeps worst-case frame time predictable.
 - Deterministic RNG seeds allow reproducible performance benchmarks (run with identical seed to compare changes).
+- Runtime performance monitor (see `CONFIG.PERFORMANCE`) auto-scales visual density on sustained slow frames: caps DPR, trims starfield counts, reduces spawn rates, and lowers particle budgets on low-power devices while leaving high-end rigs untouched.
 
 Potential future optimizations (not yet implemented):
 

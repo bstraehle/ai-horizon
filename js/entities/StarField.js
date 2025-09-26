@@ -33,13 +33,21 @@ export class StarField {
    * @param {number} height Canvas height.
    * @param {import('../types.js').RNGLike} [rng] Optional RNG (nextFloat()).
    * @param {boolean} [isMobile=false] Mobile flag.
+   * @param {number} [qualityScale=1] Optional scale factor (0-1] for low-power modes.
    * @returns {StarData[] | {layers:Array<{name:string,stars:StarData[],config:{twinkleRate:number,twinkleXFactor:number}}>} }
    */
-  static init(width, height, rng, isMobile = false) {
+  static init(width, height, rng, isMobile = false, qualityScale = 1) {
     const rand = rng || { nextFloat: Math.random.bind(Math) };
-    const baseCount = isMobile
+    const perf = CONFIG.PERFORMANCE || {};
+    const minScale = typeof perf.MIN_STARFIELD_SCALE === "number" ? perf.MIN_STARFIELD_SCALE : 0.35;
+    const clampScale = Math.max(
+      minScale,
+      Math.min(1, typeof qualityScale === "number" ? qualityScale : 1)
+    );
+    const baseTarget = isMobile
       ? CONFIG.GAME.STARFIELD_COUNT_MOBILE || CONFIG.GAME.STARFIELD_COUNT
       : CONFIG.GAME.STARFIELD_COUNT;
+    const baseCount = Math.max(1, Math.round(baseTarget * clampScale));
 
     /**
      * @typedef {{ name?:string, countFactor?:number, sizeMult?:number, speedMult?:number, brightnessMult?:number, twinkleRate?:number, twinkleXFactor?:number }} LayerDef

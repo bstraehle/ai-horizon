@@ -42,7 +42,7 @@ export class BackgroundManager {
    * - Any exception inside Nebula/StarField init surfaces upward (not caught here) so calling
    *   code can decide whether to fallback or crash early.
    *
-   * @param {{ view:{width:number,height:number}, running:boolean, isMobile:boolean, rng?: RNGLike }} ctxObj Context-like object; minimal projection of GameContext.
+   * @param {{ view:{width:number,height:number}, running:boolean, isMobile:boolean, isLowPower?:boolean, starfieldScale?:number, rng?: RNGLike }} ctxObj Context-like object; minimal projection of GameContext.
    * @returns {{ nebulaConfigs?: any, starField: any }} New background state to assign onto the main context.
    */
   static init(ctxObj) {
@@ -50,13 +50,17 @@ export class BackgroundManager {
       view: { width, height },
       running,
       isMobile,
+      isLowPower,
+      starfieldScale,
       rng,
     } = ctxObj;
+    const mobileHint = isMobile || !!isLowPower;
+    const scale = typeof starfieldScale === "number" ? starfieldScale : 1;
     const state = {};
     if (running) {
-      state.nebulaConfigs = Nebula.init(width, height, isMobile, rng);
+      state.nebulaConfigs = Nebula.init(width, height, mobileHint, rng);
     }
-    state.starField = StarField.init(width, height, rng, isMobile);
+    state.starField = StarField.init(width, height, rng, mobileHint, scale);
     return state;
   }
 

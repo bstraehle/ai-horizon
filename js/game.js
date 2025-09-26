@@ -55,6 +55,7 @@ import {
 import { EventBus } from "./core/EventBus.js";
 import { GameStateMachine } from "./core/GameStateMachine.js";
 import { EventHandlers } from "./systems/EventHandlers.js";
+import { PerformanceMonitor } from "./core/PerformanceMonitor.js";
 /** @typedef {import('./types.js').GameState} GameState */
 
 /**
@@ -120,6 +121,15 @@ class AIHorizon {
     this.events = new EventBus();
 
     this._isMobile = this.isMobile();
+    this._isLowPowerMode = false;
+    this._performanceLevel = 0;
+    this._starfieldScale = 1;
+    this._spawnRateScale = 1;
+    this._particleBudget = Number.POSITIVE_INFINITY;
+    this._performanceParticleMultiplier = 1;
+    this._dprOverride = null;
+    this._engineTrailModulo = 1;
+    this._engineTrailStep = 0;
 
     this.asteroidSpeed = this._isMobile
       ? CONFIG.SPEEDS.ASTEROID_MOBILE
@@ -213,6 +223,15 @@ class AIHorizon {
       { maxSize: 256 }
     );
 
+    const perfConfig = CONFIG.PERFORMANCE || {};
+    this.performanceMonitor = new PerformanceMonitor({
+      levels: Array.isArray(perfConfig.LEVELS) ? perfConfig.LEVELS : undefined,
+      sampleWindow: perfConfig.SAMPLE_WINDOW,
+      cooldownFrames: perfConfig.COOLDOWN_FRAMES,
+      onLevelChange: (level, meta) => this._applyPerformanceProfile(level, meta),
+    });
+    this._applyPerformanceProfile(this._performanceLevel, { reinitialize: false, initial: true });
+
     this._warmUpPools();
 
     this.bindEventHandlers();
@@ -263,7 +282,7 @@ class AIHorizon {
         this._lastDtSec = dtSec;
         this.update(dtSec);
       },
-      draw: () => this.draw(),
+      draw: (frameDtMs) => this.draw(frameDtMs),
       shouldUpdate: () => this.state.isRunning(),
       stepMs: CONFIG.TIME.STEP_MS,
       maxSubSteps: CONFIG.TIME.MAX_SUB_STEPS,
@@ -318,8 +337,10 @@ class AIHorizon {
    */
   createGoldBurst(x, y) {
     const rng = this.rng;
-    const count = 8;
+    const baseCount = 8;
+    const count = Math.max(2, Math.round(baseCount * this._performanceParticleMultiplier));
     for (let i = 0; i < count; i++) {
+      if (this.particles.length >= this._particleBudget) break;
       const angle = (Math.PI * 2 * i) / count + (rng.nextFloat() - 0.5) * 0.4;
       const speed = rng.range(40, 160);
       const vx = Math.cos(angle) * speed;
@@ -805,6 +826,10 @@ class AIHorizon {
       this.loop.stop();
       this._loopRunning = false;
     }
+    if (this.performanceMonitor) {
+      this.performanceMonitor.reset(this._performanceLevel);
+    }
+    this._engineTrailStep = 0;
 
     /**
      * @param {Array<any>} arr
@@ -1333,7 +1358,13 @@ class AIHorizon {
       typeof this.state.isRunning === "function" &&
       this.state.isRunning()
     ) {
-      Nebula.update(this.view.width, this.view.height, this.nebulaConfigs, this._isMobile, dtSec);
+      Nebula.update(
+        this.view.width,
+        this.view.height,
+        this.nebulaConfigs,
+        this._isMobile || this._isLowPowerMode,
+        dtSec
+      );
     }
     updateAsteroids(this, dtSec);
     updateBullets(this, dtSec);
@@ -1420,7 +1451,12 @@ class AIHorizon {
    */
   createExplosion(x, y) {
     const rng = this.rng;
-    for (let i = 0; i < CONFIG.EXPLOSION.PARTICLE_COUNT; i++) {
+    const particleCount = Math.max(
+      0,
+      Math.round(CONFIG.EXPLOSION.PARTICLE_COUNT * this._performanceParticleMultiplier)
+    );
+    for (let i = 0; i < particleCount; i++) {
+      if (this.particles.length >= this._particleBudget) break;
       const vx = (rng.nextFloat() - 0.5) * CONFIG.EXPLOSION.PARTICLE_SPEED_VAR;
       const vy = (rng.nextFloat() - 0.5) * CONFIG.EXPLOSION.PARTICLE_SPEED_VAR;
       const size =
@@ -1510,9 +1546,92 @@ class AIHorizon {
   }
 
   /**
+   * Apply the performance profile associated with the provided level.
+   * @param {number} level
+   * @param {{ reinitialize?: boolean, force?: boolean, initial?: boolean, averageFrameMs?: number }} [meta]
+   */
+  _applyPerformanceProfile(level, meta = {}) {
+    const prevLevel = this._performanceLevel;
+    const shouldForce = meta.force === true || meta.initial === true;
+    if (!shouldForce && level === prevLevel) {
+      return;
+    }
+
+    const perf = CONFIG.PERFORMANCE || {};
+    const defaults = {
+      dprMax: CONFIG.VIEW.DPR_MAX,
+      starfieldScale: 1,
+      spawnRateScale: 1,
+      particleMultiplier: 1,
+      particleBudget: Number.POSITIVE_INFINITY,
+      engineTrailModulo: 1,
+    };
+    /** @type {any} */
+    const levels = Array.isArray(perf.LEVELS) ? perf.LEVELS : [];
+    const idx = Math.max(0, Math.min(level - 1, levels.length - 1));
+    const profile = level > 0 && levels.length > 0 ? { ...defaults, ...levels[idx] } : defaults;
+
+    const minStarfieldScale = Math.max(0, perf.MIN_STARFIELD_SCALE || 0.35);
+
+    this._performanceLevel = level;
+    this._starfieldScale = Math.max(minStarfieldScale, Math.min(1, profile.starfieldScale || 1));
+    this._spawnRateScale = Math.max(0.35, Math.min(1, profile.spawnRateScale || 1));
+    this._performanceParticleMultiplier = Math.max(
+      0.1,
+      Math.min(1, profile.particleMultiplier || 1)
+    );
+    this._particleBudget = Number.isFinite(profile.particleBudget)
+      ? Math.max(200, profile.particleBudget)
+      : Number.POSITIVE_INFINITY;
+    const overrideDpr = typeof profile.dprMax === "number" ? Math.max(0.75, profile.dprMax) : null;
+    this._dprOverride = level > 0 ? overrideDpr : null;
+    this._engineTrailModulo = Math.max(1, Math.round(profile.engineTrailModulo || 1));
+    this._isLowPowerMode = level > 0;
+    this._engineTrailStep = 0;
+
+    if (this.particles && this.particlePool && this.particles.length > this._particleBudget) {
+      const excess = this.particles.splice(this._particleBudget);
+      for (const particle of excess) {
+        this.particlePool.release(particle);
+      }
+    }
+
+    if (meta.reinitialize !== false) {
+      try {
+        this.resizeCanvas();
+      } catch (_e) {
+        /* ignore resize failures */
+      }
+      try {
+        this.initBackground();
+      } catch (_e) {
+        /* ignore background refresh errors */
+      }
+    }
+
+    if (level !== prevLevel && typeof console !== "undefined" && console.info) {
+      const avg = typeof meta.averageFrameMs === "number" ? meta.averageFrameMs.toFixed(1) : null;
+      const suffix = avg ? ` (avg ${avg}ms)` : "";
+      console.info(`[Performance] Adjusted to level ${level}${suffix}`);
+    }
+  }
+
+  /**
    * Draw all game objects and background for the current frame.
    */
-  draw() {
+  draw(frameDtMs = CONFIG.TIME.STEP_MS) {
+    const shouldTrack = !!(
+      this.state &&
+      typeof this.state.isRunning === "function" &&
+      this.state.isRunning() &&
+      !(typeof this.state.isPaused === "function" && this.state.isPaused())
+    );
+    if (this.performanceMonitor) {
+      const maxSample = CONFIG.TIME.STEP_MS * CONFIG.TIME.MAX_SUB_STEPS * 1.5;
+      const safeFrame = Math.min(frameDtMs, maxSample || frameDtMs || CONFIG.TIME.STEP_MS);
+      this.performanceMonitor.sample(safeFrame, { active: shouldTrack });
+    }
+
     if (this.state.isPaused()) {
       if (!this._pausedFrameRendered) {
         this.drawFrame();
@@ -1537,6 +1656,8 @@ class AIHorizon {
    */
   initBackground() {
     const ctx = getGameContext(this);
+    ctx.starfieldScale = this._starfieldScale;
+    ctx.isLowPower = this._isLowPowerMode;
     try {
       const url = new URL(window.location.href);
       if (!url.searchParams.has(CONFIG.RNG.SEED_PARAM)) {

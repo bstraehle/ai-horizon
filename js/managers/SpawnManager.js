@@ -14,6 +14,8 @@ import { Star } from "../entities/Star.js";
  * @property {number} asteroidSpeed
  * @property {number} starSpeed
  * @property {boolean} [_isMobile]
+ * @property {boolean} [_isLowPowerMode]
+ * @property {number} [_spawnRateScale]
  * @property {AsteroidPool | null | undefined} [asteroidPool]
  * @property {StarPool | null | undefined} [starPool]
  * @property {Asteroid[]} asteroids
@@ -114,18 +116,24 @@ export class SpawnManager {
     const dt = typeof dtSec === "number" ? dtSec : CONFIG.TIME.DEFAULT_DT;
     const rng = game.rng;
     const isMobile = typeof game._isMobile === "boolean" ? game._isMobile : null;
-    const asteroidRate =
-      isMobile === true
-        ? CONFIG.GAME.ASTEROID_SPAWN_RATE_MOBILE
-        : isMobile === false
-          ? CONFIG.GAME.ASTEROID_SPAWN_RATE_DESKTOP
-          : CONFIG.GAME.ASTEROID_SPAWN_RATE;
-    const starRate =
-      isMobile === true
-        ? CONFIG.GAME.STAR_SPAWN_RATE_MOBILE
-        : isMobile === false
-          ? CONFIG.GAME.STAR_SPAWN_RATE_DESKTOP
-          : CONFIG.GAME.STAR_SPAWN_RATE;
+    const lowPower = !!game._isLowPowerMode;
+    const treatAsMobile = isMobile === true || (lowPower && isMobile !== false);
+    const asteroidBase = treatAsMobile
+      ? CONFIG.GAME.ASTEROID_SPAWN_RATE_MOBILE
+      : isMobile === false
+        ? CONFIG.GAME.ASTEROID_SPAWN_RATE_DESKTOP
+        : CONFIG.GAME.ASTEROID_SPAWN_RATE;
+    const starBase = treatAsMobile
+      ? CONFIG.GAME.STAR_SPAWN_RATE_MOBILE
+      : isMobile === false
+        ? CONFIG.GAME.STAR_SPAWN_RATE_DESKTOP
+        : CONFIG.GAME.STAR_SPAWN_RATE;
+    const spawnScale =
+      typeof game._spawnRateScale === "number" && game._spawnRateScale > 0
+        ? Math.max(0.1, Math.min(1, game._spawnRateScale))
+        : 1;
+    const asteroidRate = asteroidBase * spawnScale;
+    const starRate = starBase * spawnScale;
 
     const pAst = 1 - Math.exp(-asteroidRate * dt);
     const pStar = 1 - Math.exp(-starRate * dt);

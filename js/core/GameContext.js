@@ -20,6 +20,8 @@ import { CONFIG } from "../constants.js";
  * @property {number} [timerRemaining]
  * @property {number} [timerSeconds]
  * @property {boolean} isMobile
+ * @property {boolean} isLowPower
+ * @property {number} starfieldScale
  * @property {import('../types.js').RNGLike} rng
  * @property {{ nebulaConfigs?: any, starField: any }} background
  */
@@ -58,6 +60,9 @@ export function getGameContext(game) {
     timerSeconds: typeof game.timerSeconds === "number" ? game.timerSeconds : undefined,
 
     isMobile: game._isMobile,
+    isLowPower: !!game._isLowPowerMode,
+
+    starfieldScale: typeof game._starfieldScale === "number" ? game._starfieldScale : 1,
 
     rng: game.rng,
 
