@@ -147,6 +147,8 @@ class AIHorizon {
     this.state = new GameStateMachine();
     this._pausedFrameRendered = false;
     this._suppressFullResetOnResize = false;
+    this._loopRunning = false;
+    this._resumeLoopOnVisibility = false;
 
     this.fireLimiter.reset();
     this.timeMs = 0;
@@ -381,6 +383,7 @@ class AIHorizon {
     this.handlePauseKeyDown = this.handlePauseKeyDown.bind(this);
     this.shouldTogglePause = this.shouldTogglePause.bind(this);
     this.handleScroll = this.handleScroll.bind(this);
+    this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
     this.shoot = this.shoot.bind(this);
     this.movementKeys = new Set(CONFIG.INPUT.MOVEMENT_CODES);
   }
@@ -420,13 +423,7 @@ class AIHorizon {
             this.gameOverScreen,
             this.restartBtn
           ),
-        handleVisibilityChange: () =>
-          UIManager.handleVisibilityChange(
-            this.gameInfo,
-            this.startBtn,
-            this.gameOverScreen,
-            this.restartBtn
-          ),
+        handleVisibilityChange: this.handleVisibilityChange,
         handleDocumentFocusIn: (e) =>
           UIManager.handleDocumentFocusIn(
             e,
@@ -500,6 +497,35 @@ class AIHorizon {
    */
   handleScroll() {
     this.canvasRect = this.canvas.getBoundingClientRect();
+  }
+
+  /**
+   * Pause rendering work when the document is hidden and resume when visible.
+   * Also delegates focus management back to the UI layer after visibility returns.
+   */
+  handleVisibilityChange() {
+    const hidden = typeof document !== "undefined" && document.hidden;
+    if (hidden) {
+      this._resumeLoopOnVisibility = this._loopRunning;
+      if (this.loop && this._loopRunning) {
+        this.loop.stop();
+        this._loopRunning = false;
+      }
+      return;
+    }
+
+    if (this._resumeLoopOnVisibility && this.loop) {
+      this.loop.start();
+      this._loopRunning = true;
+    }
+    this._resumeLoopOnVisibility = false;
+
+    UIManager.handleVisibilityChange(
+      this.gameInfo,
+      this.startBtn,
+      this.gameOverScreen,
+      this.restartBtn
+    );
   }
 
   /**
@@ -775,7 +801,10 @@ class AIHorizon {
    * and re-evaluates platform-dependent parameters.
    */
   fullReset() {
-    if (this.loop) this.loop.stop();
+    if (this.loop) {
+      this.loop.stop();
+      this._loopRunning = false;
+    }
 
     /**
      * @param {Array<any>} arr
@@ -890,6 +919,7 @@ class AIHorizon {
     this.state.start();
     this.initBackground();
     this.loop.start();
+    this._loopRunning = true;
   }
 
   /**
@@ -1252,7 +1282,10 @@ class AIHorizon {
     } catch (_e) {
       this._suppressFullResetOnResize = false;
     }
-    if (this.loop) this.loop.stop();
+    if (this.loop) {
+      this.loop.stop();
+      this._loopRunning = false;
+    }
   }
 
   /**

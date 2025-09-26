@@ -14,6 +14,8 @@ import { CONFIG } from "../constants.js";
  * Failure Modes: none (guards not required; relies on valid ctx).
  */
 export class Background {
+  /** @type {WeakMap<CanvasRenderingContext2D, { width:number, height:number, gradient:CanvasGradient }>} */
+  static _gradientCache = new WeakMap();
   /**
    * Paint the background gradient from TOP -> MID -> BOTTOM colors.
    *
@@ -26,11 +28,16 @@ export class Background {
    */
   static draw(ctx, width, height) {
     ctx.save();
-    const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, CONFIG.COLORS.BACKGROUND.TOP);
-    gradient.addColorStop(0.5, CONFIG.COLORS.BACKGROUND.MID);
-    gradient.addColorStop(1, CONFIG.COLORS.BACKGROUND.BOTTOM);
-    ctx.fillStyle = gradient;
+    let cache = Background._gradientCache.get(ctx);
+    if (!cache || cache.width !== width || cache.height !== height) {
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, CONFIG.COLORS.BACKGROUND.TOP);
+      gradient.addColorStop(0.5, CONFIG.COLORS.BACKGROUND.MID);
+      gradient.addColorStop(1, CONFIG.COLORS.BACKGROUND.BOTTOM);
+      cache = { width, height, gradient };
+      Background._gradientCache.set(ctx, cache);
+    }
+    ctx.fillStyle = cache.gradient;
     ctx.fillRect(0, 0, width, height);
     ctx.restore();
   }

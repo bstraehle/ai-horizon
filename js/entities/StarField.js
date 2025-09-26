@@ -18,6 +18,7 @@ export class StarField {
    * @property {number} size
    * @property {number} speed
    * @property {number} brightness
+   * @property {number} twinkleOffset
    */
 
   /**
@@ -45,34 +46,44 @@ export class StarField {
      */
     /** @type {LayerDef[] | null} */
     const layerDefs = Array.isArray(CONFIG.STARFIELD.LAYERS) ? CONFIG.STARFIELD.LAYERS : null;
+    const defaultTwinkleFactor = CONFIG.STARFIELD.TWINKLE_X_FACTOR;
     if (!layerDefs || layerDefs.length === 0) {
-      return Array.from({ length: baseCount }, () => ({
-        x: rand.nextFloat() * width,
-        y: rand.nextFloat() * height,
-        size: rand.nextFloat() * CONFIG.STARFIELD.SIZE_VAR + CONFIG.STARFIELD.SIZE_MIN,
-        speed: rand.nextFloat() * CONFIG.STARFIELD.SPEED_VAR + CONFIG.STARFIELD.SPEED_MIN,
-        brightness:
-          rand.nextFloat() * CONFIG.STARFIELD.BRIGHTNESS_VAR + CONFIG.STARFIELD.BRIGHTNESS_MIN,
-      }));
+      return Array.from({ length: baseCount }, () => {
+        const x = rand.nextFloat() * width;
+        return {
+          x,
+          y: rand.nextFloat() * height,
+          size: rand.nextFloat() * CONFIG.STARFIELD.SIZE_VAR + CONFIG.STARFIELD.SIZE_MIN,
+          speed: rand.nextFloat() * CONFIG.STARFIELD.SPEED_VAR + CONFIG.STARFIELD.SPEED_MIN,
+          brightness:
+            rand.nextFloat() * CONFIG.STARFIELD.BRIGHTNESS_VAR + CONFIG.STARFIELD.BRIGHTNESS_MIN,
+          twinkleOffset: x * defaultTwinkleFactor,
+        };
+      });
     }
 
     /** @typedef {{name:string, stars:StarData[], config:{twinkleRate:number, twinkleXFactor:number}}} LayerRuntime */
     /** @type {LayerRuntime[]} */
     const layers = layerDefs.map((ld /** @type {LayerDef} */) => {
       const layerCount = Math.max(1, Math.round(baseCount * (ld.countFactor || 1)));
-      const stars = Array.from({ length: layerCount }, () => ({
-        x: rand.nextFloat() * width,
-        y: rand.nextFloat() * height,
-        size:
-          (rand.nextFloat() * CONFIG.STARFIELD.SIZE_VAR + CONFIG.STARFIELD.SIZE_MIN) *
-          (ld.sizeMult || 1),
-        speed:
-          (rand.nextFloat() * CONFIG.STARFIELD.SPEED_VAR + CONFIG.STARFIELD.SPEED_MIN) *
-          (ld.speedMult || 1),
-        brightness:
-          (rand.nextFloat() * CONFIG.STARFIELD.BRIGHTNESS_VAR + CONFIG.STARFIELD.BRIGHTNESS_MIN) *
-          (ld.brightnessMult || 1),
-      }));
+      const twinkleFactor = ld.twinkleXFactor || CONFIG.STARFIELD.TWINKLE_X_FACTOR;
+      const stars = Array.from({ length: layerCount }, () => {
+        const x = rand.nextFloat() * width;
+        return {
+          x,
+          y: rand.nextFloat() * height,
+          size:
+            (rand.nextFloat() * CONFIG.STARFIELD.SIZE_VAR + CONFIG.STARFIELD.SIZE_MIN) *
+            (ld.sizeMult || 1),
+          speed:
+            (rand.nextFloat() * CONFIG.STARFIELD.SPEED_VAR + CONFIG.STARFIELD.SPEED_MIN) *
+            (ld.speedMult || 1),
+          brightness:
+            (rand.nextFloat() * CONFIG.STARFIELD.BRIGHTNESS_VAR + CONFIG.STARFIELD.BRIGHTNESS_MIN) *
+            (ld.brightnessMult || 1),
+          twinkleOffset: x * twinkleFactor,
+        };
+      });
       return {
         name: ld.name || "layer",
         stars,
@@ -110,6 +121,10 @@ export class StarField {
     if (!starField) return;
     ctx.save();
     ctx.fillStyle = CONFIG.COLORS.STAR.GRAD_IN;
+    ctx.shadowColor = CONFIG.COLORS.STAR.GRAD_IN;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    const blurMult = CONFIG.STARFIELD.SHADOW_BLUR_MULT;
 
     /**
      * @param {StarData[]} stars
@@ -117,6 +132,8 @@ export class StarField {
      * @param {number} twinkleXFactor
      */
     const drawStars = (stars, twinkleRate, twinkleXFactor) => {
+      let prevAlpha = -1;
+      let prevBlur = -1;
       for (let i = 0; i < stars.length; i++) {
         const star = stars[i];
         if (!paused) {
@@ -124,16 +141,28 @@ export class StarField {
           if (star.y > height) {
             star.y = CONFIG.STARFIELD.RESET_Y;
             star.x = (rng ? rng.nextFloat() : Math.random()) * width;
+            star.twinkleOffset = star.x * twinkleXFactor;
           }
         }
-        const twinkle = Math.sin(timeSec * twinkleRate + star.x * twinkleXFactor) * 0.3 + 0.7;
-        ctx.save();
-        ctx.globalAlpha = star.brightness * twinkle;
-        ctx.shadowColor = CONFIG.COLORS.STAR.GRAD_IN;
-        ctx.shadowBlur = star.size * CONFIG.STARFIELD.SHADOW_BLUR_MULT;
+        if (typeof star.twinkleOffset !== "number") {
+          star.twinkleOffset = star.x * twinkleXFactor;
+        }
+        const twinkle = Math.sin(timeSec * twinkleRate + star.twinkleOffset) * 0.3 + 0.7;
+        const alpha = Math.max(0, Math.min(1, star.brightness * twinkle));
+        if (alpha <= 0.01) continue;
+        if (Math.abs(alpha - prevAlpha) > 0.001) {
+          ctx.globalAlpha = alpha;
+          prevAlpha = alpha;
+        }
+        const blur = star.size * blurMult;
+        if (Math.abs(blur - prevBlur) > 0.01) {
+          ctx.shadowBlur = blur;
+          prevBlur = blur;
+        }
         ctx.fillRect(star.x, star.y, star.size, star.size);
-        ctx.restore();
       }
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
     };
 
     if (Array.isArray(starField)) {
@@ -177,6 +206,7 @@ export class StarField {
         size: Math.max(1, s.size * sAvg),
         speed: s.speed * sAvg,
         brightness: s.brightness,
+        twinkleOffset: s.x * sx * CONFIG.STARFIELD.TWINKLE_X_FACTOR,
       }));
     }
     if (starField && /** @type {any} */ (starField).layers) {
@@ -194,6 +224,11 @@ export class StarField {
                 size: Math.max(1, s.size * sAvg),
                 speed: s.speed * sAvg,
                 brightness: s.brightness,
+                twinkleOffset:
+                  s.x *
+                  sx *
+                  ((layer.config && layer.config.twinkleXFactor) ||
+                    CONFIG.STARFIELD.TWINKLE_X_FACTOR),
               })
             ),
           })

@@ -12,6 +12,9 @@ import { CONFIG, PI2 } from "../constants.js";
  * Performance: Blob count & wobble math chosen to remain small (O(totalBlobs)). Disable or reduce counts via CONFIG for low-end.
  */
 export class Nebula {
+  /** @type {WeakMap<CanvasRenderingContext2D, Map<string, CanvasGradient>>} */
+  static _gradientCache = new WeakMap();
+
   /**
    * @typedef {Object} NebulaBlob
    * @property {number} baseOx
@@ -34,7 +37,7 @@ export class Nebula {
    * @property {number} r
    * @property {string} color0
    * @property {string} color1
-   * @property {number} [_variantIndex] - internal palette variant index for theme blending
+   * @property {number} [_variantIndex]
    * @property {number} dx
    * @property {number} dy
    * @property {number} dr
@@ -173,6 +176,11 @@ export class Nebula {
    */
   static draw(ctx, nebulaConfigs) {
     ctx.save();
+    let cache = Nebula._gradientCache.get(ctx);
+    if (!cache) {
+      cache = new Map();
+      Nebula._gradientCache.set(ctx, cache);
+    }
     for (const nebula of nebulaConfigs) {
       const blobs = nebula.blobs || [
         {
@@ -189,9 +197,17 @@ export class Nebula {
         ctx.translate(nebula.x + (b.ox || 0), nebula.y + (b.oy || 0));
         ctx.rotate(b.rot || 0);
         ctx.scale(b.sx || 1, b.sy || 1);
-        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, b.r || nebula.r);
-        grad.addColorStop(0, nebula.color0);
-        grad.addColorStop(1, nebula.color1);
+        const radius = b.r || nebula.r;
+        const sx = b.sx || 1;
+        const sy = b.sy || 1;
+        const key = `${nebula.color0}|${nebula.color1}|${radius.toFixed(3)}|${sx.toFixed(3)}|${sy.toFixed(3)}`;
+        let grad = cache.get(key);
+        if (!grad) {
+          grad = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+          grad.addColorStop(0, nebula.color0);
+          grad.addColorStop(1, nebula.color1);
+          cache.set(key, grad);
+        }
         ctx.fillStyle = grad;
         ctx.globalCompositeOperation = "lighter";
         ctx.beginPath();
