@@ -617,8 +617,24 @@ export class UIManager {
       submitEl &&
       !submitEl.classList.contains("hidden") &&
       (t === submitEl || (t && typeof t.closest === "function" && t.closest("#submitScoreBtn")));
-
-    if (targetIsRestart || targetIsInitials || targetIsSubmit) return;
+    // If the restart button itself is blurring but there are no interactive
+    // initials / submit controls visible, immediately reclaim focus so that
+    // stray taps/clicks (especially on mobile) don't leave the overlay with
+    // no focused control. This matches the UX request to "keep focus on the
+    // Play Again button when the submit button is not visible".
+    if (targetIsRestart) {
+      if (
+        e &&
+        e.type === "blur" &&
+        (!initialsEl || initialsEl.classList.contains("hidden")) &&
+        (!submitEl || submitEl.classList.contains("hidden"))
+      ) {
+        if (UIManager._preserveFocus) UIManager.focusPreserveScroll(restartBtn);
+        else UIManager.focusWithRetry(restartBtn);
+      }
+      return; // Always return after handling restart target.
+    }
+    if (targetIsInitials || targetIsSubmit) return;
 
     if (UIManager._preserveFocus) UIManager.focusPreserveScroll(restartBtn);
     else UIManager.focusWithRetry(restartBtn);
