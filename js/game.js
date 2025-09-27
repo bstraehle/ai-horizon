@@ -658,9 +658,16 @@ class AIHorizon {
    * Restart the game when restart button is clicked.
    */
   handleRestartClick() {
+    // Ignore clicks while cooldown is active to avoid accidental restart from held input.
+    if (this.restartBtn && this.restartBtn.dataset && this.restartBtn.dataset.cooldown === "1")
+      return;
     this.hideGameOver();
     this.startGame();
-    this.startBtn.focus();
+    try {
+      this.startBtn.focus();
+    } catch (_) {
+      /* ignore */
+    }
   }
 
   /**
@@ -680,8 +687,18 @@ class AIHorizon {
    * @param {KeyboardEvent} e - The keyboard event.
    */
   handleRestartKeyDown(e) {
+    // Prevent Space (fire key) from triggering an accidental restart via the
+    // browser's default button activation behavior. Space should only fire in-game.
+    if (e.code === "Space" || e.key === " ") {
+      e.preventDefault(); // cancels default click synthesis on keyup
+      return; // ignore
+    }
+    // Allow Escape (existing confirm) to restart. Optionally we could allow Enter in future.
     if (AIHorizon.PAUSE_CONFIRM_CODES.has(e.code)) {
       e.preventDefault();
+      // Guard against extremely rapid repeats while cooldown is active.
+      if (this.restartBtn && this.restartBtn.dataset && this.restartBtn.dataset.cooldown === "1")
+        return;
       this.hideGameOver();
       this.startGame();
       this.startBtn.focus();
@@ -1299,6 +1316,26 @@ class AIHorizon {
       submittedScore,
       allowInitials
     );
+
+    // Apply a short cooldown so a held touch/space doesn't immediately restart.
+    try {
+      if (this.restartBtn) {
+        this.restartBtn.dataset.cooldown = "1";
+        this.restartBtn.setAttribute("aria-disabled", "true");
+        this.restartBtn.classList.add("is-cooldown");
+        setTimeout(() => {
+          try {
+            delete this.restartBtn.dataset.cooldown;
+            this.restartBtn.setAttribute("aria-disabled", "false");
+            this.restartBtn.classList.remove("is-cooldown");
+          } catch (_) {
+            /* ignore */
+          }
+        }, 750);
+      }
+    } catch (_) {
+      /* ignore */
+    }
 
     try {
       setTimeout(() => {
