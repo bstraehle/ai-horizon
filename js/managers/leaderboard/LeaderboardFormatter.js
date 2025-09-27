@@ -1,8 +1,4 @@
-/**
- * Pure formatting and qualification helpers for leaderboard entries.
- * Kept framework / DOM agnostic so they are trivial to unit test and reuse.
- */
-export const MAX_DEFAULT = 10;
+import { LeaderboardManager } from "../LeaderboardManager";
 
 /**
  * Normalize raw leaderboard entries into a canonical immutable array shape.
@@ -35,20 +31,21 @@ export function normalize(arr) {
  *
  * @param {number} score Candidate score.
  * @param {{id:string,score:number}[]|null|undefined} entries Current (possibly unsorted) entries.
- * @param {number} [max=MAX_DEFAULT] Upper bound list length considered for qualification.
+ * @param {number} [max=LeaderboardManager.MAX_ENTRIES] Upper bound list length considered for qualification.
  * @returns {boolean} True if user should be prompted for initials.
  */
-export function qualifiesForInitials(score, entries, max = MAX_DEFAULT) {
+export function qualifiesForInitials(score, entries, max = LeaderboardManager.MAX_ENTRIES) {
   if (typeof score !== "number" || !Number.isFinite(score) || score <= 0) return false;
-  if (!Array.isArray(entries) || entries.length === 0) return true;
-  if (entries.length < 3) return true;
+  if (!Array.isArray(entries) || entries.length === 0) return true; // empty board bootstrap
   try {
-    const sorted = entries
-      .slice()
-      .sort((a, b) => b.score - a.score)
-      .slice(0, max);
-    return sorted.some((e) => score > e.score);
+    const sorted = entries.slice().sort((a, b) => b.score - a.score);
+    // If the board is not yet full, accept any positive score (space remains)
+    if (sorted.length < max) return true;
+    // Board full: require strictly beating the cutoff (lowest score within top max)
+    const cutoff = sorted[max - 1]?.score;
+    return typeof cutoff === "number" && Number.isFinite(cutoff) ? score > cutoff : true;
   } catch (_) {
+    // Fail-open to avoid blocking UX if data shape unexpectedly breaks sorting.
     return true;
   }
 }

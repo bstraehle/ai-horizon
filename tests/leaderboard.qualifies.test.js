@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { LeaderboardManager } from "../js/managers/LeaderboardManager.js";
 
-// The helper logic (documented in code):
+// Helper logic (updated):
 //  - score must be > 0
-//  - < 3 existing entries => any positive score qualifies
-//  - otherwise must beat at least one of the current top MAX_ENTRIES scores
+//  - if the leaderboard is not full (< max entries) any positive score qualifies
+//  - once full, score must strictly beat the cutoff (lowest score in current top max)
 
 describe("LeaderboardManager.qualifiesForInitials", () => {
   it("rejects non-positive scores", () => {
@@ -16,22 +16,30 @@ describe("LeaderboardManager.qualifiesForInitials", () => {
     expect(LeaderboardManager.qualifiesForInitials(5, [])).toBe(true);
   });
 
-  it("accepts any positive score when fewer than 3 entries exist even if lower than existing", () => {
-    const entries = [
-      { id: "AAA", score: 500 },
-      { id: "BBB", score: 400 },
-    ];
-    expect(LeaderboardManager.qualifiesForInitials(10, entries)).toBe(true); // lower but under bootstrap threshold
-  });
-
-  it("requires beating at least one entry when 3 or more entries exist", () => {
+  it("accepts any positive score when board not full even if lower than all existing", () => {
     const entries = [
       { id: "AAA", score: 900 },
       { id: "BBB", score: 800 },
       { id: "CCC", score: 700 },
+      { id: "DDD", score: 600 },
     ];
-    expect(LeaderboardManager.qualifiesForInitials(650, entries)).toBe(false); // below all
-    expect(LeaderboardManager.qualifiesForInitials(750, entries)).toBe(true); // beats 700
+    // MAX_ENTRIES default is 25 so still not full
+    expect(LeaderboardManager.qualifiesForInitials(10, entries)).toBe(true);
+  });
+
+  it("requires beating cutoff once board is full", () => {
+    const max = 5;
+    const entries = [
+      { id: "AAA", score: 900 },
+      { id: "BBB", score: 800 },
+      { id: "CCC", score: 700 },
+      { id: "DDD", score: 600 },
+      { id: "EEE", score: 500 },
+    ];
+    // Full now (length == max). Cutoff is 500.
+    expect(LeaderboardManager.qualifiesForInitials(500, entries, max)).toBe(false); // tie not enough
+    expect(LeaderboardManager.qualifiesForInitials(501, entries, max)).toBe(true); // beats cutoff
+    expect(LeaderboardManager.qualifiesForInitials(100, entries, max)).toBe(false); // well below
   });
 
   it("respects provided max cutoff slice when more than MAX_ENTRIES entries provided", () => {

@@ -49,14 +49,16 @@ describe("UIManager.showGameOver initials gating", () => {
     expect(initialsInput.classList.contains("hidden")).toBe(false);
   });
 
-  it("hides initials form when score does not enter top MAX_ENTRIES", () => {
-    // Fill leaderboard with higher scores
-    LeaderboardManager._cacheEntries = [
-      { id: "AAA", score: 900 },
-      { id: "BBB", score: 800 },
-      { id: "CCC", score: 700 },
-    ];
-    const score = 100; // not high enough
+  it("hides initials form when board is full and score does not beat cutoff", () => {
+    // Create a full leaderboard (descending scores). Cutoff will be the lowest score (100).
+    LeaderboardManager._cacheEntries = Array.from(
+      { length: LeaderboardManager.MAX_ENTRIES },
+      (_, i) => ({
+        id: `A${String(i).padStart(2, "0")}`.slice(0, 3),
+        score: (LeaderboardManager.MAX_ENTRIES - i) * 100, // e.g., 2500..100 when max=25
+      })
+    );
+    const score = 100; // equal to cutoff (tie should NOT qualify)
     UIManager.showGameOver(
       document.getElementById("gameOverScreen"),
       document.getElementById("restartBtn"),
