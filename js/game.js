@@ -1148,6 +1148,7 @@ class AIHorizon {
           /** @param {MouseEvent} e */
           const onClick = (e) => {
             if (submittedScore) return;
+            if (submitBtn && submitBtn.dataset && submitBtn.dataset.cooldown === "1") return;
             e.preventDefault();
             try {
               const raw = initialsInput
@@ -1189,6 +1190,7 @@ class AIHorizon {
           try {
             submitBtn.addEventListener("pointerdown", (ev) => {
               if (submittedScore) return;
+              if (submitBtn && submitBtn.dataset && submitBtn.dataset.cooldown === "1") return;
               try {
                 ev.preventDefault();
               } catch (_) {
@@ -1208,6 +1210,9 @@ class AIHorizon {
           const onKey = (ev) => {
             if (ev.key === "Enter") {
               ev.preventDefault();
+              if (submitBtn && submitBtn.dataset && submitBtn.dataset.cooldown === "1") {
+                return;
+              }
               try {
                 const raw = initialsInput
                   ? String(initialsInput.value || "")
@@ -1317,7 +1322,30 @@ class AIHorizon {
       allowInitials
     );
 
-    // Apply a short cooldown so a held touch/space doesn't immediately restart.
+    // Apply a short cooldown so a held touch/space doesn't immediately apply.
+    try {
+      const submitBtn = /** @type {HTMLButtonElement|null} */ (
+        document.getElementById("submitScoreBtn")
+      );
+      if (submitBtn) {
+        submitBtn.dataset.cooldown = "1";
+        submitBtn.setAttribute("aria-disabled", "true");
+        submitBtn.classList.add("is-cooldown");
+        setTimeout(() => {
+          try {
+            delete submitBtn.dataset.cooldown;
+            submitBtn.setAttribute("aria-disabled", "false");
+            submitBtn.classList.remove("is-cooldown");
+          } catch (_) {
+            /* ignore */
+          }
+        }, 750);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+
+    // Apply a short cooldown so a held touch/space doesn't immediately apply.
     try {
       if (this.restartBtn) {
         this.restartBtn.dataset.cooldown = "1";
