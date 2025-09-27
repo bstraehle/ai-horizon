@@ -2,7 +2,7 @@
  * Provides offline-first caching for core assets and a network-first strategy for API calls.
  * Increment CACHE_VERSION to force an update after deploys that change cached assets.
  */
-const CACHE_VERSION = "v1.0.1";
+const CACHE_VERSION = "v1.0.3";
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
@@ -73,17 +73,48 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Helper: cache-first for static assets
-async function cacheFirst(request) {
+// Helper: stale-while-revalidate for static assets
+// Returns cached response immediately (if any) while updating cache in background.
+async function staleWhileRevalidate(request) {
   const cache = await caches.open(STATIC_CACHE);
   const cached = await cache.match(request, { ignoreSearch: true });
-  if (cached) return cached;
+
+  // Background update
+  (async () => {
+    try {
+      const fresh = await fetch(request, { cache: "no-cache" });
+      if (fresh && fresh.ok) {
+        await cache.put(request, fresh.clone());
+        // Notify any open clients that a resource has been updated (lightweight broadcast)
+        try {
+          const clientsList = await self.clients.matchAll({
+            type: "window",
+            includeUncontrolled: true,
+          });
+          for (const client of clientsList) {
+            client.postMessage({ type: "asset-updated", url: request.url });
+          }
+        } catch (_) {
+          // Ignore broadcast errors
+        }
+      }
+    } catch (_) {
+      // Likely offline / timeout; keep existing cached version
+    }
+  })();
+
+  if (cached) {
+    // Don't block on update
+    return cached;
+  }
+
+  // No cached version yet: fetch normally (still with no-cache to ensure origin validation)
   try {
-    const response = await fetch(request);
-    if (response.ok) cache.put(request, response.clone());
-    return response;
+    const fresh = await fetch(request, { cache: "no-cache" });
+    if (fresh && fresh.ok) await cache.put(request, fresh.clone());
+    return fresh;
   } catch (err) {
-    return cached || Promise.reject(err);
+    return Promise.reject(err);
   }
 }
 
@@ -199,7 +230,7 @@ self.addEventListener("fetch", (event) => {
 
   if (isSameOrigin) {
     if (/\.(?:js|css|png|webmanifest)$/.test(url.pathname)) {
-      event.respondWith(cacheFirst(request));
+      event.respondWith(staleWhileRevalidate(request));
       return;
     }
   }
@@ -208,5 +239,32 @@ self.addEventListener("fetch", (event) => {
 self.addEventListener("message", (event) => {
   if (event.data === "skipWaiting") {
     self.skipWaiting();
+    return;
+  }
+  if (event.data && event.data.type === "refreshAssets") {
+    // Proactively re-fetch core assets & detected bundle
+    event.waitUntil(
+      (async () => {
+        try {
+          const cache = await caches.open(STATIC_CACHE);
+          const bundlePath = await detectBundlePath();
+          const targets = [...PRECACHE_CORE, ...(bundlePath ? [bundlePath] : [])];
+          await Promise.all(
+            targets.map(async (url) => {
+              try {
+                const fresh = await fetch(url + "?v=" + Date.now(), { cache: "no-cache" });
+                if (fresh && fresh.ok) {
+                  await cache.put(url, fresh.clone());
+                }
+              } catch (_) {
+                // Ignore failures (offline or network error)
+              }
+            })
+          );
+        } catch (_) {
+          // swallow
+        }
+      })()
+    );
   }
 });

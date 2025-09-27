@@ -21,17 +21,80 @@
   }
 
   window.addEventListener("load", () => {
-    // Some browsers without Trusted Types support may not accept an object; coerce if needed.
-    // Pass the TrustedScriptURL directly if present; browsers doing enforcement will accept it.
-    navigator.serviceWorker.register(swUrl).catch((e) => {
-      if (e && /TrustedScriptURL/i.test(String(e))) {
-        console.error(
-          "[PWA] SW registration blocked by Trusted Types; verify CSP includes: trusted-types ai-horizon-sw",
-          e
-        );
-      } else {
-        console.warn("[PWA] Service worker registration failed", e);
-      }
-    });
+    navigator.serviceWorker
+      .register(swUrl)
+      .then((reg) => {
+        // Immediate update check on load to pick new deploys.
+        if (reg.update) {
+          try {
+            reg.update();
+          } catch (_) {
+            // Expected: ignore failed update attempt (likely offline or race)
+          }
+        }
+
+        // When back online, ask SW to refresh core assets.
+        window.addEventListener("online", () => {
+          // Trigger a manual update check for the SW itself.
+          if (reg.update) {
+            try {
+              reg.update();
+            } catch (_) {
+              // Expected: ignore failed update attempt (likely offline)
+            }
+          }
+          // Send refresh message to active controller.
+          if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: "refreshAssets" });
+          }
+        });
+
+        // If we already have a controller, request asset refresh if we're online at startup.
+        if (navigator.onLine && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: "refreshAssets" });
+        }
+
+        // Listen for asset update notifications (optional UI hook)
+        navigator.serviceWorker.addEventListener("message", (evt) => {
+          if (evt.data && evt.data.type === "asset-updated") {
+            // Could implement a toast; for now just log.
+            // console.log(`[PWA] Updated: ${evt.data.url}`);
+          }
+        });
+
+        // If a new waiting worker appears, auto-skipWaiting (fast path) then reload.
+        function attemptActivation() {
+          if (reg.waiting) {
+            reg.waiting.postMessage("skipWaiting");
+          }
+        }
+        reg.addEventListener("updatefound", () => {
+          const sw = reg.installing;
+          if (!sw) return;
+          sw.addEventListener("statechange", () => {
+            if (sw.state === "installed" && navigator.serviceWorker.controller) {
+              attemptActivation();
+            }
+          });
+        });
+
+        // After controllerchange, reload once to take advantage of the new SW.
+        let refreshed = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (refreshed) return; // prevent double reloads
+          refreshed = true;
+          window.location.reload();
+        });
+      })
+      .catch((e) => {
+        if (e && /TrustedScriptURL/i.test(String(e))) {
+          console.error(
+            "[PWA] SW registration blocked by Trusted Types; verify CSP includes: trusted-types ai-horizon-sw",
+            e
+          );
+        } else {
+          console.warn("[PWA] Service worker registration failed", e);
+        }
+      });
   });
 })();
