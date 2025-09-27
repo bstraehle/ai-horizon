@@ -227,11 +227,6 @@ body {
 }
 .action-button:disabled,
 .action-button[aria-disabled="true"],
-.action-button.is-cooldown {
-  cursor: not-allowed;
-  opacity: 0.6;
-  pointer-events: none;
-}
 .action-button:focus-visible {
   outline: 3px solid var(--color-btn-focus-outline);
   outline-offset: -3px;

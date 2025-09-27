@@ -120,6 +120,13 @@ class AIHorizon {
     this.input = new InputState();
     this.events = new EventBus();
 
+    // Guard to prevent an accidental 'click' on the Game Over / Restart UI that
+    // can be synthesized when the user lifts the finger they were using for
+    // continuous gameplay touch-drag fire control. When armed, the very next
+    // click event (capture phase) is swallowed, then the guard auto-disarms.
+    this._uiTouchGuardActive = false;
+    this._uiTouchGuardTimeout = null;
+
     this._isMobile = this.isMobile();
     this._isLowPowerMode = false;
     this._performanceLevel = 0;
@@ -237,6 +244,13 @@ class AIHorizon {
     this.bindEventHandlers();
     this.setupEventListeners();
     this._unsubscribeEvents = EventHandlers.register(this);
+
+    // Global capture listener to intercept the first post-game synthetic click.
+    try {
+      document.addEventListener("click", this.handleGuardClick, true);
+    } catch (_e) {
+      /* ignore */
+    }
 
     this.startBtn.focus();
 
@@ -407,6 +421,7 @@ class AIHorizon {
     this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
     this.shoot = this.shoot.bind(this);
     this.movementKeys = new Set(CONFIG.INPUT.MOVEMENT_CODES);
+    this.handleGuardClick = this.handleGuardClick.bind(this);
   }
 
   /**
@@ -675,6 +690,14 @@ class AIHorizon {
    * @param {KeyboardEvent} e - The keyboard event.
    */
   handleStartKeyDown(e) {
+    // Prevent Space (fire key) from triggering a start via the browser's default
+    // button activation behavior. Space should only initiate firing once the game
+    // has actually started, not launch the mission itself.
+    if (e.code === "Space" || e.key === " ") {
+      e.preventDefault(); // cancels default synthesized click on keyup
+      return; // ignore
+    }
+    // Allow existing confirm/pause codes (currently Escape) to start the game.
     if (AIHorizon.PAUSE_CONFIRM_CODES.has(e.code)) {
       e.preventDefault();
       this.startGame();
@@ -753,8 +776,21 @@ class AIHorizon {
       const crossedBreakpoint =
         (prevWidth < BREAKPOINT && newWidth >= BREAKPOINT) ||
         (prevWidth >= BREAKPOINT && newWidth < BREAKPOINT);
-
-      if (currentlyMobile !== this._isMobile || crossedBreakpoint) {
+      const RESET_ON_BREAKPOINT = (CONFIG.VIEW && CONFIG.VIEW.RESET_ON_BREAKPOINT) || false;
+      if (currentlyMobile !== this._isMobile) {
+        // Update platform-dependent parameters without clearing dynamic entities.
+        try {
+          this.softReinitForPlatformChange(currentlyMobile);
+        } catch (_e) {
+          /* fallback: if soft reinit fails we can still attempt a full reset */
+          try {
+            this.fullReset();
+          } catch (_err) {
+            /* ignore */
+          }
+        }
+      } else if (RESET_ON_BREAKPOINT && crossedBreakpoint) {
+        // Opt-in legacy behavior.
         this.fullReset();
       }
       try {
@@ -1022,6 +1058,18 @@ class AIHorizon {
    * End the game.
    */
   gameOver() {
+    // Arm UI touch guard if a gameplay touch was active (continuous fire / drag).
+    try {
+      if (this.input && this.input.fireHeld) {
+        this._uiTouchGuardActive = true;
+        if (this._uiTouchGuardTimeout) clearTimeout(this._uiTouchGuardTimeout);
+        this._uiTouchGuardTimeout = setTimeout(() => {
+          this._uiTouchGuardActive = false;
+        }, 0);
+      }
+    } catch (_e) {
+      /* ignore */
+    }
     this.state.end();
     this.updateHighScore();
     UIManager.hidePause(this.pauseScreen);
@@ -1059,7 +1107,7 @@ class AIHorizon {
           try {
             if (initialsInput) {
               initialsInput.classList.add("invalid");
-              setTimeout(() => initialsInput.classList.remove("invalid"), 900);
+              setTimeout(() => initialsInput.classList.remove("invalid"), 0);
               initialsInput.focus({ preventScroll: true });
             }
           } catch (_e) {
@@ -1322,59 +1370,36 @@ class AIHorizon {
       allowInitials
     );
 
-    // Apply a short cooldown so a held touch/space doesn't immediately apply.
-    try {
-      const submitBtn = /** @type {HTMLButtonElement|null} */ (
-        document.getElementById("submitScoreBtn")
-      );
-      if (submitBtn) {
-        submitBtn.dataset.cooldown = "1";
-        submitBtn.setAttribute("aria-disabled", "true");
-        submitBtn.classList.add("is-cooldown");
-        setTimeout(() => {
-          try {
-            delete submitBtn.dataset.cooldown;
-            submitBtn.setAttribute("aria-disabled", "false");
-            submitBtn.classList.remove("is-cooldown");
-          } catch (_) {
-            /* ignore */
-          }
-        }, 750);
-      }
-    } catch (_) {
-      /* ignore */
-    }
-
-    // Apply a short cooldown so a held touch/space doesn't immediately apply.
-    try {
-      if (this.restartBtn) {
-        this.restartBtn.dataset.cooldown = "1";
-        this.restartBtn.setAttribute("aria-disabled", "true");
-        this.restartBtn.classList.add("is-cooldown");
-        setTimeout(() => {
-          try {
-            delete this.restartBtn.dataset.cooldown;
-            this.restartBtn.setAttribute("aria-disabled", "false");
-            this.restartBtn.classList.remove("is-cooldown");
-          } catch (_) {
-            /* ignore */
-          }
-        }, 750);
-      }
-    } catch (_) {
-      /* ignore */
-    }
-
     try {
       setTimeout(() => {
         this._suppressFullResetOnResize = false;
-      }, 800);
+      }, 0);
     } catch (_e) {
       this._suppressFullResetOnResize = false;
     }
     if (this.loop) {
       this.loop.stop();
       this._loopRunning = false;
+    }
+  }
+
+  /**
+   * Capture-phase click handler to swallow the first unintended click after game over
+   * if the guard is active. Prevents accidental activation of restart/submit buttons.
+   * @param {MouseEvent} e
+   */
+  handleGuardClick(e) {
+    if (!this._uiTouchGuardActive) return;
+    try {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    } catch (_e) {
+      /* ignore */
+    }
+    this._uiTouchGuardActive = false;
+    if (this._uiTouchGuardTimeout) {
+      clearTimeout(this._uiTouchGuardTimeout);
+      this._uiTouchGuardTimeout = null;
     }
   }
 
