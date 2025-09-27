@@ -27,7 +27,7 @@ export class LeaderboardManager {
   static IS_REMOTE = true;
   // Identifier for leaderboard partition; appended as query param `?id=...` to the Cognito API endpoint
   static REMOTE_ID = 1;
-  static MAX_ENTRIES = 10;
+  static MAX_ENTRIES = 100;
   static KEY_LEADERBOARD = "aiHorizonLeaderboard";
   static REMOTE_REFRESH_COOLDOWN_MS = 2500;
   /** @type {{id:string,score:number}[]|null} */
