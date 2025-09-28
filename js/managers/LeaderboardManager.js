@@ -29,7 +29,7 @@ export class LeaderboardManager {
   static REMOTE_ID = 1;
   static MAX_ENTRIES = 25;
   static KEY_LEADERBOARD = "aiHorizonLeaderboard";
-  static REMOTE_REFRESH_COOLDOWN_MS = 2500;
+  static REMOTE_REFRESH_COOLDOWN_MS = 0;
   /** @type {{id:string,score:number}[]|null} */
   static _cacheEntries = null;
   /** @type {Promise<{id:string,score:number}[]>|null} */
