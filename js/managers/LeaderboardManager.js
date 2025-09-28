@@ -99,7 +99,7 @@ export class LeaderboardManager {
    * Pure: does not touch DOM; safe for snapshot/unit tests.
    * @param {{id:string,score:number}} entry
    * @param {number} index Zero-based rank index
-   * @returns {{rank:number,badge:string,medal:string,thumb:boolean,icon:string,text:string}}
+   * @returns {{rank:number,badge:string,medal:string,icon:string,text:string}}
    */
   static formatRow(entry, index) {
     return formatRow(entry, index);

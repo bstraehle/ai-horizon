@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { LeaderboardManager } from "../js/managers/LeaderboardManager.js";
 
 describe("LeaderboardManager.formatRow / formatRows", () => {
-  it("formats top three with medals and no thumbs", () => {
+  it("formats top three with medals", () => {
     const rows = [
       { id: "AAA", score: 1000 },
       { id: "BBB", score: 900 },
