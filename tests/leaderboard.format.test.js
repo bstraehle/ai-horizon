@@ -16,17 +16,17 @@ describe("LeaderboardManager.formatRow / formatRows", () => {
     expect(formatted[2].thumb).toBe(false);
   });
 
-  it("uses fire for ranks 4-10 and thumbs for ranks 11-25", () => {
+  it("uses fire for ranks 4-10 and diamond for ranks 11-25", () => {
     const rows = Array.from({ length: 12 }, (_, i) => ({ id: "AAA", score: 1000 - i * 10 }));
     const r4 = LeaderboardManager.formatRow(rows[3], 3); // rank 4
     expect(r4.medal).toBe("");
-    expect(r4.icon).toBe("👏");
-    expect(r4.text).toContain("👏");
+    expect(r4.icon).toBe("🔥");
+    expect(r4.text).toContain("🔥");
     const r11 = LeaderboardManager.formatRow(rows[10], 10); // rank 11
     expect(r11.medal).toBe("");
-    expect(r11.icon).toBe("👍");
-    expect(r11.thumb).toBe(true); // backward compatibility
-    expect(r11.text).toContain("👍");
+    expect(r11.icon).toBe("💎");
+    expect(r11.thumb).toBe(true); // backward compatibility now indicates diamond
+    expect(r11.text).toContain("💎");
   });
 
   it("falls back to ??? for invalid initials", () => {

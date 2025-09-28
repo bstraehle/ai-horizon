@@ -1,3 +1,4 @@
+````markdown
 # Lambda Leaderboard Functions
 
 This directory contains the AWS Lambda handler and sample API Gateway proxy event payloads used for local testing.
@@ -57,3 +58,4 @@ These JSON event files are intended for local invocation frameworks (e.g. AWS SA
 1. Externalize table name and region via environment variables.
 2. Add schema validation (e.g. score object shape) before performing DynamoDB update.
 3. Optional pagination / multiple leaderboard rows (current design assumes a single aggregated item by id).
+````

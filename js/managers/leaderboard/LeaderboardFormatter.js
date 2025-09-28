@@ -55,8 +55,8 @@ export function qualifiesForInitials(score, entries, max = LeaderboardManager.MA
  *
  * Presentation Rules:
  * - Medals for ranks 1–3 using emoji (🥇/🥈/🥉).
- * - Ranks 4–10: clapping hands emoji (👏).
- * - Ranks 11–25: thumbs‑up emoji (👍).
+ * - Ranks 4–10: fire emoji (🔥).
+ * - Ranks 11–25: diamond emoji (💎).
  * - Ranks >25: no additional icon (still supported if more than MAX_ENTRIES passed into formatRows safeguard).
  * - Badge displays 1–3 uppercase letters; otherwise '???'.
  * - Text order: medal? + icon? + rank — BADGE — score.
@@ -71,16 +71,18 @@ export function formatRow(entry, index) {
   const medal = index < 3 ? medals[index] : "";
   let icon = "";
   if (!medal) {
-    if (rank >= 4 && rank <= 10) icon = "👏";
-    else if (rank >= 11 && rank <= 20) icon = "👍";
+    if (rank >= 4 && rank <= 10) icon = "🔥";
+    else if (rank >= 11 && rank <= 20) icon = "💎";
     else if (rank >= 21 && rank <= LeaderboardManager.MAX_ENTRIES) icon = "🌱";
   }
   const badge = /^[A-Z]{1,3}$/.test(entry.id) ? entry.id : "???";
   const medalPrefix = medal ? medal + " " : "";
   const iconPrefix = icon ? icon + " " : "";
   const text = `${medalPrefix}${iconPrefix}${rank} — ${badge} — ${entry.score}`;
-  // Backward compatibility: retain `thumb` boolean to indicate thumbs-up specifically.
-  const thumb = icon === "👍";
+  // Backward compatibility: retain `thumb` boolean to indicate thumbs-up or special icons.
+  // Historically `thumb` indicated a thumbs-up; preserve compatibility by also
+  // treating the diamond icon (💎) as a thumb marker used in some UI variants.
+  const thumb = icon === "👍" || icon === "💎";
   return { rank, badge, medal, thumb, icon, text };
 }
 
