@@ -101,6 +101,8 @@ class AIHorizon {
     );
     this.timerEl = /** @type {HTMLElement|null} */ (document.getElementById("timer"));
 
+    this.highScoreBox = /** @type {HTMLElement|null} */ (document.getElementById("highScoreBox"));
+
     this.highScore = 0;
     this.score = 0;
     try {
@@ -137,6 +139,30 @@ class AIHorizon {
     this._dprOverride = null;
     this._engineTrailModulo = 1;
     this._engineTrailStep = 0;
+
+    // Initialize connection status classes on the high score box and listen for changes.
+    try {
+      const setOnlineClass = (online) => {
+        if (!this.highScoreBox) return;
+        this.highScoreBox.classList.remove("connection-online", "connection-offline");
+        this.highScoreBox.classList.add(online ? "connection-online" : "connection-offline");
+      };
+
+      // Set initial state based on navigator.onLine when available; default to offline if unknown.
+      const onlineInit =
+        typeof navigator !== "undefined" && typeof navigator.onLine === "boolean"
+          ? navigator.onLine
+          : false;
+      setOnlineClass(onlineInit);
+
+      // Update on browser events. These are passive and low-cost; safe to leave attached.
+      if (typeof window !== "undefined" && window.addEventListener) {
+        window.addEventListener("online", () => setOnlineClass(true));
+        window.addEventListener("offline", () => setOnlineClass(false));
+      }
+    } catch (_e) {
+      /* ignore failures silently */
+    }
 
     this.asteroidSpeed = this._isMobile
       ? CONFIG.SPEEDS.ASTEROID_MOBILE

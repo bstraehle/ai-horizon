@@ -29,6 +29,8 @@
   --color-btn-gradient-hover-end: #777;
   --color-btn-gradient-hover-start: #555;
   --color-btn-gradient-start: #333;
+  --color-connection-online: #24a148;
+  --color-connection-offline: var(--color-btn-focus-outline);
   --color-text: #fff;
   --color-text-secondary: #ddd;
   --color-title-shadow: #ddd;
@@ -120,6 +122,21 @@ body {
   display: inline-block;
   padding: var(--space-1) var(--space-2);
   position: relative;
+}
+
+/* Connection status border for the High Score box */
+#highScoreBox {
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+#highScoreBox.connection-online {
+  border-color: var(--color-connection-online);
+  box-shadow: 0 0 8px rgba(36, 161, 72, 0.15);
+}
+#highScoreBox.connection-offline {
+  border-color: var(--color-connection-offline);
+  box-shadow: 0 0 8px rgba(178, 0, 0, 0.12);
 }
 .game-info {
   backface-visibility: hidden;
