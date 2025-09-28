@@ -174,13 +174,6 @@ body {
   position: fixed;
   z-index: 2000;
 }
-.game-over-screen.keyboard-open {
-  align-items: flex-start;
-  padding-top: var(--space-6);
-}
-.game-over-screen.recenter-pulse {
-  will-change: transform;
-}
 .game-over-content {
   background: var(--color-bg);
   border: 2px solid var(--color-border);
