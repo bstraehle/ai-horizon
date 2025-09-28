@@ -55,24 +55,32 @@ export function qualifiesForInitials(score, entries, max = LeaderboardManager.MA
  *
  * Presentation Rules:
  * - Medals for ranks 1–3 using emoji (🥇/🥈/🥉).
- * - Thumbs‑up indicator for ranks >=4 (legacy visual cue).
+ * - Ranks 4–10: clapping hands emoji (👏).
+ * - Ranks 11–25: thumbs‑up emoji (👍).
+ * - Ranks >25: no additional icon (still supported if more than MAX_ENTRIES passed into formatRows safeguard).
  * - Badge displays 1–3 uppercase letters; otherwise '???'.
- * - Text order: medal? + thumb? + rank — BADGE — score.
+ * - Text order: medal? + icon? + rank — BADGE — score.
  *
  * @param {{id:string,score:number}} entry Canonical normalized entry.
  * @param {number} index Zero‑based index (rank = index + 1).
- * @returns {{rank:number,badge:string,medal:string,thumb:boolean,text:string}} Structured + textual formatting.
+ * @returns {{rank:number,badge:string,medal:string,thumb:boolean,icon:string,text:string}} Structured + textual formatting.
  */
 export function formatRow(entry, index) {
   const rank = index + 1;
   const medals = ["🥇", "🥈", "🥉"];
   const medal = index < 3 ? medals[index] : "";
-  const thumb = index >= 3;
+  let icon = "";
+  if (!medal) {
+    if (rank >= 4 && rank <= 10) icon = "👏";
+    else if (rank >= 11 && rank <= 25) icon = "👍";
+  }
   const badge = /^[A-Z]{1,3}$/.test(entry.id) ? entry.id : "???";
   const medalPrefix = medal ? medal + " " : "";
-  const thumbPrefix = thumb ? "👍 " : "";
-  const text = `${medalPrefix}${thumbPrefix}${rank} — ${badge} — ${entry.score}`;
-  return { rank, badge, medal, thumb, text };
+  const iconPrefix = icon ? icon + " " : "";
+  const text = `${medalPrefix}${iconPrefix}${rank} — ${badge} — ${entry.score}`;
+  // Backward compatibility: retain `thumb` boolean to indicate thumbs-up specifically.
+  const thumb = icon === "👍";
+  return { rank, badge, medal, thumb, icon, text };
 }
 
 /**
