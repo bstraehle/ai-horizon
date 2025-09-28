@@ -694,6 +694,96 @@ try {
         /* ignore */
       }
     });
+    // Setup mobile keyboard / initials input helpers so the Game Over overlay
+    // recenters correctly after the virtual keyboard hides (submit/enter/blur).
+    (function setupInitialsKeyboardFix() {
+      try {
+        const gameOverScreen = /** @type {HTMLElement|null} */ (
+          document.getElementById("gameOverScreen")
+        );
+        const initialsInput = /** @type {HTMLElement|null} */ (
+          document.getElementById("initialsInput")
+        );
+        const submitBtn = /** @type {HTMLElement|null} */ (
+          document.getElementById("submitScoreBtn")
+        );
+        if (!gameOverScreen || !initialsInput) return;
+
+        const applyKeyboardOpen = () => {
+          try {
+            gameOverScreen.classList.add("keyboard-open");
+            // If visualViewport is available, add bottom padding equal to
+            // the keyboard height so the flex centering accounts for it.
+            if (typeof window !== "undefined" && window.visualViewport) {
+              const kbHeight = Math.max(0, window.innerHeight - window.visualViewport.height);
+              if (kbHeight > 0) gameOverScreen.style.paddingBottom = `${kbHeight}px`;
+              else gameOverScreen.style.paddingBottom = "";
+            }
+          } catch (_) {
+            /* ignore */
+          }
+        };
+
+        const clearKeyboardOpenAndRecenter = () => {
+          try {
+            // Remove the temporary keyboard class and clear padding.
+            gameOverScreen.classList.remove("keyboard-open");
+            gameOverScreen.style.paddingBottom = "";
+            // Small reflow hack: add a short-lived class to force the browser
+            // to recalculate flex layout and re-center the content.
+            gameOverScreen.classList.add("recenter-pulse");
+            try {
+              // Encourage layout recalculation in some browsers.
+              window.dispatchEvent(new Event("resize"));
+            } catch (_) {
+              /* ignore */
+            }
+            setTimeout(() => {
+              try {
+                gameOverScreen.classList.remove("recenter-pulse");
+              } catch (_) {
+                /* ignore */
+              }
+            }, 80);
+          } catch (_) {
+            /* ignore */
+          }
+        };
+
+        initialsInput.addEventListener("focus", applyKeyboardOpen, { passive: true });
+        // Slight delay on blur to allow virtual keyboard to begin hiding.
+        initialsInput.addEventListener("blur", () => setTimeout(clearKeyboardOpenAndRecenter, 50), {
+          passive: true,
+        });
+        // Handle Enter key (submit via keyboard)
+        initialsInput.addEventListener("keydown", (ev) => {
+          try {
+            if (ev && (ev.key === "Enter" || ev.keyCode === 13)) {
+              // Recenter immediately; submit handlers will run separately.
+              clearKeyboardOpenAndRecenter();
+            }
+          } catch (_) {
+            /* ignore */
+          }
+        });
+        if (submitBtn)
+          submitBtn.addEventListener("click", clearKeyboardOpenAndRecenter, { passive: true });
+
+        // If the visualViewport changes while the initials input is active,
+        // keep the padding in sync so the input remains visible.
+        if (window.visualViewport && typeof window.visualViewport.addEventListener === "function") {
+          window.visualViewport.addEventListener("resize", () => {
+            try {
+              if (document.activeElement === initialsInput) applyKeyboardOpen();
+            } catch (_) {
+              /* ignore */
+            }
+          });
+        }
+      } catch (_) {
+        /* ignore */
+      }
+    })();
   }
 } catch (_) {
   /* ignore */
