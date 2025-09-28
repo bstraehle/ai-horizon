@@ -55,15 +55,15 @@ export function qualifiesForInitials(score, entries, max = LeaderboardManager.MA
  *
  * Presentation Rules:
  * - Medals for ranks 1–3 using emoji (🥇/🥈/🥉).
- * - Ranks 4–10: fire emoji (🔥).
- * - Ranks 11–25: diamond emoji (💎).
- * - Ranks >25: no additional icon (still supported if more than MAX_ENTRIES passed into formatRows safeguard).
+ * - Ranks 4–10: clapping hands emoji (👏).
+ * - Ranks 11–25: clapping hands emoji (👏).
+ * - Ranks >25: clapping hands emoji (👏) (used for 21+ in current mapping up to MAX_ENTRIES).
  * - Badge displays 1–3 uppercase letters; otherwise '???'.
  * - Text order: medal? + icon? + rank — BADGE — score.
  *
  * @param {{id:string,score:number}} entry Canonical normalized entry.
  * @param {number} index Zero‑based index (rank = index + 1).
- * @returns {{rank:number,badge:string,medal:string,thumb:boolean,icon:string,text:string}} Structured + textual formatting.
+ * @returns {{rank:number,badge:string,medal:string,icon:string,text:string}} Structured + textual formatting.
  */
 export function formatRow(entry, index) {
   const rank = index + 1;
@@ -71,19 +71,15 @@ export function formatRow(entry, index) {
   const medal = index < 3 ? medals[index] : "";
   let icon = "";
   if (!medal) {
-    if (rank >= 4 && rank <= 10) icon = "🔥";
-    else if (rank >= 11 && rank <= 20) icon = "💎";
-    else if (rank >= 21 && rank <= LeaderboardManager.MAX_ENTRIES) icon = "🌱";
+    if (rank >= 4 && rank <= 10) icon = "👏";
+    else if (rank >= 11 && rank <= 20) icon = "👏";
+    else if (rank >= 21 && rank <= LeaderboardManager.MAX_ENTRIES) icon = "👏";
   }
   const badge = /^[A-Z]{1,3}$/.test(entry.id) ? entry.id : "???";
   const medalPrefix = medal ? medal + " " : "";
   const iconPrefix = icon ? icon + " " : "";
   const text = `${medalPrefix}${iconPrefix}${rank} — ${badge} — ${entry.score}`;
-  // Backward compatibility: retain `thumb` boolean to indicate thumbs-up or special icons.
-  // Historically `thumb` indicated a thumbs-up; preserve compatibility by also
-  // treating the diamond icon (💎) as a thumb marker used in some UI variants.
-  const thumb = icon === "👍" || icon === "💎";
-  return { rank, badge, medal, thumb, icon, text };
+  return { rank, badge, medal, icon, text };
 }
 
 /**
