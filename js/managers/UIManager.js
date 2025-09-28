@@ -634,7 +634,15 @@ export class UIManager {
       }
       return; // Always return after handling restart target.
     }
-    if (targetIsInitials || targetIsSubmit) return;
+    // If the submit button itself is blurring and is visible, reclaim focus to submit button.
+    if (targetIsSubmit) {
+      if (e && e.type === "blur" && submitEl && !submitEl.classList.contains("hidden")) {
+        if (UIManager._preserveFocus) UIManager.focusPreserveScroll(submitEl);
+        else UIManager.focusWithRetry(submitEl);
+      }
+      return;
+    }
+    if (targetIsInitials) return;
 
     if (UIManager._preserveFocus) UIManager.focusPreserveScroll(restartBtn);
     else UIManager.focusWithRetry(restartBtn);
