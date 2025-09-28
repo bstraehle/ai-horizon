@@ -72,7 +72,8 @@ export function formatRow(entry, index) {
   let icon = "";
   if (!medal) {
     if (rank >= 4 && rank <= 10) icon = "👏";
-    else if (rank >= 11 && rank <= 25) icon = "👍";
+    else if (rank >= 11 && rank <= 20) icon = "👍";
+    else if (rank >= 21 && rank <= LeaderboardManager.MAX_ENTRIES) icon = "🌱";
   }
   const badge = /^[A-Z]{1,3}$/.test(entry.id) ? entry.id : "???";
   const medalPrefix = medal ? medal + " " : "";
