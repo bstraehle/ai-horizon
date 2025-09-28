@@ -604,7 +604,42 @@ export class UIManager {
       leaderboard &&
       t &&
       (t === leaderboard || (typeof t.closest === "function" && t.closest("#leaderboardList")));
-    if (targetIsLeaderboard) return;
+    if (targetIsLeaderboard) {
+      // On touch devices, if there are no interactive initials/submit controls
+      // visible, tapping the leaderboard should not steal focus from the
+      // Play Again / restart button. Allow desktop (keyboard) interactions
+      // to behave as before.
+      try {
+        const initialsEl = /** @type {HTMLElement|null} */ (
+          document.getElementById("initialsInput")
+        );
+        const submitEl = /** @type {HTMLElement|null} */ (
+          document.getElementById("submitScoreBtn")
+        );
+        const touchDevice =
+          typeof navigator !== "undefined" &&
+          ((typeof navigator.maxTouchPoints === "number" && navigator.maxTouchPoints > 0) ||
+            "ontouchstart" in window);
+        const noInteractiveControls =
+          (!initialsEl || initialsEl.classList.contains("hidden")) &&
+          (!submitEl || submitEl.classList.contains("hidden"));
+
+        if (touchDevice && noInteractiveControls) {
+          if (UIManager._preserveFocus) UIManager.focusPreserveScroll(restartBtn);
+          else UIManager.focusWithRetry(restartBtn);
+          try {
+            if (e && e.cancelable) e.preventDefault();
+            if (e && typeof e.stopPropagation === "function") e.stopPropagation();
+          } catch (_) {
+            /* ignore */
+          }
+          return;
+        }
+      } catch (_) {
+        /* ignore */
+      }
+      return;
+    }
     const targetIsRestart =
       t === restartBtn || (t && typeof t.closest === "function" && t.closest("#restartBtn"));
     const initialsEl = /** @type {HTMLElement|null} */ (document.getElementById("initialsInput"));
