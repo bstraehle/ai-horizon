@@ -462,6 +462,63 @@ export class UIManager {
     }
   }
 
+  /**
+   * Recenter the leaderboard panel in the viewport.
+   * This helps when the on-screen keyboard may have shifted the viewport
+   * (mobile) — call after a submit to bring the leaderboard back into view.
+   */
+  static recenterLeaderboard() {
+    try {
+      const list =
+        typeof document !== "undefined" ? document.getElementById("leaderboardList") : null;
+      const container =
+        typeof document !== "undefined" ? document.getElementById("leaderboard") : null;
+      const target = list || container;
+      if (!target) return;
+
+      // Prefer centering the element in viewport. Use smooth behavior where supported.
+      try {
+        if (typeof target.scrollIntoView === "function") {
+          // { block: 'center' } recenters vertically; graceful fallback if options unsupported.
+          try {
+            target.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+            return;
+          } catch (_) {
+            // options may not be supported; fall through to simple call.
+            try {
+              target.scrollIntoView();
+              return;
+            } catch (_) {
+              /* ignore */
+            }
+          }
+        }
+      } catch (_) {
+        /* ignore */
+      }
+
+      // Fallback: compute center and scroll window manually.
+      try {
+        const rect = target.getBoundingClientRect();
+        const absY = (rect.top + rect.bottom) / 2 + (window.pageYOffset || window.scrollY || 0);
+        const top = Math.max(0, Math.floor(absY - (window.innerHeight || 0) / 2));
+        try {
+          window.scrollTo({ top, behavior: "smooth" });
+        } catch (_) {
+          try {
+            window.scrollTo(0, top);
+          } catch (_) {
+            /* ignore */
+          }
+        }
+      } catch (_) {
+        /* ignore */
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
   /** Ensure appropriate overlay button is focused based on visibility.
    * Respects _preserveFocus flag to decide focus strategy (scroll preserving vs retry).
    * @param {HTMLElement|null} gameInfo Start overlay element.

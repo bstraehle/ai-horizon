@@ -1252,6 +1252,11 @@ class AIHorizon {
               /* ignore */
             }
             try {
+              UIManager.recenterLeaderboard();
+            } catch (_) {
+              /* ignore */
+            }
+            try {
               UIManager.focusWithRetry(this.restartBtn);
             } catch (_e) {
               /* ignore */
@@ -1312,6 +1317,11 @@ class AIHorizon {
               try {
                 hideInitialsUI();
               } catch (_e) {
+                /* ignore */
+              }
+              try {
+                UIManager.recenterLeaderboard();
+              } catch (_) {
                 /* ignore */
               }
               try {
