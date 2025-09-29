@@ -109,8 +109,16 @@ export class UIManager {
     }
 
     try {
+      // Support a standalone initials overlay (#initialsScreen). Prefer its
+      // .initials-entry when present so we can show initials before Game Over.
+      const initialsScreen = /** @type {HTMLElement|null} */ (
+        document.getElementById("initialsScreen")
+      );
       const initialsEntry = /** @type {HTMLElement|null} */ (
-        document.querySelector(".initials-entry")
+        (initialsScreen &&
+          initialsScreen.querySelector &&
+          initialsScreen.querySelector(".initials-entry")) ||
+          document.querySelector(".initials-entry")
       );
       const initialsInput = /** @type {HTMLElement|null} */ (
         document.getElementById("initialsInput")
@@ -127,7 +135,37 @@ export class UIManager {
       const toggleInitialsUI = (visible) => {
         const method = visible ? "remove" : "add";
         try {
-          if (initialsEntry) initialsEntry.classList[method]("hidden");
+          // If a standalone initials screen exists, toggle its visibility
+          // by toggling the overlay and the inner entry. Otherwise toggle
+          // the inline initials entry inside the Game Over overlay.
+          if (initialsScreen) {
+            try {
+              initialsScreen.classList[method]("hidden");
+            } catch (_) {
+              /* ignore */
+            }
+            try {
+              if (initialsEntry) initialsEntry.classList[method]("hidden");
+            } catch (_) {
+              /* ignore */
+            }
+
+            // When the standalone initials overlay is shown, hide the main
+            // Game Over overlay so only the initials dialog is visible.
+            try {
+              if (gameOverScreen) {
+                if (visible) {
+                  // showing initials -> hide main game over
+                  gameOverScreen.classList.add("hidden");
+                } else {
+                  // hiding initials -> restore main game over
+                  gameOverScreen.classList.remove("hidden");
+                }
+              }
+            } catch (_) {
+              /* ignore */
+            }
+          } else if (initialsEntry) initialsEntry.classList[method]("hidden");
         } catch (_) {
           /* ignore - DOM mutation best effort */
         }
@@ -527,9 +565,18 @@ export class UIManager {
    * @param {HTMLElement|null} restartBtn Restart button element.
    */
   static ensureOverlayFocus(gameInfo, startBtn, gameOverScreen, restartBtn) {
+    // If the game over overlay is showing, prefer the initials input if visible.
     if (gameOverScreen && !gameOverScreen.classList.contains("hidden")) {
+      const initialsScreen = /** @type {HTMLElement|null} */ (
+        document.getElementById("initialsScreen")
+      );
       const inputEl = /** @type {HTMLElement|null} */ (document.getElementById("initialsInput"));
-      const preferredEl = inputEl && !inputEl.classList.contains("hidden") ? inputEl : restartBtn;
+      const initialsVisible = initialsScreen && !initialsScreen.classList.contains("hidden");
+      const preferredEl = initialsVisible
+        ? inputEl
+        : inputEl && !inputEl.classList.contains("hidden")
+          ? inputEl
+          : restartBtn;
       if (UIManager._preserveFocus) UIManager.focusPreserveScroll(preferredEl);
       else UIManager.focusWithRetry(preferredEl);
       return;
@@ -582,8 +629,13 @@ export class UIManager {
     if (overlayGameOverVisible) {
       const isRestart =
         t === restartBtn || (t && typeof t.closest === "function" && t.closest("#restartBtn"));
+      // If there is a standalone initialsScreen, its controls should be considered interactive.
+      const initialsScreen = /** @type {HTMLElement|null} */ (
+        document.getElementById("initialsScreen")
+      );
       const initialsEl = /** @type {HTMLElement|null} */ (document.getElementById("initialsInput"));
       const submitEl = /** @type {HTMLElement|null} */ (document.getElementById("submitScoreBtn"));
+      const initialsVisible = initialsScreen && !initialsScreen.classList.contains("hidden");
       const isInitials =
         initialsEl &&
         !initialsEl.classList.contains("hidden") &&

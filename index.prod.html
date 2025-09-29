@@ -80,7 +80,32 @@
     >
       <div class="game-over-content">
         <h2 id="gameOverTitle">AI HORIZON</h2>
-        <div class="initials-entry hidden" aria-hidden="false">
+        <div id="leaderboard" class="leaderboard" aria-live="polite">
+          <ol id="leaderboardList" tabindex="0"></ol>
+        </div>
+        <button
+          id="restartBtn"
+          class="action-button"
+          type="button"
+          tabindex="0"
+          aria-label="Play Again"
+        >
+          Play Again
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="initialsScreen"
+      class="game-over-screen hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="initialsTitle"
+      aria-describedby="initialsLabel"
+    >
+      <div class="game-over-content">
+        <h2 id="gameOverTitle">AI HORIZON</h2>
+        <div class="initials-entry" aria-hidden="false">
           <label id="initialsLabel" for="initialsInput" class="initials-label"
             >Enter your 1 to 3-letter initials</label
           >
@@ -98,18 +123,6 @@
             Submit
           </button>
         </div>
-        <div id="leaderboard" class="leaderboard" aria-live="polite">
-          <ol id="leaderboardList" tabindex="0"></ol>
-        </div>
-        <button
-          id="restartBtn"
-          class="action-button"
-          type="button"
-          tabindex="0"
-          aria-label="Play Again"
-        >
-          Play Again
-        </button>
       </div>
     </div>
 

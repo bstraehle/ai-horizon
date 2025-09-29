@@ -1109,7 +1109,14 @@ class AIHorizon {
         const submitBtn = /** @type {HTMLButtonElement|null} */ (
           document.getElementById("submitScoreBtn")
         );
+        const initialsScreen = /** @type {HTMLElement|null} */ (
+          document.getElementById("initialsScreen")
+        );
+        const gameOverScreen = /** @type {HTMLElement|null} */ (
+          document.getElementById("gameOverScreen")
+        );
 
+        // Hide any inline initials UI (was used when initials were inside game over overlay).
         if (initialsEntry) initialsEntry.classList.add("hidden");
 
         const _trySubmit = () => {
@@ -1242,12 +1249,20 @@ class AIHorizon {
               /* ignore */
             }
             try {
+              // After successful submit, render leaderboard and transition to Game Over overlay.
               if (lbEl) LeaderboardManager.render(lbEl);
             } catch (_e) {
               /* ignore */
             }
             try {
               hideInitialsUI();
+            } catch (_e) {
+              /* ignore */
+            }
+            try {
+              // If we have a standalone initials screen, hide it and then show game over overlay.
+              if (initialsScreen) initialsScreen.classList.add("hidden");
+              if (gameOverScreen) gameOverScreen.classList.remove("hidden");
             } catch (_e) {
               /* ignore */
             }
@@ -1316,6 +1331,12 @@ class AIHorizon {
               }
               try {
                 hideInitialsUI();
+              } catch (_e) {
+                /* ignore */
+              }
+              try {
+                if (initialsScreen) initialsScreen.classList.add("hidden");
+                if (gameOverScreen) gameOverScreen.classList.remove("hidden");
               } catch (_e) {
                 /* ignore */
               }

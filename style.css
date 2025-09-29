@@ -194,33 +194,6 @@ body {
   margin-bottom: var(--space-6);
 }
 /* 6. Forms / Initials Entry & Actions -------------------- */
-.initials-entry {
-  align-items: center;
-  display: flex;
-  flex-direction: column;
-}
-.initials-entry .initials-label {
-  display: block;
-  margin-bottom: var(--space-5);
-  text-align: center;
-}
-.initials-entry .initials-input,
-.initials-entry .action-button {
-  margin-bottom: var(--space-5);
-}
-.initials-entry .initials-input {
-  background: rgba(255, 255, 255, 0.01);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-1);
-  color: var(--color-text);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  max-width: 12rem;
-  padding: 6px 8px;
-  text-align: center;
-  text-transform: uppercase;
-  width: 8ch;
-}
 .action-button {
   background: var(--btn-bg);
   border: none;
@@ -273,6 +246,33 @@ body {
 }
 .action-link:hover {
   color: var(--color-text);
+}
+.initials-entry {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+}
+.initials-entry .action-button {
+  margin-bottom: 0;
+}
+.initials-entry .initials-input {
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-1);
+  color: var(--color-text);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--space-5);
+  max-width: 12rem;
+  padding: 6px 8px;
+  text-align: center;
+  text-transform: uppercase;
+  width: 8ch;
+}
+.initials-entry .initials-label {
+  display: block;
+  margin-bottom: var(--space-5);
+  text-align: center;
 }
 /* 9. Utilities (visibility, a11y) ------------------------ */
 .hidden {
