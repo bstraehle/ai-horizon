@@ -339,6 +339,55 @@ class AIHorizon {
   }
 
   /**
+   * Release every element of a pooled collection back to its pool.
+   * Defensive: tolerates missing arrays or pools.
+   * @param {Array<any>} arr
+   * @param {{ release: (obj:any)=>void } | undefined | null} pool
+   */
+  _releaseAll(arr, pool) {
+    if (!arr || !pool) return;
+    for (const it of arr) {
+      try {
+        pool.release(it);
+      } catch (_e) {
+        /* ignore individual release failures */
+      }
+    }
+  }
+
+  /** Release all dynamic entity collections back to their pools. */
+  _releaseAllDynamic() {
+    this._releaseAll(this.asteroids, this.asteroidPool);
+    this._releaseAll(this.bullets, this.bulletPool);
+    this._releaseAll(this.explosions, this.explosionPool);
+    this._releaseAll(this.particles, this.particlePool);
+    this._releaseAll(this.stars, this.starPool);
+  }
+
+  /**
+   * Reset score, timer, scoreboard UI, fire limiter, input state & dynamic collections.
+   * (Time counters & performance monitor resets are handled by fullReset separately.)
+   */
+  _resetCoreRuntimeState() {
+    this.score = 0;
+    this.updateScore();
+    this.timerRemaining = this.timerSeconds;
+    try {
+      UIManager.setTimer(this.timerEl, this.timerRemaining);
+    } catch (_e) {
+      /* ignore */
+    }
+    this.asteroids = [];
+    this.bullets = [];
+    this.explosions = [];
+    this.particles = [];
+    this.stars = [];
+    this.scorePopups = [];
+    this.fireLimiter.reset();
+    this.input = new InputState();
+  }
+
+  /**
    * Create a transient score popup drawn on the canvas.
    * Visual only; does not affect game logic besides animating feedback for scoring events.
    * Lifespan is short and the popup fades/moves (handled in render/update systems).
@@ -521,11 +570,7 @@ class AIHorizon {
     if (!this.state.isRunning() && !this.state.isPaused()) return false;
     if (e.repeat) return false;
     const codeOrKey = e.code || e.key;
-    const isPauseOrConfirm = AIHorizon.PAUSE_CONFIRM_CODES.has(codeOrKey);
-    if (this.state.isPaused()) {
-      return isPauseOrConfirm;
-    }
-    return isPauseOrConfirm;
+    return AIHorizon.PAUSE_CONFIRM_CODES.has(codeOrKey);
   }
 
   /**
@@ -906,40 +951,10 @@ class AIHorizon {
       this.performanceMonitor.reset(this._performanceLevel);
     }
     this._engineTrailStep = 0;
-
-    /**
-     * @param {Array<any>} arr
-     * @param {{ release: (obj: any) => void } | undefined} pool
-     */
-    const releaseAll = (arr, pool) => {
-      if (!arr || !pool) return;
-      for (const it of arr) pool.release(it);
-    };
-    releaseAll(this.asteroids, this.asteroidPool);
-    releaseAll(this.bullets, this.bulletPool);
-    releaseAll(this.explosions, this.explosionPool);
-    releaseAll(this.particles, this.particlePool);
-    releaseAll(this.stars, this.starPool);
-
-    this.asteroids = [];
-    this.bullets = [];
-    this.explosions = [];
-    this.particles = [];
-    this.stars = [];
-    this.scorePopups = [];
-
-    this.score = 0;
-    this.updateScore();
-    this.timerRemaining = this.timerSeconds;
-    try {
-      UIManager.setTimer(this.timerEl, this.timerRemaining);
-    } catch (_e) {
-      /* ignore */
-    }
+    this._releaseAllDynamic();
+    this._resetCoreRuntimeState();
     this.timeMs = 0;
     this.timeSec = 0;
-    this.fireLimiter.reset();
-    this.input = new InputState();
 
     SpawnManager.reset(this);
 
@@ -1027,36 +1042,8 @@ class AIHorizon {
    * Reset score and clear dynamic entity arrays.
    */
   resetGameState(forceNebula = false) {
-    /**
-     * Release all elements back to their pool.
-     * @param {Array<any>} arr
-     * @param {{ release: (obj: any) => void } | undefined} pool
-     */
-    const releaseAll = (arr, pool) => {
-      if (!arr || !pool) return;
-      for (const it of arr) pool.release(it);
-    };
-    releaseAll(this.asteroids, this.asteroidPool);
-    releaseAll(this.bullets, this.bulletPool);
-    releaseAll(this.explosions, this.explosionPool);
-    releaseAll(this.particles, this.particlePool);
-    releaseAll(this.stars, this.starPool);
-    this.score = 0;
-    this.updateScore();
-    this.timerRemaining = this.timerSeconds;
-    try {
-      UIManager.setTimer(this.timerEl, this.timerRemaining);
-    } catch (_e) {
-      /* ignore */
-    }
-    this.asteroids = [];
-    this.bullets = [];
-    this.explosions = [];
-    this.particles = [];
-    this.stars = [];
-    this.scorePopups = [];
-    this.fireLimiter.reset();
-    this.input = new InputState();
+    this._releaseAllDynamic();
+    this._resetCoreRuntimeState();
     SpawnManager.reset(this);
     if (forceNebula) {
       this.nebulaConfigs = undefined;
@@ -1419,14 +1406,13 @@ class AIHorizon {
     }
 
     let allowInitials = undefined;
-
     UIManager.showGameOver(
       this.gameOverScreen,
       this.restartBtn,
       this.finalScoreEl,
       this.score,
       submittedScore,
-      allowInitials
+      undefined
     );
 
     try {
