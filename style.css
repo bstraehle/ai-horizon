@@ -171,8 +171,27 @@ body {
   display: flex;
   inset: 0;
   justify-content: center;
+  padding-top: max(var(--page-vertical), env(safe-area-inset-top));
+  padding-bottom: max(var(--page-vertical), env(safe-area-inset-bottom));
   position: fixed;
   z-index: 2000;
+}
+@supports (height: 100svh) {
+  .game-over-screen {
+    min-height: 100svh;
+  }
+}
+@supports (height: 100dvh) {
+  .game-over-screen {
+    height: 100dvh;
+    overflow-y: auto;
+  }
+}
+@supports (height: 100svh) and (height: 100dvh) {
+  .game-over-screen {
+    min-height: 100svh;
+    height: 100dvh;
+  }
 }
 .game-over-content {
   background: var(--color-bg);
