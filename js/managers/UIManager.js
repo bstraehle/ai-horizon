@@ -635,7 +635,6 @@ export class UIManager {
       );
       const initialsEl = /** @type {HTMLElement|null} */ (document.getElementById("initialsInput"));
       const submitEl = /** @type {HTMLElement|null} */ (document.getElementById("submitScoreBtn"));
-      const initialsVisible = initialsScreen && !initialsScreen.classList.contains("hidden");
       const isInitials =
         initialsEl &&
         !initialsEl.classList.contains("hidden") &&
