@@ -7,6 +7,229 @@ export class UIManager {
   /** @type {(() => void)|null} */
   static _initialsSubmitFocusCleanup = null;
 
+  // ----------------------------
+  // Generic small helpers (internal – not part of public API surface)
+  // ----------------------------
+
+  /** Execute a function and ignore any thrown error (defensive DOM ops). */
+  /**
+   * @param {() => any} fn
+   * @returns {any}
+   */
+  static _try(fn) {
+    try {
+      return fn();
+    } catch (_) {
+      return undefined;
+    }
+  }
+
+  /** Return document element by id (defensive for non‑browser env). */
+  /**
+   * @param {string} id
+   * @returns {HTMLElement|null}
+   */
+  static _byId(id) {
+    try {
+      return typeof document !== "undefined" ? document.getElementById(id) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /** Scroll leaderboard list (if present) back to top. */
+  static _resetLeaderboardScroll() {
+    const list = UIManager._byId("leaderboardList");
+    if (!list) return;
+    UIManager._try(() => {
+      if (typeof list.scrollTo === "function") list.scrollTo(0, 0);
+      else list.scrollTop = 0;
+    });
+    // Fallback legacy attempt.
+    UIManager._try(() => {
+      // If previous attempt threw, ensure scrollTop=0.
+      list.scrollTop = 0;
+    });
+  }
+
+  /** Gather all initials related elements (works for inline or standalone overlay). */
+  static _getInitialsElements() {
+    /** @type {HTMLElement|null} */ const initialsScreen = UIManager._byId("initialsScreen");
+    /** @type {HTMLElement|null} */ let initialsEntry = null;
+    UIManager._try(() => {
+      initialsEntry =
+        initialsScreen?.querySelector?.(".initials-entry") ||
+        document.querySelector?.(".initials-entry") ||
+        null;
+    });
+    return {
+      initialsScreen,
+      initialsEntry,
+      initialsInput: UIManager._byId("initialsInput"),
+      submitBtn: UIManager._byId("submitScoreBtn"),
+      initialsLabel: UIManager._byId("initialsLabel"),
+    };
+  }
+
+  /** Toggle visibility of initials UI (standalone or inline) while keeping Game Over overlay state consistent. */
+  /**
+   * @param {boolean} visible
+   * @param {HTMLElement|null} gameOverScreen
+   * @param {{initialsScreen:HTMLElement|null, initialsEntry:HTMLElement|null, initialsInput:HTMLElement|null, submitBtn:HTMLElement|null, initialsLabel:HTMLElement|null}} elements
+   */
+  static _toggleInitialsUI(visible, gameOverScreen, elements) {
+    const { initialsScreen, initialsEntry, initialsInput, submitBtn, initialsLabel } = elements;
+    const method = visible ? "remove" : "add";
+
+    UIManager._try(() => {
+      if (initialsScreen) initialsScreen.classList[method]("hidden");
+    });
+    UIManager._try(() => {
+      if (initialsEntry) initialsEntry.classList[method]("hidden");
+    });
+
+    // If a standalone initials overlay is used, hide the main game over screen while initials are visible.
+    if (initialsScreen && gameOverScreen) {
+      UIManager._try(() => {
+        if (visible) gameOverScreen.classList.add("hidden");
+        else gameOverScreen.classList.remove("hidden");
+      });
+    }
+
+    UIManager._try(() => {
+      if (initialsInput) initialsInput.classList[method]("hidden");
+    });
+    UIManager._try(() => {
+      if (submitBtn) submitBtn.classList[method]("hidden");
+    });
+    UIManager._try(() => {
+      if (initialsLabel) initialsLabel.classList[method]("hidden");
+    });
+    UIManager._try(() => {
+      UIManager.syncInitialsSubmitFocusGuard();
+    });
+  }
+
+  /** Determine and apply initials UI visibility using leaderboard qualification logic. */
+  /**
+   * @param {number} score
+   * @param {boolean|undefined} allowInitials
+   * @param {HTMLElement|null} gameOverScreen
+   * @param {{initialsScreen:HTMLElement|null, initialsEntry:HTMLElement|null, initialsInput:HTMLElement|null, submitBtn:HTMLElement|null, initialsLabel:HTMLElement|null}} elements
+   */
+  static _applyInitialsQualification(score, allowInitials, gameOverScreen, elements) {
+    const toggle = /** @param {boolean} v */ (v) =>
+      UIManager._toggleInitialsUI(v, gameOverScreen, elements);
+    // Explicit override always wins.
+    if (typeof allowInitials === "boolean") {
+      toggle(allowInitials);
+      return;
+    }
+    const baseline = typeof score === "number" && score > 0;
+    if (!baseline) {
+      toggle(false);
+      return;
+    }
+
+    const max = LeaderboardManager.MAX_ENTRIES || 0;
+    const cachedEntries =
+      typeof LeaderboardManager.getCached === "function" && LeaderboardManager.getCached();
+    if (Array.isArray(cachedEntries)) {
+      const qualifies = LeaderboardManager.qualifiesForInitials(score, cachedEntries.slice(), max);
+      toggle(qualifies);
+      return;
+    }
+
+    // Pending load promise branch.
+    if (LeaderboardManager._pendingLoadPromise) {
+      toggle(false);
+      LeaderboardManager._pendingLoadPromise
+        .then((entries) => {
+          UIManager._try(() => {
+            if (!Array.isArray(entries)) {
+              toggle(true); // Unknown shape – show form to be safe.
+              return;
+            }
+            const qualifies = LeaderboardManager.qualifiesForInitials(score, entries, max);
+            toggle(qualifies);
+          });
+        })
+        .catch(() => {});
+      return;
+    }
+
+    const maybe = LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
+    if (Array.isArray(maybe)) {
+      const qualifies = LeaderboardManager.qualifiesForInitials(score, maybe, max);
+      toggle(qualifies);
+      return;
+    }
+    if (maybe && typeof maybe.then === "function") {
+      toggle(false);
+      maybe
+        .then((entries) => {
+          UIManager._try(() => {
+            if (!Array.isArray(entries)) {
+              toggle(true);
+              return;
+            }
+            const qualifies = LeaderboardManager.qualifiesForInitials(score, entries, max);
+            toggle(qualifies);
+          });
+        })
+        .catch(() => {});
+      return;
+    }
+    // Fallback unknown result – show initials.
+    toggle(true);
+  }
+
+  /** Internal shared multi-stage focus retry sequence. */
+  /**
+   * @param {HTMLElement|null} el
+   * @param {() => void} attemptFn
+   * @param {{forceCue?:boolean}} [options]
+   */
+  static _retryFocus(el, attemptFn, options = {}) {
+    const { forceCue = false } = options || {};
+    if (!el) return;
+    const attempt = () => {
+      try {
+        attemptFn();
+      } catch (_) {
+        /* ignore */
+      }
+      // Try a plain focus fallback if still not active.
+      if (document.activeElement !== el) {
+        UIManager._try(() => el.focus());
+      }
+    };
+    attempt();
+    if (document.activeElement === el) return;
+    requestAnimationFrame(() => {
+      attempt();
+      if (document.activeElement === el) return;
+      setTimeout(() => {
+        attempt();
+        if (document.activeElement === el) return;
+        setTimeout(() => {
+          attempt();
+          if (document.activeElement === el) return;
+          setTimeout(() => {
+            attempt();
+            if (document.activeElement === el) return;
+            if (forceCue) {
+              UIManager._try(() => {
+                el.classList.add("js-force-focus");
+                setTimeout(() => UIManager._try(() => el.classList.remove("js-force-focus")), 2000);
+              });
+            }
+          }, 750);
+        }, 250);
+      }, 100);
+    });
+  }
+
   /**
    * Safe Element check for non-browser environments.
    * @param {unknown} obj
@@ -90,178 +313,12 @@ export class UIManager {
   ) {
     if (finalScoreEl) finalScoreEl.textContent = String(score);
     if (gameOverScreen) gameOverScreen.classList.remove("hidden");
-    try {
-      const leaderboard = /** @type {HTMLElement|null} */ (
-        document.getElementById("leaderboardList")
-      );
-      if (leaderboard) {
-        try {
-          if (typeof leaderboard.scrollTo === "function") leaderboard.scrollTo(0, 0);
-          else leaderboard.scrollTop = 0;
-        } catch (_) {
-          try {
-            leaderboard.scrollTop = 0;
-          } catch (_) {
-            void 0;
-          }
-        }
-      }
-    } catch (_) {
-      /* ignore */
-    }
+    UIManager._resetLeaderboardScroll();
 
-    try {
-      // Support a standalone initials overlay (#initialsScreen). Prefer its
-      // .initials-entry when present so we can show initials before Game Over.
-      const initialsScreen = /** @type {HTMLElement|null} */ (
-        document.getElementById("initialsScreen")
-      );
-      const initialsEntry = /** @type {HTMLElement|null} */ (
-        (initialsScreen &&
-          initialsScreen.querySelector &&
-          initialsScreen.querySelector(".initials-entry")) ||
-          document.querySelector(".initials-entry")
-      );
-      const initialsInput = /** @type {HTMLElement|null} */ (
-        document.getElementById("initialsInput")
-      );
-      const submitBtn = /** @type {HTMLElement|null} */ (document.getElementById("submitScoreBtn"));
-      const initialsLabel = /** @type {HTMLElement|null} */ (
-        document.getElementById("initialsLabel")
-      );
+    // Initials gating / visibility handling
+    const initialsElements = UIManager._getInitialsElements();
+    UIManager._applyInitialsQualification(score, allowInitials, gameOverScreen, initialsElements);
 
-      /**
-       * Apply visibility to initials UI elements.
-       * @param {boolean} visible
-       */
-      const toggleInitialsUI = (visible) => {
-        const method = visible ? "remove" : "add";
-        try {
-          // If a standalone initials screen exists, toggle its visibility
-          // by toggling the overlay and the inner entry. Otherwise toggle
-          // the inline initials entry inside the Game Over overlay.
-          if (initialsScreen) {
-            try {
-              initialsScreen.classList[method]("hidden");
-            } catch (_) {
-              /* ignore */
-            }
-            try {
-              if (initialsEntry) initialsEntry.classList[method]("hidden");
-            } catch (_) {
-              /* ignore */
-            }
-
-            // When the standalone initials overlay is shown, hide the main
-            // Game Over overlay so only the initials dialog is visible.
-            try {
-              if (gameOverScreen) {
-                if (visible) {
-                  // showing initials -> hide main game over
-                  gameOverScreen.classList.add("hidden");
-                } else {
-                  // hiding initials -> restore main game over
-                  gameOverScreen.classList.remove("hidden");
-                }
-              }
-            } catch (_) {
-              /* ignore */
-            }
-          } else if (initialsEntry) initialsEntry.classList[method]("hidden");
-        } catch (_) {
-          /* ignore - DOM mutation best effort */
-        }
-        try {
-          if (initialsInput) initialsInput.classList[method]("hidden");
-        } catch (_) {
-          /* ignore - DOM mutation best effort */
-        }
-        try {
-          if (submitBtn) submitBtn.classList[method]("hidden");
-        } catch (_) {
-          /* ignore - DOM mutation best effort */
-        }
-        try {
-          if (initialsLabel) initialsLabel.classList[method]("hidden");
-        } catch (_) {
-          /* ignore - DOM mutation best effort */
-        }
-        try {
-          UIManager.syncInitialsSubmitFocusGuard();
-        } catch (_) {
-          /* ignore */
-        }
-      };
-
-      if (typeof allowInitials === "boolean") {
-        toggleInitialsUI(allowInitials);
-      } else {
-        const baseline = typeof score === "number" && score > 0;
-        if (!baseline) {
-          toggleInitialsUI(false);
-        } else {
-          const max = LeaderboardManager.MAX_ENTRIES || 0;
-          const cachedEntries = LeaderboardManager.getCached && LeaderboardManager.getCached();
-          if (Array.isArray(cachedEntries)) {
-            const entries = cachedEntries.slice();
-            const qualifies = LeaderboardManager.qualifiesForInitials(score, entries, max);
-            toggleInitialsUI(qualifies);
-          } else if (LeaderboardManager._pendingLoadPromise) {
-            toggleInitialsUI(false);
-            LeaderboardManager._pendingLoadPromise
-              .then(
-                /** @param {{id:string,score:number}[]|any} entries */
-                (entries) => {
-                  try {
-                    if (!Array.isArray(entries)) {
-                      toggleInitialsUI(true);
-                      return;
-                    }
-                    const qualifies = LeaderboardManager.qualifiesForInitials(score, entries, max);
-                    toggleInitialsUI(qualifies);
-                  } catch (_) {
-                    /* ignore - qualification check best effort */
-                  }
-                }
-              )
-              .catch(() => {});
-          } else {
-            const maybe = LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
-            if (Array.isArray(maybe)) {
-              const qualifies = LeaderboardManager.qualifiesForInitials(score, maybe, max);
-              toggleInitialsUI(qualifies);
-            } else if (maybe && typeof maybe.then === "function") {
-              toggleInitialsUI(false);
-              maybe
-                .then(
-                  /** @param {{id:string,score:number}[]|any} entries */
-                  (entries) => {
-                    try {
-                      if (!Array.isArray(entries)) {
-                        toggleInitialsUI(true);
-                        return;
-                      }
-                      const qualifies = LeaderboardManager.qualifiesForInitials(
-                        score,
-                        entries,
-                        max
-                      );
-                      toggleInitialsUI(qualifies);
-                    } catch (_) {
-                      /* ignore - async qualification check best effort */
-                    }
-                  }
-                )
-                .catch(() => {});
-            } else {
-              toggleInitialsUI(true);
-            }
-          }
-        }
-      }
-    } catch (_) {
-      /* ignore */
-    }
     const initialsInput = /** @type {HTMLElement|null} */ (
       document.getElementById("initialsInput")
     );
@@ -292,29 +349,26 @@ export class UIManager {
       } catch (_) {
         UIManager._preserveFocus = false;
       }
-
       UIManager.focusPreserveScroll(preferred);
-      try {
+      UIManager._try(() => {
         const target = preferred;
-        setTimeout(() => {
-          try {
-            if (UIManager._preserveFocus) UIManager.focusPreserveScroll(target);
-            else UIManager.focusWithRetry(target);
-          } catch (_) {
-            void 0;
-          }
-        }, 120);
-        setTimeout(() => {
-          try {
-            if (UIManager._preserveFocus) UIManager.focusPreserveScroll(target);
-            else UIManager.focusWithRetry(target);
-          } catch (_) {
-            void 0;
-          }
-        }, 420);
-      } catch (_) {
-        void 0;
-      }
+        setTimeout(
+          () =>
+            UIManager._try(() => {
+              if (UIManager._preserveFocus) UIManager.focusPreserveScroll(target);
+              else UIManager.focusWithRetry(target);
+            }),
+          120
+        );
+        setTimeout(
+          () =>
+            UIManager._try(() => {
+              if (UIManager._preserveFocus) UIManager.focusPreserveScroll(target);
+              else UIManager.focusWithRetry(target);
+            }),
+          420
+        );
+      });
       try {
         if (preferred && document.activeElement !== preferred) {
           preferred.classList.add("js-force-focus");
@@ -345,25 +399,11 @@ export class UIManager {
       }
     } else {
       UIManager.focusWithRetry(preferred);
-      try {
+      UIManager._try(() => {
         const target = preferred;
-        setTimeout(() => {
-          try {
-            UIManager.focusWithRetry(target);
-          } catch (_) {
-            void 0;
-          }
-        }, 120);
-        setTimeout(() => {
-          try {
-            UIManager.focusWithRetry(target);
-          } catch (_) {
-            void 0;
-          }
-        }, 420);
-      } catch (_) {
-        /* ignore */
-      }
+        setTimeout(() => UIManager._try(() => UIManager.focusWithRetry(target)), 120);
+        setTimeout(() => UIManager._try(() => UIManager.focusWithRetry(target)), 420);
+      });
     }
 
     try {
@@ -399,53 +439,17 @@ export class UIManager {
    */
   static focusWithRetry(el) {
     if (!el) return;
-    const tryFocus = () => {
-      try {
-        el.focus({ preventScroll: true });
-      } catch (_) {
+    UIManager._retryFocus(
+      el,
+      () => {
         try {
-          el.focus();
+          el.focus({ preventScroll: true });
         } catch (_) {
-          /* ignore */
+          UIManager._try(() => el.focus());
         }
-      }
-      try {
-        if (document.activeElement !== el) el.focus();
-      } catch (_) {
-        /* ignore */
-      }
-    };
-    tryFocus();
-    if (document.activeElement !== el) {
-      requestAnimationFrame(() => {
-        tryFocus();
-        if (document.activeElement !== el) {
-          setTimeout(() => {
-            tryFocus();
-            if (document.activeElement !== el) {
-              setTimeout(() => {
-                tryFocus();
-                if (document.activeElement !== el) {
-                  setTimeout(() => {
-                    tryFocus();
-                    if (document.activeElement !== el) {
-                      try {
-                        el.classList.add("js-force-focus");
-                        setTimeout(() => {
-                          el.classList.remove("js-force-focus");
-                        }, 2000);
-                      } catch (_) {
-                        /* ignore */
-                      }
-                    }
-                  }, 750);
-                }
-              }, 250);
-            }
-          }, 100);
-        }
-      });
-    }
+      },
+      { forceCue: true }
+    );
   }
 
   /** Try focusing an element while preserving the document scroll position.
@@ -458,64 +462,30 @@ export class UIManager {
    */
   static focusPreserveScroll(el) {
     if (!el) return;
-    const tryFocus = () => {
-      try {
-        el.focus({ preventScroll: true });
-      } catch (_) {
+    UIManager._retryFocus(
+      el,
+      () => {
         try {
-          const scrollX =
-            typeof window.scrollX === "number" ? window.scrollX : window.pageXOffset || 0;
-          const scrollY =
-            typeof window.scrollY === "number" ? window.scrollY : window.pageYOffset || 0;
-          el.focus();
-          try {
-            window.scrollTo(scrollX, scrollY);
-          } catch (_) {
-            /* ignore */
-          }
+          el.focus({ preventScroll: true });
         } catch (_) {
-          /* ignore */
+          const scrollX =
+            typeof window.scrollX === "number" ? window.scrollX : window.pageXOffset || 0;
+          const scrollY =
+            typeof window.scrollY === "number" ? window.scrollY : window.pageYOffset || 0;
+          UIManager._try(() => el.focus());
+          UIManager._try(() => window.scrollTo(scrollX, scrollY));
         }
-      }
-      try {
         if (document.activeElement !== el) {
           const scrollX =
             typeof window.scrollX === "number" ? window.scrollX : window.pageXOffset || 0;
           const scrollY =
             typeof window.scrollY === "number" ? window.scrollY : window.pageYOffset || 0;
-          el.focus();
-          try {
-            window.scrollTo(scrollX, scrollY);
-          } catch (_) {
-            /* ignore */
-          }
+          UIManager._try(() => el.focus());
+          UIManager._try(() => window.scrollTo(scrollX, scrollY));
         }
-      } catch (_) {
-        /* ignore */
-      }
-    };
-
-    tryFocus();
-    if (document.activeElement !== el) {
-      requestAnimationFrame(() => {
-        tryFocus();
-        if (document.activeElement !== el) {
-          setTimeout(() => {
-            tryFocus();
-            if (document.activeElement !== el) {
-              setTimeout(() => {
-                tryFocus();
-                if (document.activeElement !== el) {
-                  setTimeout(() => {
-                    tryFocus();
-                  }, 750);
-                }
-              }, 250);
-            }
-          }, 100);
-        }
-      });
-    }
+      },
+      { forceCue: false }
+    );
   }
 
   /** Remove any active initials screen focus guard listeners. */
