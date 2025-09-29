@@ -193,6 +193,8 @@ export class UIManager {
   static _retryFocus(el, attemptFn, options = {}) {
     const { forceCue = false } = options || {};
     if (!el) return;
+    const hasDocument = typeof document !== "undefined";
+    const getActive = () => (hasDocument ? document.activeElement : null);
     const attempt = () => {
       try {
         attemptFn();
@@ -200,24 +202,22 @@ export class UIManager {
         /* ignore */
       }
       // Try a plain focus fallback if still not active.
-      if (document.activeElement !== el) {
-        UIManager._try(() => el.focus());
-      }
+      if (hasDocument && getActive() !== el) UIManager._try(() => el.focus());
     };
     attempt();
-    if (document.activeElement === el) return;
+    if (hasDocument && getActive() === el) return;
     requestAnimationFrame(() => {
       attempt();
-      if (document.activeElement === el) return;
+      if (hasDocument && getActive() === el) return;
       setTimeout(() => {
         attempt();
-        if (document.activeElement === el) return;
+        if (hasDocument && getActive() === el) return;
         setTimeout(() => {
           attempt();
-          if (document.activeElement === el) return;
+          if (hasDocument && getActive() === el) return;
           setTimeout(() => {
             attempt();
-            if (document.activeElement === el) return;
+            if (hasDocument && getActive() === el) return;
             if (forceCue) {
               UIManager._try(() => {
                 el.classList.add("js-force-focus");
