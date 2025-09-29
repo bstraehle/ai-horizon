@@ -4,6 +4,8 @@
 import { LeaderboardManager } from "./LeaderboardManager.js";
 export class UIManager {
   static _preserveFocus = false;
+  /** @type {(() => void)|null} */
+  static _initialsSubmitFocusCleanup = null;
 
   /**
    * Safe Element check for non-browser environments.
@@ -184,6 +186,11 @@ export class UIManager {
         } catch (_) {
           /* ignore - DOM mutation best effort */
         }
+        try {
+          UIManager.syncInitialsSubmitFocusGuard();
+        } catch (_) {
+          /* ignore */
+        }
       };
 
       if (typeof allowInitials === "boolean") {
@@ -358,6 +365,12 @@ export class UIManager {
         /* ignore */
       }
     }
+
+    try {
+      UIManager.syncInitialsSubmitFocusGuard();
+    } catch (_) {
+      /* ignore */
+    }
   }
 
   /** Hide game over overlay.
@@ -365,6 +378,11 @@ export class UIManager {
    */
   static hideGameOver(gameOverScreen) {
     if (gameOverScreen) gameOverScreen.classList.add("hidden");
+    try {
+      UIManager.teardownInitialsSubmitFocusGuard();
+    } catch (_) {
+      /* ignore */
+    }
   }
 
   /** Hide start/info overlay.
@@ -497,6 +515,133 @@ export class UIManager {
           }, 100);
         }
       });
+    }
+  }
+
+  /** Remove any active initials screen focus guard listeners. */
+  static teardownInitialsSubmitFocusGuard() {
+    const cleanup = UIManager._initialsSubmitFocusCleanup;
+    if (typeof cleanup === "function") {
+      try {
+        cleanup();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    UIManager._initialsSubmitFocusCleanup = null;
+  }
+
+  /** Ensure taps/clicks outside the initials input focus the submit button. */
+  static syncInitialsSubmitFocusGuard() {
+    UIManager.teardownInitialsSubmitFocusGuard();
+    try {
+      const submitBtn = /** @type {HTMLElement|null} */ (document.getElementById("submitScoreBtn"));
+      if (!submitBtn || submitBtn.classList.contains("hidden")) return;
+
+      /** @type {HTMLElement[]} */
+      const containers = [];
+      const initialsScreen = /** @type {HTMLElement|null} */ (
+        document.getElementById("initialsScreen")
+      );
+      if (initialsScreen && !initialsScreen.classList.contains("hidden")) {
+        containers.push(initialsScreen);
+      }
+      if (!containers.length) {
+        const inlineEntry = /** @type {HTMLElement|null} */ (
+          document.querySelector(".initials-entry")
+        );
+        if (inlineEntry && !inlineEntry.classList.contains("hidden")) {
+          containers.push(inlineEntry);
+        }
+      }
+      if (!containers.length) return;
+
+      /**
+       * Redirect focus to submit button when interacting outside the initials input.
+       * @param {Event} event
+       */
+      const handler = (event) => {
+        try {
+          const submit = /** @type {HTMLElement|null} */ (
+            document.getElementById("submitScoreBtn")
+          );
+          if (!submit || submit.classList.contains("hidden")) {
+            UIManager.syncInitialsSubmitFocusGuard();
+            return;
+          }
+          const input = /** @type {HTMLElement|null} */ (document.getElementById("initialsInput"));
+          const target = UIManager.isElement(event && event.target)
+            ? /** @type {Element} */ (event.target)
+            : null;
+          const insideInput =
+            input &&
+            !input.classList.contains("hidden") &&
+            target &&
+            typeof target.closest === "function" &&
+            (target === input || !!target.closest("#initialsInput"));
+          if (insideInput) return;
+          const insideLabel =
+            target && typeof target.closest === "function" && !!target.closest("#initialsLabel");
+          if (insideLabel) return;
+          const insideSubmit =
+            submit &&
+            target &&
+            typeof target.closest === "function" &&
+            (target === submit || !!target.closest("#submitScoreBtn"));
+          if (insideSubmit) return;
+
+          if (event && event.cancelable) {
+            try {
+              event.preventDefault();
+            } catch (_) {
+              /* ignore */
+            }
+          }
+          try {
+            if (event && typeof event.stopPropagation === "function") {
+              event.stopPropagation();
+            }
+          } catch (_) {
+            /* ignore */
+          }
+
+          if (UIManager._preserveFocus) UIManager.focusPreserveScroll(submit);
+          else UIManager.focusWithRetry(submit);
+        } catch (_) {
+          /* ignore */
+        }
+      };
+
+      const touchOptions = { capture: true, passive: false };
+      containers.forEach((container) => {
+        try {
+          container.addEventListener("mousedown", handler, true);
+        } catch (_) {
+          /* ignore */
+        }
+        try {
+          container.addEventListener("touchstart", handler, touchOptions);
+        } catch (_) {
+          /* ignore */
+        }
+      });
+
+      UIManager._initialsSubmitFocusCleanup = () => {
+        containers.forEach((container) => {
+          try {
+            container.removeEventListener("mousedown", handler, true);
+          } catch (_) {
+            /* ignore */
+          }
+          try {
+            container.removeEventListener("touchstart", handler, touchOptions);
+          } catch (_) {
+            /* ignore */
+          }
+        });
+      };
+    } catch (_) {
+      /* ignore */
     }
   }
 

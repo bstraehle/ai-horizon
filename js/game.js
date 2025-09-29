@@ -1221,6 +1221,11 @@ class AIHorizon {
             } catch (_err) {
               /* ignore */
             }
+            try {
+              UIManager.syncInitialsSubmitFocusGuard();
+            } catch (_err) {
+              /* ignore */
+            }
           };
 
           /** @param {MouseEvent} e */
