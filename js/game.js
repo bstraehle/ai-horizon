@@ -1405,7 +1405,6 @@ class AIHorizon {
       /* ignore */
     }
 
-    let allowInitials = undefined;
     UIManager.showGameOver(
       this.gameOverScreen,
       this.restartBtn,
