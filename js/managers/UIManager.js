@@ -630,9 +630,6 @@ export class UIManager {
       const isRestart =
         t === restartBtn || (t && typeof t.closest === "function" && t.closest("#restartBtn"));
       // If there is a standalone initialsScreen, its controls should be considered interactive.
-      const initialsScreen = /** @type {HTMLElement|null} */ (
-        document.getElementById("initialsScreen")
-      );
       const initialsEl = /** @type {HTMLElement|null} */ (document.getElementById("initialsInput"));
       const submitEl = /** @type {HTMLElement|null} */ (document.getElementById("submitScoreBtn"));
       const isInitials =
