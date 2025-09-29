@@ -240,12 +240,12 @@ body {
   outline: 3px solid var(--color-btn-focus-outline);
   outline-offset: -3px;
 }
+.action-link:hover {
+  color: var(--color-text);
+}
 .js-force-focus {
   outline: 3px solid var(--color-btn-focus-outline) !important;
   outline-offset: -3px !important;
-}
-.action-link:hover {
-  color: var(--color-text);
 }
 .initials-entry {
   align-items: center;
