@@ -8,8 +8,6 @@ export class UIManager {
   /** @type {(() => void)|null} */
   static _initialsSubmitFocusCleanup = null;
 
-  // --- Internal helpers ---
-
   /** @param {() => any} fn */
   static _try(fn) {
     try {
@@ -463,34 +461,56 @@ export class UIManager {
           const submit = /** @type {HTMLElement|null} */ (
             document.getElementById("submitScoreBtn")
           );
-          const input = /** @type {HTMLElement|null} */ (document.getElementById("initialsInput"));
-
-          // If the form isn't visible, do nothing.
+          const input = /** @type {HTMLInputElement|null} */ (
+            document.getElementById("initialsInput")
+          );
           if (!submit || submit.classList.contains("hidden") || !input) {
-            UIManager.syncInitialsSubmitFocusGuard(); // Resync to clean up listeners
+            UIManager.syncInitialsSubmitFocusGuard();
             return;
           }
-
           const target = UIManager.isElement(event && event.target)
             ? /** @type {Element} */ (event.target)
             : null;
 
-          // Allow interactions with the input, its label, and the submit button.
           const insideInput = target && (target === input || !!target.closest("#initialsInput"));
+          const insideLabel = target && !!target.closest("#initialsLabel");
+          const insideSubmit = target && (target === submit || !!target.closest("#submitScoreBtn"));
+
+          const valueLength = (input.value || "").length;
+
+          if (valueLength < 3) {
+            if (!insideInput && !insideLabel) {
+              if (event.cancelable) event.preventDefault();
+              if (typeof event.stopPropagation === "function") event.stopPropagation();
+              try {
+                input.classList.add("invalid");
+                setTimeout(() => input.classList.remove("invalid"), 0);
+              } catch (_) {
+                /* non-critical */
+              }
+              UIManager.focusWithRetry(input);
+              return;
+            }
+            return;
+          }
           if (insideInput) return;
 
-          const insideLabel = target && !!target.closest("#initialsLabel");
-          if (insideLabel) return;
-
-          const insideSubmit = target && (target === submit || !!target.closest("#submitScoreBtn"));
+          if (event.cancelable) event.preventDefault();
+          if (typeof event.stopPropagation === "function") event.stopPropagation();
           if (insideSubmit) return;
-
-          // For any other interaction, prevent the default action (which would be to blur the input)
-          // and explicitly focus the submit button.
-          if (event.cancelable) {
-            event.preventDefault();
+          try {
+            if (/^[A-Z]{3}$/.test(input.value || "")) {
+              if (!(submit && submit.dataset && submit.dataset.cooldown === "1")) {
+                try {
+                  submit?.click();
+                } catch (_) {
+                  /* non-critical submit trigger */
+                }
+              }
+            }
+          } catch (_) {
+            /* ignore pattern issues */
           }
-
           UIManager.focusWithRetry(submit);
         } catch (_) {
           /* ignore */
@@ -524,16 +544,12 @@ export class UIManager {
         typeof document !== "undefined" ? document.getElementById("leaderboard") : null;
       const target = list || container;
       if (!target) return;
-
-      // Prefer centering the element in viewport. Use smooth behavior where supported.
       try {
         if (typeof target.scrollIntoView === "function") {
-          // { block: 'center' } recenters vertically; graceful fallback if options unsupported.
           try {
             target.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
             return;
           } catch (_) {
-            // options may not be supported; fall through to simple call.
             try {
               target.scrollIntoView();
               return;
@@ -545,8 +561,6 @@ export class UIManager {
       } catch (_) {
         /* ignore */
       }
-
-      // Fallback: compute center and scroll window manually.
       try {
         const rect = target.getBoundingClientRect();
         const absY = (rect.top + rect.bottom) / 2 + (window.pageYOffset || window.scrollY || 0);
@@ -570,7 +584,6 @@ export class UIManager {
 
   /** Ensure correct overlay element has focus based on visibility. @param {HTMLElement|null} gameInfo @param {HTMLElement|null} startBtn @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} restartBtn */
   static ensureOverlayFocus(gameInfo, startBtn, gameOverScreen, restartBtn) {
-    // If the game over overlay is showing, prefer the initials input if visible.
     if (gameOverScreen && !gameOverScreen.classList.contains("hidden")) {
       const initialsScreen = /** @type {HTMLElement|null} */ (
         document.getElementById("initialsScreen")
@@ -633,7 +646,6 @@ export class UIManager {
     if (overlayGameOverVisible) {
       const isRestart =
         t === restartBtn || (t && typeof t.closest === "function" && t.closest("#restartBtn"));
-      // If there is a standalone initialsScreen, its controls should be considered interactive.
       const initialsEl = /** @type {HTMLElement|null} */ (document.getElementById("initialsInput"));
       const submitEl = /** @type {HTMLElement|null} */ (document.getElementById("submitScoreBtn"));
       const isInitials =
@@ -711,10 +723,6 @@ export class UIManager {
       t &&
       (t === leaderboard || (typeof t.closest === "function" && t.closest("#leaderboardList")));
     if (targetIsLeaderboard) {
-      // On touch devices, if there are no interactive initials/submit controls
-      // visible, tapping the leaderboard should not steal focus from the
-      // Play Again / restart button. Allow desktop (keyboard) interactions
-      // to behave as before.
       try {
         const initialsEl = /** @type {HTMLElement|null} */ (
           document.getElementById("initialsInput")
@@ -758,11 +766,6 @@ export class UIManager {
       submitEl &&
       !submitEl.classList.contains("hidden") &&
       (t === submitEl || (t && typeof t.closest === "function" && t.closest("#submitScoreBtn")));
-    // If the restart button itself is blurring but there are no interactive
-    // initials / submit controls visible, immediately reclaim focus so that
-    // stray taps/clicks (especially on mobile) don't leave the overlay with
-    // no focused control. This matches the UX request to "keep focus on the
-    // Play Again button when the submit button is not visible".
     if (targetIsRestart) {
       if (
         e &&
@@ -773,9 +776,8 @@ export class UIManager {
         if (UIManager._preserveFocus) UIManager.focusPreserveScroll(restartBtn);
         else UIManager.focusWithRetry(restartBtn);
       }
-      return; // Always return after handling restart target.
+      return;
     }
-    // If the submit button itself is blurring and is visible, reclaim focus to submit button.
     if (targetIsSubmit) {
       if (e && e.type === "blur" && submitEl && !submitEl.classList.contains("hidden")) {
         if (UIManager._preserveFocus) UIManager.focusPreserveScroll(submitEl);

@@ -3,9 +3,6 @@ import { JSDOM } from "jsdom";
 import { UIManager } from "../js/managers/UIManager.js";
 import { LeaderboardManager } from "../js/managers/LeaderboardManager.js";
 
-/**
- * Build a DOM structure mimicking the initials overlay.
- */
 function createDom() {
   return new JSDOM(
     `<!doctype html><html><body>
@@ -32,10 +29,9 @@ function createDom() {
   );
 }
 
-describe("UIManager initials submit focus guard", () => {
+describe("UIManager initials pointer gating until 3 chars", () => {
   /** @type {JSDOM|null} */
   let dom = null;
-  /** @type {(() => void)|null} */
   let cleanup = null;
 
   beforeEach(() => {
@@ -74,11 +70,9 @@ describe("UIManager initials submit focus guard", () => {
     };
   });
 
-  afterEach(() => {
-    if (cleanup) cleanup();
-  });
+  afterEach(() => cleanup && cleanup());
 
-  it("focuses submit button when clicking outside initials input", async () => {
+  it("blocks background clicks & submit focus until 3 chars entered", async () => {
     const gameOverScreen = document.getElementById("gameOverScreen");
     const restartBtn = document.getElementById("restartBtn");
     const finalScoreEl = document.getElementById("finalScore");
@@ -86,40 +80,29 @@ describe("UIManager initials submit focus guard", () => {
     UIManager.showGameOver(gameOverScreen, restartBtn, finalScoreEl, 500);
 
     const initialsScreen = document.getElementById("initialsScreen");
-    const initialsInput = document.getElementById("initialsInput");
+    const initialsInput = /** @type {HTMLInputElement} */ (
+      document.getElementById("initialsInput")
+    );
     const submitBtn = document.getElementById("submitScoreBtn");
     expect(initialsScreen.classList.contains("hidden")).toBe(false);
+
     initialsInput.focus();
+    initialsInput.value = "A"; // 1 char
+
+    const bg = initialsScreen.querySelector(".game-over-content");
+    const target = document.createElement("div");
+    bg.appendChild(target);
+
+    target.dispatchEvent(new window.Event("mousedown", { bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    // Should keep or restore focus on input, not move to submit
     expect(document.activeElement).toBe(initialsInput);
+
+    // Now complete 3 chars
     initialsInput.value = "ABC";
-
-    const background = initialsScreen.querySelector(".game-over-content");
-    const backgroundTarget = document.createElement("div");
-    background.appendChild(backgroundTarget);
-
-    const event = new window.Event("mousedown", { bubbles: true, cancelable: true });
-    backgroundTarget.dispatchEvent(event);
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
+    target.dispatchEvent(new window.Event("mousedown", { bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    // Now legacy behavior: submit gains focus
     expect(document.activeElement).toBe(submitBtn);
-  });
-
-  it("does not override focus when interacting with initials input", async () => {
-    const gameOverScreen = document.getElementById("gameOverScreen");
-    const restartBtn = document.getElementById("restartBtn");
-    const finalScoreEl = document.getElementById("finalScore");
-
-    UIManager.showGameOver(gameOverScreen, restartBtn, finalScoreEl, 500);
-
-    const initialsInput = document.getElementById("initialsInput");
-    initialsInput.focus();
-
-    const event = new window.Event("mousedown", { bubbles: true, cancelable: true });
-    initialsInput.dispatchEvent(event);
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(document.activeElement).toBe(initialsInput);
   });
 });
