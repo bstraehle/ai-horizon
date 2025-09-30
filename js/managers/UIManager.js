@@ -10,6 +10,7 @@ export class UIManager {
 
   // --- Internal helpers ---
 
+  /** @param {() => any} fn */
   static _try(fn) {
     try {
       return fn();
@@ -18,6 +19,7 @@ export class UIManager {
     }
   }
 
+  /** @param {string} id */
   static _byId(id) {
     try {
       return typeof document !== "undefined" ? document.getElementById(id) : null;
@@ -161,7 +163,12 @@ export class UIManager {
       return;
     }
     toggle(true);
-  } /** @param {HTMLElement|null} el @param {() => void} attemptFn @param {{forceCue?:boolean}} [options] */
+  }
+  /**
+   * @param {HTMLElement|null} el
+   * @param {() => void} attemptFn
+   * @param {{forceCue?:boolean}} [options]
+   */
   static _retryFocus(el, attemptFn, options = {}) {
     const { forceCue = false } = options || {};
     if (!el) return;
