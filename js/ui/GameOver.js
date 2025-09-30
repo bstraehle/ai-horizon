@@ -139,7 +139,7 @@ export function handleGameOver(game) {
             } catch {
               /* optional */
             }
-            setTimeout(clear, 750);
+            setTimeout(clear, 1000);
           }
         } catch {
           /* non-critical restart gating */
