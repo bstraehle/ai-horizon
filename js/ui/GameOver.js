@@ -34,7 +34,7 @@ export function handleGameOver(game) {
         const raw = String(initialsInput.value || "")
           .trim()
           .toUpperCase();
-        if (!/^[A-Z]{1,3}$/.test(raw)) {
+        if (!/^[A-Z]{3}$/.test(raw)) {
           try {
             initialsInput.classList.add("invalid");
             setTimeout(() => initialsInput.classList.remove("invalid"), 0);
