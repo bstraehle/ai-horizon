@@ -10,7 +10,6 @@ export class UIManager {
 
   // --- Internal helpers ---
 
-  /** Execute fn defensively (return undefined on error). @param {() => any} fn @returns {any} */
   static _try(fn) {
     try {
       return fn();
@@ -19,7 +18,6 @@ export class UIManager {
     }
   }
 
-  /** getElementById (defensive). @param {string} id @returns {HTMLElement|null} */
   static _byId(id) {
     try {
       return typeof document !== "undefined" ? document.getElementById(id) : null;
@@ -28,7 +26,6 @@ export class UIManager {
     }
   }
 
-  /** Scroll leaderboard list (if present) to top. */
   static _resetLeaderboardScroll() {
     const list = UIManager._byId("leaderboardList");
     if (!list) return;
@@ -36,9 +33,7 @@ export class UIManager {
       if (typeof list.scrollTo === "function") list.scrollTo(0, 0);
       else list.scrollTop = 0;
     });
-    // Fallback legacy attempt.
     UIManager._try(() => {
-      // If previous attempt threw, ensure scrollTop=0.
       list.scrollTop = 0;
     });
   }
@@ -51,7 +46,7 @@ export class UIManager {
    * @property {HTMLElement|null} submitBtn
    * @property {HTMLElement|null} initialsLabel
    */
-  /** Collect initials related DOM references. @returns {InitialsElements} */
+  /** @returns {InitialsElements} */
   static _getInitialsElements() {
     /** @type {HTMLElement|null} */ const initialsScreen = UIManager._byId("initialsScreen");
     /** @type {HTMLElement|null} */ let initialsEntry = null;
@@ -70,7 +65,7 @@ export class UIManager {
     };
   }
 
-  /** Toggle initials UI visibility and sync Game Over overlay. @param {boolean} visible @param {HTMLElement|null} gameOverScreen @param {InitialsElements} elements */
+  /** @param {boolean} visible @param {HTMLElement|null} gameOverScreen @param {InitialsElements} elements */
   static _toggleInitialsUI(visible, gameOverScreen, elements) {
     const { initialsScreen, initialsEntry, initialsInput, submitBtn, initialsLabel } = elements;
     const method = visible ? "remove" : "add";
@@ -82,7 +77,6 @@ export class UIManager {
       if (initialsEntry) initialsEntry.classList[method]("hidden");
     });
 
-    // If a standalone initials overlay is used, hide the main game over screen while initials are visible.
     if (initialsScreen && gameOverScreen) {
       UIManager._try(() => {
         if (visible) gameOverScreen.classList.add("hidden");
@@ -104,11 +98,10 @@ export class UIManager {
     });
   }
 
-  /** Decide if initials form should show (score > 0 & qualifies) and toggle. @param {number} score @param {boolean|undefined} allowInitials @param {HTMLElement|null} gameOverScreen @param {InitialsElements} elements */
+  /** @param {number} score @param {boolean|undefined} allowInitials @param {HTMLElement|null} gameOverScreen @param {InitialsElements} elements */
   static _applyInitialsQualification(score, allowInitials, gameOverScreen, elements) {
     const toggle = /** @param {boolean} v */ (v) =>
       UIManager._toggleInitialsUI(v, gameOverScreen, elements);
-    // Explicit override always wins.
     if (typeof allowInitials === "boolean") {
       toggle(allowInitials);
       return;
@@ -128,14 +121,13 @@ export class UIManager {
       return;
     }
 
-    // Pending load promise branch.
     if (LeaderboardManager._pendingLoadPromise) {
       toggle(false);
       LeaderboardManager._pendingLoadPromise
         .then((entries) => {
           UIManager._try(() => {
             if (!Array.isArray(entries)) {
-              toggle(true); // Unknown shape – show form to be safe.
+              toggle(true);
               return;
             }
             const qualifies = LeaderboardManager.qualifiesForInitials(score, entries, max);
@@ -168,11 +160,8 @@ export class UIManager {
         .catch(() => {});
       return;
     }
-    // Fallback unknown result – show initials.
     toggle(true);
-  }
-
-  /** Multi-stage (rAF + timeouts) focus retry; adds visual cue when forceCue. @param {HTMLElement|null} el @param {() => void} attemptFn @param {{forceCue?:boolean}} [options] */
+  } /** @param {HTMLElement|null} el @param {() => void} attemptFn @param {{forceCue?:boolean}} [options] */
   static _retryFocus(el, attemptFn, options = {}) {
     const { forceCue = false } = options || {};
     if (!el) return;
@@ -184,7 +173,6 @@ export class UIManager {
       } catch (_) {
         /* ignore */
       }
-      // Try a plain focus fallback if still not active.
       if (hasDocument && getActive() !== el) UIManager._try(() => el.focus());
     };
     attempt();
@@ -214,7 +202,6 @@ export class UIManager {
   }
 
   /**
-   * Safe Element check for non-browser environments.
    * @param {unknown} obj
    * @returns {obj is Element}
    */
@@ -222,14 +209,12 @@ export class UIManager {
     return typeof Element !== "undefined" && obj instanceof Element;
   }
 
-  /** Update current score text. @param {HTMLElement|null} currentScoreEl @param {number|string} score */
+  /** @param {HTMLElement|null} currentScoreEl @param {number|string} score */
   static setScore(currentScoreEl, score) {
     if (currentScoreEl) currentScoreEl.textContent = String(score);
   }
 
   /**
-   * Update countdown timer (M:SS formatting, floor of remaining seconds).
-   * Gracefully no‑ops if element missing.
    * @param {HTMLElement|null} timerEl Timer display element.
    * @param {number} secondsRemaining Seconds (float) remaining; negative values clamped to 0.
    */
@@ -241,17 +226,17 @@ export class UIManager {
     timerEl.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
   }
 
-  /** Show pause overlay. @param {HTMLElement|null} pauseScreen */
+  /** @param {HTMLElement|null} pauseScreen */
   static showPause(pauseScreen) {
     if (pauseScreen) pauseScreen.classList.remove("hidden");
   }
 
-  /** Hide pause overlay. @param {HTMLElement|null} pauseScreen */
+  /** @param {HTMLElement|null} pauseScreen */
   static hidePause(pauseScreen) {
     if (pauseScreen) pauseScreen.classList.add("hidden");
   }
 
-  /** Show Game Over overlay, render score, decide initials visibility, and focus best target. @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} restartBtn @param {HTMLElement|null} finalScoreEl @param {number} score @param {boolean} [preserveScroll=false] @param {boolean|undefined} [allowInitials] */
+  /** @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} restartBtn @param {HTMLElement|null} finalScoreEl @param {number} score @param {boolean} [preserveScroll=false] @param {boolean|undefined} [allowInitials] */
   static showGameOver(
     gameOverScreen,
     restartBtn,
@@ -264,7 +249,6 @@ export class UIManager {
     if (gameOverScreen) gameOverScreen.classList.remove("hidden");
     UIManager._resetLeaderboardScroll();
 
-    // Initials gating / visibility handling
     const initialsElements = UIManager._getInitialsElements();
     UIManager._applyInitialsQualification(score, allowInitials, gameOverScreen, initialsElements);
 
@@ -362,7 +346,7 @@ export class UIManager {
     }
   }
 
-  /** Hide Game Over overlay & remove focus guard. @param {HTMLElement|null} gameOverScreen */
+  /** @param {HTMLElement|null} gameOverScreen */
   static hideGameOver(gameOverScreen) {
     if (gameOverScreen) gameOverScreen.classList.add("hidden");
     try {
@@ -372,12 +356,12 @@ export class UIManager {
     }
   }
 
-  /** Hide start/info overlay. @param {HTMLElement|null} gameInfo */
+  /** @param {HTMLElement|null} gameInfo */
   static hideGameInfo(gameInfo) {
     if (gameInfo) gameInfo.classList.add("hidden");
   }
 
-  /** Focus with retry & visual cue. @param {HTMLElement|null} el */
+  /** @param {HTMLElement|null} el */
   static focusWithRetry(el) {
     if (!el) return;
     UIManager._retryFocus(
@@ -393,7 +377,7 @@ export class UIManager {
     );
   }
 
-  /** Focus preserving scroll position (fallback saves/restores scroll). @param {HTMLElement|null} el */
+  /** @param {HTMLElement|null} el */
   static focusPreserveScroll(el) {
     if (!el) return;
     UIManager._retryFocus(
@@ -422,7 +406,6 @@ export class UIManager {
     );
   }
 
-  /** Remove active initials screen focus guard listeners. */
   static teardownInitialsSubmitFocusGuard() {
     const cleanup = UIManager._initialsSubmitFocusCleanup;
     if (typeof cleanup === "function") {
@@ -464,84 +447,60 @@ export class UIManager {
        * Redirect focus to submit button when interacting outside the initials input.
        * @param {Event} event
        */
+      /**
+       * Prevent blur and redirect focus to submit button when interacting outside the initials input.
+       * @param {MouseEvent|TouchEvent} event
+       */
       const handler = (event) => {
         try {
           const submit = /** @type {HTMLElement|null} */ (
             document.getElementById("submitScoreBtn")
           );
-          if (!submit || submit.classList.contains("hidden")) {
-            UIManager.syncInitialsSubmitFocusGuard();
+          const input = /** @type {HTMLElement|null} */ (document.getElementById("initialsInput"));
+
+          // If the form isn't visible, do nothing.
+          if (!submit || submit.classList.contains("hidden") || !input) {
+            UIManager.syncInitialsSubmitFocusGuard(); // Resync to clean up listeners
             return;
           }
-          const input = /** @type {HTMLElement|null} */ (document.getElementById("initialsInput"));
+
           const target = UIManager.isElement(event && event.target)
             ? /** @type {Element} */ (event.target)
             : null;
-          const insideInput =
-            input &&
-            !input.classList.contains("hidden") &&
-            target &&
-            typeof target.closest === "function" &&
-            (target === input || !!target.closest("#initialsInput"));
+
+          // Allow interactions with the input, its label, and the submit button.
+          const insideInput = target && (target === input || !!target.closest("#initialsInput"));
           if (insideInput) return;
-          const insideLabel =
-            target && typeof target.closest === "function" && !!target.closest("#initialsLabel");
+
+          const insideLabel = target && !!target.closest("#initialsLabel");
           if (insideLabel) return;
-          const insideSubmit =
-            submit &&
-            target &&
-            typeof target.closest === "function" &&
-            (target === submit || !!target.closest("#submitScoreBtn"));
+
+          const insideSubmit = target && (target === submit || !!target.closest("#submitScoreBtn"));
           if (insideSubmit) return;
 
-          if (event && event.cancelable) {
-            try {
-              event.preventDefault();
-            } catch (_) {
-              /* ignore */
-            }
-          }
-          try {
-            if (event && typeof event.stopPropagation === "function") {
-              event.stopPropagation();
-            }
-          } catch (_) {
-            /* ignore */
+          // For any other interaction, prevent the default action (which would be to blur the input)
+          // and explicitly focus the submit button.
+          if (event.cancelable) {
+            event.preventDefault();
           }
 
-          if (UIManager._preserveFocus) UIManager.focusPreserveScroll(submit);
-          else UIManager.focusWithRetry(submit);
+          UIManager.focusWithRetry(submit);
         } catch (_) {
           /* ignore */
         }
       };
 
       const touchOptions = { capture: true, passive: false };
+
       containers.forEach((container) => {
-        try {
-          container.addEventListener("mousedown", handler, true);
-        } catch (_) {
-          /* ignore */
-        }
-        try {
-          container.addEventListener("touchstart", handler, touchOptions);
-        } catch (_) {
-          /* ignore */
-        }
+        container.addEventListener("mousedown", handler, true);
+        container.addEventListener("touchstart", handler, touchOptions);
       });
 
       UIManager._initialsSubmitFocusCleanup = () => {
         containers.forEach((container) => {
-          try {
-            container.removeEventListener("mousedown", handler, true);
-          } catch (_) {
-            /* ignore */
-          }
-          try {
-            container.removeEventListener("touchstart", handler, touchOptions);
-          } catch (_) {
-            /* ignore */
-          }
+          container.removeEventListener("mousedown", handler, true);
+          container.removeEventListener("touchstart", handler, touchOptions);
         });
       };
     } catch (_) {
