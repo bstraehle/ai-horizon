@@ -41,20 +41,10 @@ import { Star } from "../entities/Star.js";
  */
 
 /**
- * SpawnManager – probabilistic entity factory for asteroids & collectible stars.
- *
- * Responsibilities:
- * - Convert configured per‑second spawn rates into per‑tick Bernoulli trials using a Poisson process approximation:
- *     p(spawn in dt) = 1 - exp(-lambda * dt)
- * - Track cadence counters enabling rarer variants:
- *     - Indestructible (planet) asteroids after N normal spawns.
- *     - Red bonus stars after M yellow stars.
- * - Provide deterministic output when supplied a seeded RNG.
- * - Support object pools seamlessly (acquire vs new) without leaking pool semantics to callers.
- *
- * Design notes:
- * - Per‑game spawn state stored in a WeakMap keyed by the game instance: avoids mutating the game object surface.
- * - Planet palette selection cycles through available themes non‑repetitively before repeating.
+ * SpawnManager – probabilistic spawner for asteroids & stars.
+ * Uses Poisson approximation: p = 1 - exp(-lambda * dt).
+ * Tracks cadence counters (indestructible asteroids, red stars) and supports pools.
+ * Per-game state isolated in WeakMap (no surface mutations).
  */
 /**
  * Per-game spawn state:
@@ -69,10 +59,7 @@ export class SpawnManager {
   /** @type {WeakMap<object, SpawnState>} */
   static #STATE = new WeakMap();
 
-  /**
-   * Get or create per-game spawn counters.
-   * @param {object} game
-   */
+  /** Get or create per-game spawn counters. @param {object} game */
   static #state(game) {
     let st = this.#STATE.get(game);
     if (!st) {
@@ -82,35 +69,14 @@ export class SpawnManager {
     return st;
   }
 
-  /**
-   * Reset per‑game spawn cadence state (indestructible asteroid + red star counters & palette cycle).
-   *
-   * Use Cases:
-   * - Called on full game reset / new run start to ensure deterministic progression from a clean slate.
-   * - Idempotent: deleting absent state is a no‑op.
-   *
-   * @param {object} game Opaque game instance key for WeakMap.
-   */
+  /** Reset per-game spawn cadence/palette state. @param {object} game */
   static reset(game) {
     this.#STATE.delete(game);
   }
   /**
-   * Probabilistically spawn zero or more entities for this tick using a Poisson process approximation.
-   *
-   * Math:
-   *  p(spawn in dt) = 1 - exp(-lambda * dt) where lambda is per‑second spawn rate (desktop / mobile variant).
-   *
-   * Behavior:
-   * - Independently samples asteroid & star Bernoulli trials using RNG.nextFloat().
-   * - Uses platform‑specific rates if `_isMobile` boolean is provided; falls back to generic rate otherwise (tests).
-   * - Delegates creation to `createAsteroid` / `createStar` which honor object pools and cadence counters.
-   *
-   * Determinism:
-   * - Fully deterministic given a seeded RNGLike with stable nextFloat() sequence and fixed dt.
-   *
-   * @param {SpawnGameSlice} game Minimal game slice containing RNG, dimensions, speed scalars, pools, arrays.
-   * @param {number} [dtSec=CONFIG.TIME.DEFAULT_DT] Delta time (seconds) for this update step.
-   * @returns {void}
+   * Per-tick probabilistic spawn (asteroids & stars) using Poisson approximation.
+   * @param {SpawnGameSlice} game
+   * @param {number} [dtSec=CONFIG.TIME.DEFAULT_DT]
    */
   static spawnObjects(game, dtSec) {
     const dt = typeof dtSec === "number" ? dtSec : CONFIG.TIME.DEFAULT_DT;
@@ -141,19 +107,7 @@ export class SpawnManager {
     if (rng.nextFloat() < pStar) game.stars.push(this.createStar(game));
   }
 
-  /**
-   * Create (or acquire from pool) a new asteroid entity.
-   *
-   * Features:
-   * - Cadence counter spawns an indestructible "planet" asteroid after N regular asteroids (configurable).
-   * - Planet palette selection cycles through CONFIG.COLORS.ASTEROID_PLANETS using a non‑repeating pass (tracked in WeakMap state).
-   * - Size randomized within configured min + variation; indestructible variant uses its own size factor.
-   * - Horizontal spawn position constrained inside horizontal margins.
-   * - Returns pooled object when `asteroidPool` provided, else constructs new Asteroid.
-   *
-   * @param {AsteroidCreateSlice} game Slice with rng, view, speed & optional pool + cadence counters.
-   * @returns {Asteroid} New or pooled asteroid instance (caller owns insertion into arrays when not via spawnObjects).
-   */
+  /** Create/acquire asteroid; manages cadence for indestructible variant + palette cycling. @param {AsteroidCreateSlice} game @returns {Asteroid} */
   static createAsteroid(game) {
     const rng = game.rng;
     const st = /** @type {any} */ (this.#state(game));
@@ -216,17 +170,7 @@ export class SpawnManager {
         );
   }
 
-  /**
-   * Create (or acquire from pool) a collectible star (yellow or red bonus variant).
-   *
-   * Behavior:
-   * - Cadence counter spawns a red bonus star after a configured number of yellow stars.
-   * - Randomizes size & horizontal position within safe margins; speed jitter uses `rng.range` if available.
-   * - Returns pooled instance when starPool supplied.
-   *
-   * @param {StarCreateSlice} game Slice with rng, view, starSpeed & optional pool + cadence counters.
-   * @returns {Star} New or pooled star instance.
-   */
+  /** Create/acquire star; cadence spawns red variant after threshold. @param {StarCreateSlice} game @returns {Star} */
   static createStar(game) {
     const rng = game.rng;
     const st = /** @type {any} */ (this.#state(game));

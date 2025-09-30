@@ -1,21 +1,39 @@
 import { UIManager } from "../managers/UIManager.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
-// Lightweight facade over UIManager to keep game.js slimmer.
+/**
+ * Facade consolidating UI side-effects required by the main game loop.
+ * Keeps `game.js` focused on simulation by delegating DOM & accessibility details.
+ * All methods defensively accept a full `AIHorizon` instance but tolerate missing
+ * element refs (passing `null` to underlying UIManager helpers).
+ */
 export const GameUI = {
-  /** @param {AIHorizon} game */
+  /**
+   * Hide the start/info overlay.
+   * @param {AIHorizon} game
+   */
   hideGameInfo(game) {
     UIManager.hideGameInfo(game.gameInfo || null);
   },
-  /** @param {AIHorizon} game */
+  /**
+   * Show the pause overlay.
+   * @param {AIHorizon} game
+   */
   showPause(game) {
     UIManager.showPause(game.pauseScreen || null);
   },
-  /** @param {AIHorizon} game */
+  /**
+   * Hide the pause overlay.
+   * @param {AIHorizon} game
+   */
   hidePause(game) {
     UIManager.hidePause(game.pauseScreen || null);
   },
-  /** @param {AIHorizon} game @param {boolean} submittedScore */
+  /**
+   * Present the game over screen and populate score elements.
+   * @param {AIHorizon} game
+   * @param {boolean} submittedScore Whether a leaderboard submission just occurred.
+   */
   showGameOver(game, submittedScore) {
     UIManager.showGameOver(
       game.gameOverScreen || null,
@@ -26,26 +44,44 @@ export const GameUI = {
       undefined
     );
   },
-  /** @param {AIHorizon} game */
+  /**
+   * Hide the game over overlay.
+   * @param {AIHorizon} game
+   */
   hideGameOver(game) {
     UIManager.hideGameOver(game.gameOverScreen || null);
   },
-  /** @param {AIHorizon} game */
+  /**
+   * Update the visible score.
+   * @param {AIHorizon} game
+   */
   setScore(game) {
     UIManager.setScore(game.currentScoreEl || null, game.score || 0);
   },
-  /** @param {AIHorizon} game */
+  /**
+   * Update the visible countdown timer.
+   * @param {AIHorizon} game
+   */
   setTimer(game) {
     UIManager.setTimer(game.timerEl || null, game.timerRemaining);
   },
-  /** @param {AIHorizon} game */
+  /**
+   * Ensure the Start button receives focus (accessibility & mobile reliability).
+   * @param {AIHorizon} game
+   */
   focusStart(game) {
     UIManager.focusWithRetry(game.startBtn || null);
   },
-  /** @param {AIHorizon} game */
+  /**
+   * Ensure the Restart button receives focus (accessibility & mobile reliability).
+   * @param {AIHorizon} game
+   */
   focusRestart(game) {
     UIManager.focusWithRetry(game.restartBtn || null);
   },
+  /**
+   * Re-center leaderboard modal / panel (safe if not present).
+   */
   recenterLeaderboard() {
     try {
       UIManager.recenterLeaderboard();

@@ -3,9 +3,15 @@ import { InputManager } from "../managers/InputManager.js";
 import { UIManager } from "../managers/UIManager.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
-// Centralizes binding + setup previously embedded in game.js
+/**
+ * Centralizes input handler binding & DOM listener setup previously embedded in `game.js`.
+ * Two phases:
+ *  1. bind(game): ensures stable method identities for add/removeEventListener.
+ *  2. setup(game): registers DOM + document/window listeners via `InputManager`.
+ */
 export const InputBindings = {
-  /** Bind handler methods to game instance (was game.bindEventHandlers).
+  /**
+   * Bind handler methods to the game instance; must be invoked before `setup`.
    * @param {AIHorizon} game
    */
   bind(game) {
@@ -31,11 +37,12 @@ export const InputBindings = {
     game.handleScroll = game.handleScroll.bind(game);
     game.handleVisibilityChange = game.handleVisibilityChange.bind(game);
     game.shoot = game.shoot.bind(game);
-    // @ts-ignore - augmenting instance dynamically
+    // @ts-ignore dynamically augmenting instance
     game.movementKeys = new Set(CONFIG.INPUT.MOVEMENT_CODES);
     game.handleGuardClick = game.handleGuardClick.bind(game);
   },
-  /** Setup DOM listeners (was game.setupEventListeners).
+  /**
+   * Register DOM & global listeners using the already bound methods.
    * @param {AIHorizon} game
    */
   setup(game) {

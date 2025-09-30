@@ -2,9 +2,8 @@ import { CONFIG } from "../constants.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
 /**
- * Pre-allocate ("warm up") frequently used pooled objects to reduce first-interaction frame jank.
- * Uses representative sizes/speeds so objects remain in each pool's free list until acquired.
- * Intentionally wrapped in a broad try/catch to avoid startup failure in constrained/unsupported environments.
+ * Warm object pools with representative instances to reduce first-frame latency.
+ * Implementation is defensive; absence of a pool or warmUp method is silently ignored.
  * @param {AIHorizon} game
  */
 export function warmUpPools(game) {

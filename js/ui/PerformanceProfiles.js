@@ -3,12 +3,22 @@ import { initBackgroundLifecycle } from "../systems/BackgroundLifecycle.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
 /**
- * Apply performance profile mutations to the game instance.
- * Externalized from game.js to isolate tuning logic.
- * Mirrors previous private method _applyPerformanceProfile.
- * @param {AIHorizon} game
- * @param {number} level
+ * Apply a performance tier to the running game instance.
+ *
+ * Adjusts particle budgets, spawn rates, starfield density, DPR ceilings, engine trail cadence,
+ * and low-power flag. Optionally reinitializes canvas sizing & background to reflect DPR changes.
+ *
+ * Level semantics:
+ *  - level 0: baseline (no throttling, full quality)
+ *  - level N>0: apply merged profile overrides from CONFIG.PERFORMANCE.LEVELS[N-1]
+ *
+ * @param {AIHorizon} game Game instance to mutate.
+ * @param {number} level 1-based performance level (0 = baseline).
  * @param {{ reinitialize?: boolean, force?: boolean, initial?: boolean, averageFrameMs?: number }} [meta]
+ *  reinitialize: default true; resize & reinit background if not explicitly false.
+ *  force: ignore early-return when level unchanged.
+ *  initial: treated like force but annotated for logging context.
+ *  averageFrameMs: optional diagnostic used in log message.
  */
 export function applyPerformanceProfile(game, level, meta = {}) {
   const prevLevel = game._performanceLevel;

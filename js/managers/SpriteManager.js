@@ -1,40 +1,13 @@
 import { CONFIG } from "../constants.js";
 
 /**
- * SpriteManager – pre-renders frequently used vector effects to offscreen canvases.
- *
- * Goals / Benefits:
- * - Reduce per-frame draw cost by caching complex gradients & paths (bullet + trail, stars, red stars).
- * - Avoid redundant path construction & gradient setup inside tight render loops.
- * - Provide a simple atlas object consumed by `RenderManager` for conditional sprite usage.
- *
- * Fallback Behavior:
- * - In non-DOM or test environments where 2D context creation fails, methods silently skip drawing
- *   and the caller will fall back to entity-level draw routines.
+ * SpriteManager – pre-renders bullet + trail and star variants to offscreen canvases (performance cache).
+ * Returns a simple atlas; if context creation fails, canvases remain blank and runtime falls back to entity draws.
  */
 export class SpriteManager {
   /**
-   * Pre-render & cache frequently used vector effects (bullet + trail, yellow star, red star)
-   * into offscreen canvases to reduce per‑frame draw/setup cost.
-   *
-   * Performance Rationale:
-   * - Avoids repeating gradient construction & complex path stroking in hot render loops.
-   * - Consolidates bullet + trail into a single image blit (height includes trail segment) reducing draw calls.
-   *
-   * Fallback Semantics:
-   * - If a 2D context cannot be created (e.g. JSDOM / headless tests), drawing is skipped and blank canvases are returned;
-   *   downstream render code detects absence of gradient detail and gracefully falls back to entity draw methods.
-   *
-   * Determinism:
-   * - Pure function of CONFIG color constants; no RNG so re‑invocation yields identical pixel data.
-   *
-   * Return Contract:
-   * - `bullet`: Canvas with bullet body + trailing segment; consumer must stretch height to (bullet.height + bulletTrail).
-   * - `bulletTrail`: Numeric trail pixel height to add when drawing.
-   * - `star` / `starRed`: Square canvases sized by `starBaseSize`.
-   * - `starBaseSize`: Base resolution of star sprite; consumer scales down proportionally for final size / pulse.
-   *
-   * @returns {import('../types.js').SpriteAtlas} Sprite atlas object consumed by RenderManager.
+   * Build sprite atlas (bullet + trail, star, red star). Pure function of CONFIG colors.
+   * @returns {import('../types.js').SpriteAtlas}
    */
   static createSprites() {
     const trail = CONFIG.BULLET.TRAIL;

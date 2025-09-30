@@ -2,15 +2,28 @@ import { CONFIG } from "../constants.js";
 import { SpawnManager } from "../managers/SpawnManager.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
+/**
+ * Factory helpers for spawning & acquiring pooled game objects.
+ * All methods rely on pools / RNG & performance tuning parameters stored on the game instance.
+ */
 export const GameFactories = {
-  /** @param {AIHorizon} game */
+  /**
+   * Acquire a bullet from the pool, positioned at the player's cannon.
+   * @param {AIHorizon} game
+   * @returns {import('../entities/Bullet.js').Bullet}
+   */
   createBullet(game) {
     const player = /** @type {any} */ (game.player);
     const pool = /** @type {any} */ (game.bulletPool);
     const bx = player.x + (player.width - CONFIG.BULLET.WIDTH) / 2 + CONFIG.BULLET.SPAWN_OFFSET;
     return pool.acquire(bx, player.y, CONFIG.BULLET.WIDTH, CONFIG.BULLET.HEIGHT, game.bulletSpeed);
   },
-  /** @param {AIHorizon} game @param {number} x @param {number} y */
+  /**
+   * Spawn an explosion entity & its particle cloud subject to performance budget.
+   * @param {AIHorizon} game
+   * @param {number} x
+   * @param {number} y
+   */
   createExplosion(game, x, y) {
     const rng = /** @type {any} */ (game.rng);
     const particlePool = /** @type {any} */ (game.particlePool);
@@ -53,11 +66,17 @@ export const GameFactories = {
       )
     );
   },
-  /** @param {AIHorizon} game */
+  /**
+   * Create a star (delegated to SpawnManager for central rules).
+   * @param {AIHorizon} game
+   */
   createStar(game) {
     return SpawnManager.createStar(/** @type {any} */ (game));
   },
-  /** @param {AIHorizon} game */
+  /**
+   * Create an asteroid (delegated to SpawnManager).
+   * @param {AIHorizon} game
+   */
   createAsteroid(game) {
     return SpawnManager.createAsteroid(/** @type {any} */ (game));
   },

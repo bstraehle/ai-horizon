@@ -1,22 +1,6 @@
 /**
- * CollisionManager – spatial hashing + narrow‑phase resolution for arcade entities.
- *
- * Responsibilities:
- * - Maintain an ephemeral uniform grid (built each tick) to reduce bullet→asteroid checks.
- * - Perform bullet↔asteroid, player↔asteroid, and player↔star collision tests.
- * - Emit typed EventBus events instead of performing score / FX side effects inline.
- * - Recycle small arrays via a capped pool to minimize transient GC pressure.
- *
- * Performance & algorithmic notes:
- * - Broad phase complexity: O(A * C) where C is average covered cells (typically 1–4 given asteroid sizes).
- * - Narrow phase for bullets: only tests buckets intersecting bullet bounds vs naive O(B*A).
- * - Degenerate case (all asteroids in one cell) collapses to O(B*A) but remains correct.
- * - Early abort after player–asteroid hit (game over path) avoids wasted work during lethal frames.
- *
- * Design trade‑offs:
- * - Chose a uniform grid over quad/oct trees: simpler implementation, good cache locality at current entity counts.
- * - Duck typed `intersects` accepts either raw rects or objects exposing `getBounds()` to avoid per-frame boxing.
- * - Array pooling bounded by ARR_POOL_MAX to prevent unbounded memory growth during stress cases.
+ * CollisionManager – spatial hash broad phase + AABB narrow phase for bullets, asteroids, player and stars.
+ * Grid rebuilt each frame; arrays used for buckets are pooled to reduce GC churn.
  */
 /** @typedef {import('../types.js').Rect} Rect */
 
@@ -41,22 +25,34 @@ const ARR_POOL_MAX = 256;
  */
 
 /**
- * CollisionManager centralizes all collision detection and resolution.
- * It operates on the passed `game` instance to avoid broad refactors.
+ * @typedef {Object} CollisionEvents
+ * @property {(event:string,payload:any)=>void} emit
+ */
+/**
+ * @typedef {Object} CollisionPools
+ * @property {{ release:(o:any)=>void }} [bulletPool]
+ * @property {{ release:(o:any)=>void }} [asteroidPool]
+ * @property {{ release:(o:any)=>void }} [starPool]
+ */
+/**
+ * @typedef {Object} CollisionGameSlice
+ * @property {number} cellSize
+ * @property {any[]} bullets
+ * @property {any[]} asteroids
+ * @property {any[]} stars
+ * @property {any} player
+ * @property {CollisionEvents} [events]
+ * @property {CollisionPools['bulletPool']} [bulletPool]
+ * @property {CollisionPools['asteroidPool']} [asteroidPool]
+ * @property {CollisionPools['starPool']} [starPool]
+ */
+/**
+ * Centralises collision detection. Stateless aside from internal small array pool.
  */
 export class CollisionManager {
   /**
-   * Acquire an empty array from the module‑scoped pool (or create a new one).
-   *
-   * Rationale:
-   * - Spatial hash construction and neighborhood queries allocate many short‑lived arrays per frame.
-   * - Pooling avoids GC churn / minor collection pauses at high bullet + asteroid counts.
-   *
-   * Contract:
-   * - Returned array MUST be released via `_releaseArr` after use.
-   * - Contents are unspecified (array is always length=0 on return).
-   *
-   * @returns {any[]} Reusable empty array.
+   * Borrow an empty pooled array (length reset); caller must release via _releaseArr.
+   * @returns {any[]}
    * @private
    */
   static _getArr() {
@@ -65,17 +61,8 @@ export class CollisionManager {
   }
 
   /**
-   * Return an array to the pool after clearing it (length reset only – elements eligible for GC).
-   *
-   * Pool Limits:
-   * - Pool is capped at ARR_POOL_MAX to prevent unbounded memory growth during stress tests.
-   *
-   * Safety:
-   * - Idempotent for arrays already length=0.
-   * - Caller MUST NOT use the array after release (treated as borrowed resource).
-   *
-   * @param {any[]} arr Borrowed array previously obtained via `_getArr`.
-   * @returns {void}
+   * Return pooled array (cleared). Silently drops if capacity reached.
+   * @param {any[]} arr
    * @private
    */
   static _releaseArr(arr) {
@@ -85,15 +72,10 @@ export class CollisionManager {
     }
   }
   /**
-   * Axis‑aligned bounding box intersection test (strict AABB) with duck typing.
-   *
-   * Behavior:
-   * - If an object exposes `getBounds():Rect`, that value is used; otherwise the object itself is assumed Rect‑like.
-   * - No allocations: all work is scalar comparisons.
-   *
-   * @param {Rect | { getBounds: () => Rect }} rect1 First rectangle or bounds provider.
-   * @param {Rect | { getBounds: () => Rect }} rect2 Second rectangle or bounds provider.
-   * @returns {boolean} True if rectangles overlap (non‑separated on both axes).
+   * AABB overlap test; supports objects with getBounds().
+   * @param {Rect | { getBounds: () => Rect }} rect1
+   * @param {Rect | { getBounds: () => Rect }} rect2
+   * @returns {boolean}
    */
   static intersects(rect1, rect2) {
     /** @type {Rect} */
@@ -120,46 +102,18 @@ export class CollisionManager {
   }
 
   /**
-   * Perform all collision detection phases for the current frame.
-   *
-   * Phases:
-   * 1. Build spatial hash grid of asteroids (broad phase acceleration structure).
-   * 2. Bullet→Asteroid tests using neighborhood lookup via grid buckets.
-   * 3. Player→Asteroid early‑exit lethal check.
-   * 4. Player→Star collection pass.
-   * 5. Cleanup: recycle temporary arrays / grid buckets back into pool.
-   *
-   * Events Emitted (if game.events present):
-   * - 'bulletHitAsteroid' { asteroid, bullet }
-   * - 'playerHitAsteroid' { asteroid }
-   * - 'collectedStar' { star }
-   *
-   * Object Pool Interactions:
-   * - Releases consumed bullets/asteroids/stars back into their respective pools when removed.
-   *
-   * Complexity:
-   * - Building grid: O(A * C) where C is average cell coverage (1–4 typical).
-   * - Bullet queries: O(B * (C + M)) where M is avg asteroids in queried buckets (small under uniform distribution).
-   * - Worst case (all in one cell): O(B*A) but rare and still fast at tested scales.
-   *
-   * Safety / Edge Cases:
-   * - Guards against null bullet entries.
-   * - Indestructible asteroids may invoke custom onBulletHit/onShieldHit handlers controlling destruction.
-   * - Early return after player death prevents unnecessary star checks.
-   *
-   * @param {import('../types.js').CollisionGameSlice} game Game slice containing entities & pools.
-   * @returns {void}
+   * Run collision pipeline for current frame. Emits events (if present):
+   *  - bulletHitAsteroid { asteroid, bullet }
+   *  - playerHitAsteroid { asteroid }
+   *  - collectedStar { star }
+   * Early exit after player hit. Cleans up and returns pooled arrays.
+   * @param {CollisionGameSlice} game
    */
   static check(game) {
     /** @type {Map<string, any[]>} */
     const grid = new Map();
     const cs = game.cellSize | 0;
-    /**
-     * Put an asteroid into the grid cell (cx, cy).
-     * @param {number} ax
-     * @param {number} ay
-     * @param {any} a
-     */
+    /** @param {number} ax @param {number} ay @param {any} a */
     const put = (ax, ay, a) => {
       const key = ax + "," + ay;
       let arr = grid.get(key);
@@ -188,15 +142,7 @@ export class CollisionManager {
     /** @type {Set<any>} */
     const toRemoveAsteroids = new Set();
 
-    /**
-     * Collect grid buckets overlapping the query rect and return them as an array of arrays.
-     * The returned outer array is pooled; call _releaseArr on it when done.
-     * @param {number} x
-     * @param {number} y
-     * @param {number} w
-     * @param {number} h
-     * @returns {any[][]}
-     */
+    /** @param {number} x @param {number} y @param {number} w @param {number} h @returns {any[][]} */
     const neighbors = (x, y, w, h) => {
       /** @type {any[]} */
       const res = CollisionManager._getArr();
@@ -214,11 +160,7 @@ export class CollisionManager {
       return res;
     };
 
-    /**
-     * Emit bulletHitAsteroid event.
-     * @param {{ x:number,y:number,width:number,height:number,isIndestructible?:boolean,onBulletHit?:(game:any)=>boolean,onShieldHit?:()=>void }} a
-     * @param {{ x:number,y:number,width:number,height:number }} b
-     */
+    /** @param {any} a @param {any} b */
     const emitBulletHit = (a, b) => {
       if (game.events) game.events.emit("bulletHitAsteroid", { asteroid: a, bullet: b });
     };
@@ -247,17 +189,15 @@ export class CollisionManager {
                   try {
                     a.onShieldHit();
                   } catch {
-                    /* intentionally empty */
+                    /* ignore shield side-effect errors */
                   }
-                } else {
-                  /* intentionally empty */
                 }
               } else {
                 toRemoveAsteroids.add(a);
                 emitBulletHit(a, b);
               }
             } catch {
-              /* intentionally empty */
+              /* ignore asteroid collision processing errors to avoid breaking loop */
             }
             hit = true;
             break;

@@ -1,42 +1,16 @@
 /**
- * InputManager – centralized setup for all user input bindings (keyboard, mouse, touch, focus guards).
- *
- * Purpose:
- * - Attach DOM event listeners once and keep `game.js` lean.
- * - Provide an easily testable surface that only depends on passed handler callbacks.
- * - Encapsulate accessibility related listeners (focus management) alongside raw input.
- *
- * Notes:
- * - This module does not perform any game logic; it simply wires browser events to bound handlers.
- * - All handlers are expected to be pre-bound to the game instance (see Game.bindEventHandlers()).
+ * InputManager – one-time wiring of keyboard, pointer, touch and focus/accessibility listeners.
+ * Purely delegates to supplied pre-bound handler callbacks.
  */
 export class InputManager {
   /**
-   * Attach all required DOM event listeners for keyboard, mouse, touch, and accessibility focus guards.
-   *
-   * Design:
-   * - Centralizes binding logic so the main Game object remains uncluttered.
-   * - Expects the provided handler methods to be pre-bound to the game instance (no implicit `this`).
-   * - Uses passive listeners where scrolling performance benefits (touchstart on leaderboard, window scroll).
-   *
-   * Idempotency:
-   * - Not inherently idempotent: calling twice will register duplicate listeners. Call exactly once per Game lifecycle.
-   * - A future enhancement could track an attached flag or return an unsubscribe closure.
-   *
-   * Performance / Behavior Notes:
-   * - Mouse/touch move handlers may fire at high frequency; upstream handlers should minimize allocations.
-   * - Resize handler expected to internally debounce / rAF schedule heavy work.
-   * - Focus guard listeners assist keyboard + mobile ergonomics; they are lightweight conditional checks.
-   *
-   * Cleanup Strategy (Not implemented here):
-   * - A complementary `teardown` could mirror these addEventListener calls with removeEventListener for hot-reload scenarios.
-   *
-   * @param {HTMLCanvasElement} canvas The main game canvas receiving pointer events.
-   * @param {HTMLElement} gameInfo Start/info overlay root element.
-   * @param {HTMLElement} gameOverScreen Game over overlay root element.
-   * @param {HTMLButtonElement} startBtn Start/play button element.
-   * @param {HTMLButtonElement} restartBtn Restart button element.
-   * @param {import('../types.js').GameInputHandlers} handlers Object containing pre-bound handler callbacks.
+   * Attach all DOM listeners. Not idempotent; call once per game lifecycle.
+   * @param {HTMLCanvasElement} canvas Main canvas
+   * @param {HTMLElement} gameInfo Start/info overlay root
+   * @param {HTMLElement} gameOverScreen Game over overlay root
+   * @param {HTMLButtonElement} startBtn Start button
+   * @param {HTMLButtonElement} restartBtn Restart button
+   * @param {import('../types.js').GameInputHandlers} handlers Pre-bound handler callbacks
    */
   static setup(canvas, gameInfo, gameOverScreen, startBtn, restartBtn, handlers) {
     window.addEventListener("keydown", handlers.handleKeyDown);

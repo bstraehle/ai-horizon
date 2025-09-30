@@ -1,17 +1,26 @@
 import { LeaderboardManager } from "../LeaderboardManager";
 
 /**
- * Normalize raw leaderboard entries into a canonical immutable array shape.
+ * @typedef {Object} LeaderboardEntry
+ * @property {string} id   Upper‑case initials (1–3 chars) or placeholder.
+ * @property {number} score Non‑negative integer score.
  *
- * Behavior:
- * - Coerces each entry's `id` to a string (empty string fallback) and `score` to a finite number (0 fallback).
- * - Filters nothing: preserves array length for stable indexing; caller can filter separately.
- * - Defensive: non-array inputs yield an empty array.
+ * @typedef {Object} FormattedRow
+ * @property {number} rank   1‑based rank.
+ * @property {string} badge  Sanitized / validated `id` ("???" fallback).
+ * @property {string} medal  Medal emoji for top 3 or empty string.
+ * @property {string} icon   Secondary icon (👏) for non‑medal ranks within range.
+ * @property {string} text   Composite presentation string.
+ */
+
+/**
+ * Normalize potentially untrusted raw data into safe immutable entries.
+ * - Always returns a new array (never mutates input).
+ * - Coerces `id` to string (empty string fallback) and `score` to finite number (0 fallback).
+ * - Preserves original ordering and length (caller decides filtering / sorting separately).
  *
- * Complexity: O(N) over input length with minimal allocations (new array + small objects).
- *
- * @param {{id:any,score:any}[]|any} arr Potential untrusted raw data.
- * @returns {{id:string,score:number}[]} New normalized array (never the original reference).
+ * @param {any} arr Incoming value (expected array of objects with `id` & `score`).
+ * @returns {LeaderboardEntry[]} Normalized entries array (empty when input invalid).
  */
 export function normalize(arr) {
   return Array.isArray(arr)
@@ -20,61 +29,50 @@ export function normalize(arr) {
 }
 
 /**
- * Determine whether a score qualifies for showing the initials input UI.
- *
- * Rules:
- * - Score must be a finite positive number (>0).
- * - Bootstrap: if fewer than 3 existing entries, any positive score qualifies.
- * - Otherwise sort descending, take top `max`, and succeed if the candidate score strictly beats
- *   at least one of those (ties do NOT qualify to encourage improvement).
- * - Fail‑open philosophy: unexpected errors (sorting, data shape) return true to avoid UX dead‑ends.
+ * Decide whether a new score should trigger the initials entry UI.
+ * Algorithm:
+ * 1. Reject non‑finite or non‑positive scores.
+ * 2. Accept immediately if board empty OR has fewer than `max` entries.
+ * 3. Otherwise compute cutoff = score of the last (worst) entry within top `max` after sorting descending.
+ * 4. Qualify only when candidate strictly beats cutoff (ties excluded to promote improvement).
+ * Fail‑open: unexpected runtime issues (e.g., malformed data) return `true` to avoid blocking the player.
  *
  * @param {number} score Candidate score.
- * @param {{id:string,score:number}[]|null|undefined} entries Current (possibly unsorted) entries.
- * @param {number} [max=LeaderboardManager.MAX_ENTRIES] Upper bound list length considered for qualification.
- * @returns {boolean} True if user should be prompted for initials.
+ * @param {LeaderboardEntry[]|null|undefined} entries Current entries (unsorted allowed).
+ * @param {number} [max=LeaderboardManager.MAX_ENTRIES] Max leaderboard length considered.
+ * @returns {boolean} True if initials collection should proceed.
  */
 export function qualifiesForInitials(score, entries, max = LeaderboardManager.MAX_ENTRIES) {
   if (typeof score !== "number" || !Number.isFinite(score) || score <= 0) return false;
-  if (!Array.isArray(entries) || entries.length === 0) return true; // empty board bootstrap
+  if (!Array.isArray(entries) || entries.length === 0) return true;
   try {
     const sorted = entries.slice().sort((a, b) => b.score - a.score);
-    // If the board is not yet full, accept any positive score (space remains)
     if (sorted.length < max) return true;
-    // Board full: require strictly beating the cutoff (lowest score within top max)
     const cutoff = sorted[max - 1]?.score;
     return typeof cutoff === "number" && Number.isFinite(cutoff) ? score > cutoff : true;
   } catch (_) {
-    // Fail-open to avoid blocking UX if data shape unexpectedly breaks sorting.
     return true;
   }
 }
 
 /**
- * Format a single leaderboard entry into both semantic parts and a composite text string.
+ * Produce semantic + textual formatting for a single entry.
+ * Presentation:
+ * - Ranks 1–3 receive medal emoji (🥇🥈🥉).
+ * - Remaining ranks up to MAX_ENTRIES receive a clap icon (👏).
+ * - Badge is the validated initials (1–3 A–Z) or "???" fallback.
+ * - Text layout: `[medal ][icon ]<rank> — <BADGE> — <score>` (spaces only when parts present).
  *
- * Presentation Rules:
- * - Medals for ranks 1–3 using emoji (🥇/🥈/🥉).
- * - Ranks 4–10: clapping hands emoji (👏).
- * - Ranks 11–25: clapping hands emoji (👏).
- * - Ranks >25: clapping hands emoji (👏) (used for 21+ in current mapping up to MAX_ENTRIES).
- * - Badge displays 1–3 uppercase letters; otherwise '???'.
- * - Text order: medal? + icon? + rank — BADGE — score.
- *
- * @param {{id:string,score:number}} entry Canonical normalized entry.
- * @param {number} index Zero‑based index (rank = index + 1).
- * @returns {{rank:number,badge:string,medal:string,icon:string,text:string}} Structured + textual formatting.
+ * @param {LeaderboardEntry} entry Normalized entry.
+ * @param {number} index Zero‑based index within already ordered list.
+ * @returns {FormattedRow} Structured + composite formatting.
  */
 export function formatRow(entry, index) {
   const rank = index + 1;
   const medals = ["🥇", "🥈", "🥉"];
   const medal = index < 3 ? medals[index] : "";
-  let icon = "";
-  if (!medal) {
-    if (rank >= 4 && rank <= 10) icon = "👏";
-    else if (rank >= 11 && rank <= 20) icon = "👏";
-    else if (rank >= 21 && rank <= LeaderboardManager.MAX_ENTRIES) icon = "👏";
-  }
+  const needsClap = !medal && rank >= 4 && rank <= LeaderboardManager.MAX_ENTRIES;
+  const icon = needsClap ? "👏" : "";
   const badge = /^[A-Z]{1,3}$/.test(entry.id) ? entry.id : "???";
   const medalPrefix = medal ? medal + " " : "";
   const iconPrefix = icon ? icon + " " : "";
@@ -83,14 +81,11 @@ export function formatRow(entry, index) {
 }
 
 /**
- * Batch format multiple entries into an array of text rows.
+ * Vectorized convenience wrapper: returns presentation strings for many entries.
+ * Safeguards: caps output at 100 rows to avoid excessive DOM inflation.
  *
- * Safeguards:
- * - Limits output to first 100 entries to avoid pathological DOM list inflation.
- * - Non-array or empty array returns an empty list (pure behavior).
- *
- * @param {{id:string,score:number}[]} entries Normalized entries.
- * @returns {string[]} Formatted text lines (length <= 100).
+ * @param {LeaderboardEntry[]} entries Pre‑sorted normalized entries.
+ * @returns {string[]} Presentation strings (<=100 length).
  */
 export function formatRows(entries) {
   if (!Array.isArray(entries) || entries.length === 0) return [];

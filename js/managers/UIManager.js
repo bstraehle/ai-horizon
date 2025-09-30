@@ -1,5 +1,6 @@
 /**
- * UIManager centralizes DOM updates and focus management for overlays and scores.
+ * UIManager – centralised DOM & focus management for overlays, scoreboard, leaderboard & initials flow.
+ * All methods are static and defensive (try/catch) to tolerate non-browser / partial DOM environments.
  */
 import { LeaderboardManager } from "./LeaderboardManager.js";
 export class UIManager {
@@ -7,15 +8,9 @@ export class UIManager {
   /** @type {(() => void)|null} */
   static _initialsSubmitFocusCleanup = null;
 
-  // ----------------------------
-  // Generic small helpers (internal – not part of public API surface)
-  // ----------------------------
+  // --- Internal helpers ---
 
-  /** Execute a function and ignore any thrown error (defensive DOM ops). */
-  /**
-   * @param {() => any} fn
-   * @returns {any}
-   */
+  /** Execute fn defensively (return undefined on error). @param {() => any} fn @returns {any} */
   static _try(fn) {
     try {
       return fn();
@@ -24,11 +19,7 @@ export class UIManager {
     }
   }
 
-  /** Return document element by id (defensive for non‑browser env). */
-  /**
-   * @param {string} id
-   * @returns {HTMLElement|null}
-   */
+  /** getElementById (defensive). @param {string} id @returns {HTMLElement|null} */
   static _byId(id) {
     try {
       return typeof document !== "undefined" ? document.getElementById(id) : null;
@@ -37,7 +28,7 @@ export class UIManager {
     }
   }
 
-  /** Scroll leaderboard list (if present) back to top. */
+  /** Scroll leaderboard list (if present) to top. */
   static _resetLeaderboardScroll() {
     const list = UIManager._byId("leaderboardList");
     if (!list) return;
@@ -52,7 +43,15 @@ export class UIManager {
     });
   }
 
-  /** Gather all initials related elements (works for inline or standalone overlay). */
+  /**
+   * @typedef {Object} InitialsElements
+   * @property {HTMLElement|null} initialsScreen
+   * @property {HTMLElement|null} initialsEntry
+   * @property {HTMLElement|null} initialsInput
+   * @property {HTMLElement|null} submitBtn
+   * @property {HTMLElement|null} initialsLabel
+   */
+  /** Collect initials related DOM references. @returns {InitialsElements} */
   static _getInitialsElements() {
     /** @type {HTMLElement|null} */ const initialsScreen = UIManager._byId("initialsScreen");
     /** @type {HTMLElement|null} */ let initialsEntry = null;
@@ -71,12 +70,7 @@ export class UIManager {
     };
   }
 
-  /** Toggle visibility of initials UI (standalone or inline) while keeping Game Over overlay state consistent. */
-  /**
-   * @param {boolean} visible
-   * @param {HTMLElement|null} gameOverScreen
-   * @param {{initialsScreen:HTMLElement|null, initialsEntry:HTMLElement|null, initialsInput:HTMLElement|null, submitBtn:HTMLElement|null, initialsLabel:HTMLElement|null}} elements
-   */
+  /** Toggle initials UI visibility and sync Game Over overlay. @param {boolean} visible @param {HTMLElement|null} gameOverScreen @param {InitialsElements} elements */
   static _toggleInitialsUI(visible, gameOverScreen, elements) {
     const { initialsScreen, initialsEntry, initialsInput, submitBtn, initialsLabel } = elements;
     const method = visible ? "remove" : "add";
@@ -110,13 +104,7 @@ export class UIManager {
     });
   }
 
-  /** Determine and apply initials UI visibility using leaderboard qualification logic. */
-  /**
-   * @param {number} score
-   * @param {boolean|undefined} allowInitials
-   * @param {HTMLElement|null} gameOverScreen
-   * @param {{initialsScreen:HTMLElement|null, initialsEntry:HTMLElement|null, initialsInput:HTMLElement|null, submitBtn:HTMLElement|null, initialsLabel:HTMLElement|null}} elements
-   */
+  /** Decide if initials form should show (score > 0 & qualifies) and toggle. @param {number} score @param {boolean|undefined} allowInitials @param {HTMLElement|null} gameOverScreen @param {InitialsElements} elements */
   static _applyInitialsQualification(score, allowInitials, gameOverScreen, elements) {
     const toggle = /** @param {boolean} v */ (v) =>
       UIManager._toggleInitialsUI(v, gameOverScreen, elements);
@@ -184,12 +172,7 @@ export class UIManager {
     toggle(true);
   }
 
-  /** Internal shared multi-stage focus retry sequence. */
-  /**
-   * @param {HTMLElement|null} el
-   * @param {() => void} attemptFn
-   * @param {{forceCue?:boolean}} [options]
-   */
+  /** Multi-stage (rAF + timeouts) focus retry; adds visual cue when forceCue. @param {HTMLElement|null} el @param {() => void} attemptFn @param {{forceCue?:boolean}} [options] */
   static _retryFocus(el, attemptFn, options = {}) {
     const { forceCue = false } = options || {};
     if (!el) return;
@@ -239,10 +222,7 @@ export class UIManager {
     return typeof Element !== "undefined" && obj instanceof Element;
   }
 
-  /** Set the current score element.
-   * @param {HTMLElement|null} currentScoreEl
-   * @param {number|string} score
-   */
+  /** Update current score text. @param {HTMLElement|null} currentScoreEl @param {number|string} score */
   static setScore(currentScoreEl, score) {
     if (currentScoreEl) currentScoreEl.textContent = String(score);
   }
@@ -261,48 +241,17 @@ export class UIManager {
     timerEl.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
   }
 
-  /** Show pause overlay.
-   * @param {HTMLElement|null} pauseScreen
-   */
+  /** Show pause overlay. @param {HTMLElement|null} pauseScreen */
   static showPause(pauseScreen) {
     if (pauseScreen) pauseScreen.classList.remove("hidden");
   }
 
-  /** Hide pause overlay.
-   * @param {HTMLElement|null} pauseScreen
-   */
+  /** Hide pause overlay. @param {HTMLElement|null} pauseScreen */
   static hidePause(pauseScreen) {
     if (pauseScreen) pauseScreen.classList.add("hidden");
   }
 
-  /**
-   * Show Game Over overlay, populate final score, conditionally display initials form, and manage focus.
-   *
-   * Behavior:
-   * - Scrolls leaderboard list (if present) back to top to ensure high scores visible.
-   * - Determines initials form visibility by consulting cached or freshly loaded leaderboard entries unless overridden.
-   * - Chooses preferred focus target: initials input if visible & score > 0, else restart button.
-   * - Optional scroll preservation (mobile friendliness) using focusPreserveScroll + retry strategy.
-   * - Adds transient visual focus hint (js-force-focus) if programmatic focus is blocked by browser heuristics.
-   *
-   * Robustness:
-   * - All DOM operations wrapped in try/catch (best effort for non-browser / partial DOM environments).
-   *
-   * @param {HTMLElement|null} gameOverScreen Overlay root element.
-   * @param {HTMLElement|null} restartBtn Restart button element.
-   * @param {HTMLElement|null} finalScoreEl Element displaying final score.
-   * @param {number} score Final numeric score.
-   * @param {boolean} [preserveScroll=false] Attempt to keep page scroll position stable while focusing.
-   * @param {boolean|undefined} [allowInitials] Explicit override for initials visibility (bypasses qualification logic).
-   */
-  /**
-   * @param {HTMLElement|null} gameOverScreen
-   * @param {HTMLElement|null} restartBtn
-   * @param {HTMLElement|null} finalScoreEl
-   * @param {number} score
-   * @param {boolean} [preserveScroll=false]
-   * @param {boolean|undefined} [allowInitials]
-   */
+  /** Show Game Over overlay, render score, decide initials visibility, and focus best target. @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} restartBtn @param {HTMLElement|null} finalScoreEl @param {number} score @param {boolean} [preserveScroll=false] @param {boolean|undefined} [allowInitials] */
   static showGameOver(
     gameOverScreen,
     restartBtn,
@@ -413,9 +362,7 @@ export class UIManager {
     }
   }
 
-  /** Hide game over overlay.
-   * @param {HTMLElement|null} gameOverScreen
-   */
+  /** Hide Game Over overlay & remove focus guard. @param {HTMLElement|null} gameOverScreen */
   static hideGameOver(gameOverScreen) {
     if (gameOverScreen) gameOverScreen.classList.add("hidden");
     try {
@@ -425,18 +372,12 @@ export class UIManager {
     }
   }
 
-  /** Hide start/info overlay.
-   * @param {HTMLElement|null} gameInfo
-   */
+  /** Hide start/info overlay. @param {HTMLElement|null} gameInfo */
   static hideGameInfo(gameInfo) {
     if (gameInfo) gameInfo.classList.add("hidden");
   }
 
-  /** Try focusing an element reliably (helps on mobile).
-   * Implements multi‑stage retry (requestAnimationFrame + timeouts) to defeat various mobile browser focus deferrals.
-   * Adds a temporary visual cue if focus consistently fails.
-   * @param {HTMLElement|null} el Target element.
-   */
+  /** Focus with retry & visual cue. @param {HTMLElement|null} el */
   static focusWithRetry(el) {
     if (!el) return;
     UIManager._retryFocus(
@@ -452,14 +393,7 @@ export class UIManager {
     );
   }
 
-  /** Try focusing an element while preserving the document scroll position.
-   * This attempts focus with {preventScroll:true} when supported, and as a
-   * fallback will save/restore scroll coordinates around a plain focus call
-   * so the act of focusing doesn't jump the page. Use this when you want the
-   * element to receive focus but still allow the user to scroll the overlay
-   * (e.g. leaderboard) immediately afterwards.
-   * @param {HTMLElement|null} el Target element.
-   */
+  /** Focus preserving scroll position (fallback saves/restores scroll). @param {HTMLElement|null} el */
   static focusPreserveScroll(el) {
     if (!el) return;
     UIManager._retryFocus(
@@ -488,7 +422,7 @@ export class UIManager {
     );
   }
 
-  /** Remove any active initials screen focus guard listeners. */
+  /** Remove active initials screen focus guard listeners. */
   static teardownInitialsSubmitFocusGuard() {
     const cleanup = UIManager._initialsSubmitFocusCleanup;
     if (typeof cleanup === "function") {
@@ -501,7 +435,7 @@ export class UIManager {
     UIManager._initialsSubmitFocusCleanup = null;
   }
 
-  /** Ensure taps/clicks outside the initials input focus the submit button. */
+  /** Guard so interactions outside initials input shift focus to submit. */
   static syncInitialsSubmitFocusGuard() {
     UIManager.teardownInitialsSubmitFocusGuard();
     try {
@@ -615,11 +549,7 @@ export class UIManager {
     }
   }
 
-  /**
-   * Recenter the leaderboard panel in the viewport.
-   * This helps when the on-screen keyboard may have shifted the viewport
-   * (mobile) — call after a submit to bring the leaderboard back into view.
-   */
+  /** Recenter leaderboard panel (mobile keyboard helper). */
   static recenterLeaderboard() {
     try {
       const list =
@@ -672,13 +602,7 @@ export class UIManager {
     }
   }
 
-  /** Ensure appropriate overlay button is focused based on visibility.
-   * Respects _preserveFocus flag to decide focus strategy (scroll preserving vs retry).
-   * @param {HTMLElement|null} gameInfo Start overlay element.
-   * @param {HTMLElement|null} startBtn Start button element.
-   * @param {HTMLElement|null} gameOverScreen Game Over overlay element.
-   * @param {HTMLElement|null} restartBtn Restart button element.
-   */
+  /** Ensure correct overlay element has focus based on visibility. @param {HTMLElement|null} gameInfo @param {HTMLElement|null} startBtn @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} restartBtn */
   static ensureOverlayFocus(gameInfo, startBtn, gameOverScreen, restartBtn) {
     // If the game over overlay is showing, prefer the initials input if visible.
     if (gameOverScreen && !gameOverScreen.classList.contains("hidden")) {
@@ -703,21 +627,21 @@ export class UIManager {
     }
   }
 
-  /** Window focus/pageshow handler: reassert overlay focus after tab/app switches.
-   * @param {HTMLElement|null} gameInfo Start overlay element.
-   * @param {HTMLElement|null} startBtn Start button.
-   * @param {HTMLElement|null} gameOverScreen Game Over overlay.
-   * @param {HTMLElement|null} restartBtn Restart button.
+  /** Handle window focus/pageshow: reassert overlay focus.
+   * @param {HTMLElement|null} gameInfo
+   * @param {HTMLElement|null} startBtn
+   * @param {HTMLElement|null} gameOverScreen
+   * @param {HTMLElement|null} restartBtn
    */
   static handleWindowFocus(gameInfo, startBtn, gameOverScreen, restartBtn) {
     UIManager.ensureOverlayFocus(gameInfo, startBtn, gameOverScreen, restartBtn);
   }
 
-  /** Visibility change handler: when page becomes visible, reassert overlay focus.
-   * @param {HTMLElement|null} gameInfo Start overlay element.
-   * @param {HTMLElement|null} startBtn Start button.
-   * @param {HTMLElement|null} gameOverScreen Game Over overlay.
-   * @param {HTMLElement|null} restartBtn Restart button.
+  /** Handle visibility change (visible -> refocus overlays).
+   * @param {HTMLElement|null} gameInfo
+   * @param {HTMLElement|null} startBtn
+   * @param {HTMLElement|null} gameOverScreen
+   * @param {HTMLElement|null} restartBtn
    */
   static handleVisibilityChange(gameInfo, startBtn, gameOverScreen, restartBtn) {
     if (!document.hidden) {
@@ -725,13 +649,12 @@ export class UIManager {
     }
   }
 
-  /** Focus-in guard: if overlays are visible, ensure intended control retains focus (accessibility & keyboard UX).
-   * Allows interaction with initials input & submit button on Game Over overlay, and links inside overlays.
-   * @param {FocusEvent} e Native focusin event.
-   * @param {HTMLElement|null} gameInfo Start overlay.
-   * @param {HTMLElement|null} startBtn Start button.
-   * @param {HTMLElement|null} gameOverScreen Game Over overlay.
-   * @param {HTMLElement|null} restartBtn Restart button.
+  /** Focus-in guard for overlays (keeps primary controls focused).
+   * @param {FocusEvent} e
+   * @param {HTMLElement|null} gameInfo
+   * @param {HTMLElement|null} startBtn
+   * @param {HTMLElement|null} gameOverScreen
+   * @param {HTMLElement|null} restartBtn
    */
   static handleDocumentFocusIn(e, gameInfo, startBtn, gameOverScreen, restartBtn) {
     const overlayGameOverVisible = !!(
@@ -771,12 +694,10 @@ export class UIManager {
     }
   }
 
-  /** Focus / interaction guard while Start overlay visible.
-   * Prevents stray clicks/taps focusing outside the primary Start button (except links).
-   * For blur events, respects navigation to overlay anchor links.
-   * @param {Event} e DOM event (blur/mousedown/touchstart).
-   * @param {HTMLElement|null} gameInfo Start overlay element.
-   * @param {HTMLElement|null} startBtn Start button element.
+  /** Interaction guard while Start overlay visible (restrict focus to Start button & links).
+   * @param {Event} e
+   * @param {HTMLElement|null} gameInfo
+   * @param {HTMLElement|null} startBtn
    */
   static handleStartScreenFocusGuard(e, gameInfo, startBtn) {
     if (!gameInfo || gameInfo.classList.contains("hidden")) return;
@@ -808,11 +729,10 @@ export class UIManager {
     else UIManager.focusWithRetry(startBtn);
   }
 
-  /** Focus / interaction guard while Game Over overlay visible.
-   * Allows leaderboard scroll + initials entry + restart button; redirects other focus attempts.
-   * @param {Event} e DOM event (mousedown/touchstart/focus events).
-   * @param {HTMLElement|null} gameOverScreen Overlay root.
-   * @param {HTMLElement|null} restartBtn Restart button element.
+  /** Interaction guard while Game Over overlay visible (keeps restart/initials controls focused).
+   * @param {Event} e
+   * @param {HTMLElement|null} gameOverScreen
+   * @param {HTMLElement|null} restartBtn
    */
   static handleGameOverFocusGuard(e, gameOverScreen, restartBtn) {
     if (!gameOverScreen || gameOverScreen.classList.contains("hidden")) return;

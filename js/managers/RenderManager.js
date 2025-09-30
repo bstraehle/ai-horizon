@@ -1,37 +1,31 @@
 import { CONFIG } from "../constants.js";
 
 /**
- * RenderManager – orchestrates draw ordering for all visible game elements.
- *
- * Responsibilities:
- * - Provide stateless static helpers for drawing grouped entity categories (asteroids, bullets, stars, explosions, particles).
- * - Apply sprite optimizations (use pre-rendered atlas when available, fall back to entity draw methods otherwise).
- * - Maintain a deterministic layering order so visual composition is predictable and easy to tweak.
- *
- * Layer order (back → front):
- *   1. Background (delegated to game.drawBackground())
- *   2. Asteroids
- *   3. Bullets (with trail) / collectible stars
- *   4. Explosions
- *   5. Particles / transient effects
- *   6. Player ship
- *   7. Engine trail (drawn after player for glow overlap)
- *   8. Score popups (text overlay, fade + rise)
- *
- * Design notes:
- * - Static methods keep this module side-effect free and easy to unit test.
- * - Avoids per-frame allocations by using simple for loops (hot paths).
+ * @typedef {Object} RenderGameContext
+ * @property {CanvasRenderingContext2D} ctx
+ * @property {{ drawBackground?:()=>void }} [__bg]
+ * @property {any[]} asteroids
+ * @property {any[]} bullets
+ * @property {any[]} stars
+ * @property {any[]} explosions
+ * @property {any[]} particles
+ * @property {any} player
+ * @property {any} engineTrail
+ * @property {any} sprites
+ * @property {number} timeSec
+ * @property {number} [_lastDtSec]
+ * @property {{text:string,x:number,y:number,life:number,maxLife:number,fontSize?:number,fontWeight?:string,glow?:boolean,glowColor?:string,glowBlur?:number,color?:string,stroke?:string}[]} [scorePopups]
+ * @property {()=>void} [drawBackground]
+ */
+/**
+ * RenderManager – stateless helpers enforcing deterministic back→front draw order.
+ * Layer order: background, asteroids, bullets, collectible stars, explosions, particles, player, engine trail, score popups.
  */
 export class RenderManager {
   /**
-   * Draw all asteroids in their deterministic order.
-   *
-   * Performance:
-   * - Hot path: simple for loop avoids iterator overhead.
-   * - Assumes each asteroid exposes a zero‑alloc draw(ctx) method.
-   *
-   * @param {CanvasRenderingContext2D} ctx Target 2D context.
-   * @param {any[]} asteroids Asteroid entity list.
+   * Draw asteroids.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {any[]} asteroids
    */
   static drawAsteroids(ctx, asteroids) {
     for (let i = 0; i < asteroids.length; i++) {
@@ -40,15 +34,10 @@ export class RenderManager {
   }
 
   /**
-   * Draw bullets (and their trail) using sprite atlas when available; fallback to per‑bullet draw.
-   *
-   * Behavior:
-   * - When a pre‑rendered bullet sprite exists, draws a single atlas slice scaling height to include trail region.
-   * - Otherwise delegates to bullet.draw for compatibility / test environments (no DOM / offscreen failure).
-   *
-   * @param {CanvasRenderingContext2D} ctx Target 2D context.
-   * @param {any[]} bullets Bullet list.
-   * @param {any} sprites Optional sprite atlas object (from SpriteManager.createSprites()).
+   * Draw bullets (+ trail) via sprite atlas if present; fallback to per-entity draw.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {any[]} bullets
+   * @param {any} sprites
    */
   static drawBullets(ctx, bullets, sprites) {
     const spr = sprites && sprites.bullet;
@@ -69,16 +58,11 @@ export class RenderManager {
   }
 
   /**
-   * Draw collectible (foreground) stars with pulse animation & red variant support.
-   *
-   * Behavior:
-   * - Uses pre‑rendered star or red star sprite if available, scaling with optional pulse modulation.
-   * - Falls back to entity draw when sprites missing (test / minimal mode).
-   *
-   * @param {CanvasRenderingContext2D} ctx Target 2D context.
-   * @param {any[]} stars Star entities.
-   * @param {any} sprites Optional sprite atlas (may contain star/starRed).
-   * @param {number} [timeSec] Absolute time (seconds) used for pulse phase.
+   * Draw collectible stars (sprite or entity fallback).
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {any[]} stars
+   * @param {any} sprites
+   * @param {number} [timeSec]
    */
   static drawCollectibleStars(ctx, stars, sprites, timeSec = 0) {
     const starSpr = sprites && sprites.star;
@@ -102,11 +86,7 @@ export class RenderManager {
     }
   }
 
-  /**
-   * Draw active explosion animations.
-   * @param {CanvasRenderingContext2D} ctx 2D context.
-   * @param {any[]} explosions Explosion entities.
-   */
+  /** Draw explosions. @param {CanvasRenderingContext2D} ctx @param {any[]} explosions */
   static drawExplosions(ctx, explosions) {
     for (let i = 0; i < explosions.length; i++) {
       explosions[i].draw(ctx);
@@ -114,13 +94,9 @@ export class RenderManager {
   }
 
   /**
-   * Draw transient particle effects (engine sparks, debris, etc.).
-   *
-   * State Reset:
-   * - Ensures ctx.globalAlpha restored to 1 after iteration because particles may modify it.
-   *
-   * @param {CanvasRenderingContext2D} ctx 2D context.
-   * @param {any[]} particles Particle entities.
+   * Draw particles then restore globalAlpha.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {any[]} particles
    */
   static drawParticles(ctx, particles) {
     for (let i = 0; i < particles.length; i++) {
@@ -130,23 +106,9 @@ export class RenderManager {
   }
 
   /**
-   * Composite the full frame respecting deterministic layering.
-   *
-   * Layer Order:
-   *  1. Background (via game.drawBackground())
-   *  2. Asteroids
-   *  3. Bullets + collectible stars
-   *  4. Explosions
-   *  5. Particles
-   *  6. Player ship
-   *  7. Engine trail (after ship for glow overlap)
-   *  8. Score popups (text overlays)
-   *
-   * Safety:
-   * - Guards optional drawBackground / engineTrail presence.
-   * - Removes expired score popups in-place (reverse iteration) to avoid skipping elements.
-   *
-   * @param {any} game Aggregate game object exposing ctx + entity arrays.
+   * Composite full frame in fixed order (background→asteroids→bullets→stars→explosions→particles→player→trail→score popups).
+   * Removes expired score popups in-place.
+   * @param {RenderGameContext} game
    */
   static draw(game) {
     if (typeof game.drawBackground === "function") {

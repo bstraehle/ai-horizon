@@ -1,36 +1,13 @@
 import { CONFIG, clamp } from "../constants.js";
 
 /**
- * ViewManager – responsive canvas sizing + DPR transform management.
- *
- * Responsibilities:
- * - Compute logical (CSS) vs backing-store pixel sizes respecting min/max DPR caps and mobile constraints.
- * - Preserve player relative position during live resizes (center X and bottom offset heuristics) for smoother UX.
- * - Clamp player back into view when new dimensions shrink beneath previous bounds.
- * - Expose a single static `resize` entry to keep side effects localized.
+ * ViewManager – responsive canvas + DPR handling; preserves player relative position on resize.
+ * Single entry: resize(game) mutates view, canvas size, transform, player position & cached rect.
  */
 export class ViewManager {
   /**
-   * Responsive resize: recompute view dimensions, apply DPR scaling, and reposition player.
-   *
-   * Behavior:
-   * - Reads window.innerWidth/innerHeight (single source of truth) and clamps devicePixelRatio to configured min/max (with a stricter mobile cap when hinted).
-   * - Updates canvas CSS size (logical) and backing pixel size (physical) then applies a scaling transform.
-   * - If the game was running before resize, preserves relative horizontal center and bottom offset proportionally.
-   * - Otherwise (initial load / not running) re-centers player and applies spawn Y offset.
-   * - Stores latest canvas bounding rect for accurate input coordinate translation.
-   *
-   * Performance:
-   * - Called infrequently (debounced by outer code on resize events). Operations are O(1).
-   *
-   * Side Effects:
-   * - Mutates `game.view`, canvas element width/height, player position, and `game.canvasRect`.
-   *
-   * Assumptions:
-   * - Game object provides a `state.isRunning()` predicate to distinguish active play vs menu.
-   * - Player dimensions already set (used for reposition math).
-   *
-   * @param {{ canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, view: {width:number,height:number,dpr:number}, player: { x:number,y:number,width:number,height:number}, canvasRect?: DOMRect, state: import('../core/GameStateMachine.js').GameStateMachine }} game Game instance composite object.
+   * Resize & reposition preserving relative player center/bottom when running; otherwise recenter + spawn offset.
+   * @param {{ canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, view: {width:number,height:number,dpr:number}, player:{x:number,y:number,width:number,height:number}, canvasRect?:DOMRect, state: import('../core/GameStateMachine.js').GameStateMachine }} game
    */
   static resize(game) {
     const { canvas, ctx, view, player } = game;

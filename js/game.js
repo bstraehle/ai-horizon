@@ -1,20 +1,21 @@
 /**
- * AI Horizon - main game module.
+ * AI Horizon - Main game module.
  *
- * Responsibilities:
- * - Bootstraps canvas + high-DPR scaling, input, state machine, managers, pools
- * - Hosts primary entity arrays (asteroids, bullets, particles, stars, explosions)
- * - Orchestrates update order + render via `GameLoop`
- * - Central point for seeding RNG, handling pause/resume, full resets
- * - Registers cross-cutting event handlers (see `systems/EventHandlers.js`)
+ * Core responsibilities:
+ *  - Bootstraps canvas (HIDPI), input, state machine, managers & object pools
+ *  - Owns primary entity collections (asteroids, bullets, particles, stars, explosions)
+ *  - Orchestrates fixed-step updates & rendering through `GameLoop`
+ *  - Seeds & exposes deterministic RNG (query param: `?seed=VALUE`)
+ *  - Handles lifecycle: start, pause/resume, game over, full & soft resets
+ *  - Wires cross-cutting event handlers (see `systems/EventHandlers.js`)
  *
- * Noteworthy design choices:
- * - Object pools pre-warmed to reduce first interaction frame jank
- * - Deterministic runs supported with `?seed=NUMBER` (or any string hashed)
- * - State transitions guarded to prevent duplicate resets during transient mobile resizes
+ * Design highlights:
+ *  - Object pools pre-warmed to avoid first-interaction jank
+ *  - Mobile / desktop adaptive configuration & soft reinit on platform change
+ *  - Performance tiers auto-applied via `PerformanceMonitor`
  */
 
-// @ts-nocheck - The file contains extensive JSDoc-driven types that produce
+// @ts-nocheck
 
 import { CONFIG } from "./constants.js";
 
@@ -62,10 +63,18 @@ import {
 /** @typedef {import('./types.js').GameState} GameState */
 
 /**
- * Main game class for AIHorizon.
- * Handles game state, rendering, input, and logic for the arcade shooter.
+ * Main game class orchestrating simulation & rendering.
+ * @implements {Partial<GameState>}
+ *
+ * Lifecycle states are governed by `GameStateMachine` (running, paused, game over, etc.).
+ * Public API surface (selected):
+ *  - startGame(), togglePause(), gameOver(), fullReset()
+ *  - update(dt), draw(dt), drawFrame()
+ *  - createScorePopup(x,y,score,opts)
+ *
+ * Entity & resource pools are exposed as properties for systems modules.
+ * Most mutation is funneled through small facade helpers in `systems/` & `ui/` for cohesion.
  */
-/** @implements {Partial<GameState>} */
 class AIHorizon {
   /** @type {AIHorizon|null} */
   static _instance = null;
@@ -350,7 +359,6 @@ class AIHorizon {
   }
 
   /** Reset helpers delegated (see systems/ResetLifecycle). */
-  // Reset helpers extracted to systems/ResetLifecycle.js
   _releaseAllDynamic() {
     releaseAllDyn(this);
   }
@@ -421,7 +429,6 @@ class AIHorizon {
    * Must be called once in constructor before registering listeners so that
    * `removeEventListener` works reliably (stable function identities).
    */
-  // bindEventHandlers & setupEventListeners relocated to InputBindings
 
   /**
    * Global keydown handler for pause/resume toggling.
@@ -558,19 +565,19 @@ class AIHorizon {
     this.input.mouse.y = e.offsetY;
   }
 
-  /** Mouse down -> start continuous fire and fire immediately. */
+  /** Begin continuous fire (mouse). */
   handleMouseDown() {
     if (!this.state.isRunning()) return;
     this.input.fireHeld = true;
     this.shoot();
   }
 
-  /** Mouse up -> stop continuous fire. */
+  /** End continuous fire (mouse). */
   handleMouseUp() {
     this.input.fireHeld = false;
   }
 
-  /** Mouse leaves canvas -> stop continuous fire. */
+  /** Cancel continuous fire if pointer leaves canvas. */
   handleMouseLeave() {
     this.input.fireHeld = false;
   }
@@ -618,16 +625,14 @@ class AIHorizon {
    * Restart the game when restart button is clicked.
    */
   handleRestartClick() {
-    // Ignore clicks while cooldown is active to avoid accidental restart from held input.
     if (this.restartBtn && this.restartBtn.dataset && this.restartBtn.dataset.cooldown === "1")
       return;
-    // Was calling removed instance method hideGameOver(); use GameUI facade instead.
     GameUI.hideGameOver(this);
     this.startGame();
     try {
       this.startBtn.focus();
     } catch (_) {
-      /* ignore */
+      /* intentionally ignored: focus may fail if button not yet in DOM or not focusable */
     }
   }
 
@@ -636,14 +641,10 @@ class AIHorizon {
    * @param {KeyboardEvent} e - The keyboard event.
    */
   handleStartKeyDown(e) {
-    // Prevent Space (fire key) from triggering a start via the browser's default
-    // button activation behavior. Space should only initiate firing once the game
-    // has actually started, not launch the mission itself.
     if (e.code === "Space" || e.key === " ") {
-      e.preventDefault(); // cancels default synthesized click on keyup
-      return; // ignore
+      e.preventDefault();
+      return;
     }
-    // Allow existing confirm/pause codes (currently Escape) to start the game.
     if (AIHorizon.PAUSE_CONFIRM_CODES.has(e.code)) {
       e.preventDefault();
       this.startGame();
@@ -656,19 +657,14 @@ class AIHorizon {
    * @param {KeyboardEvent} e - The keyboard event.
    */
   handleRestartKeyDown(e) {
-    // Prevent Space (fire key) from triggering an accidental restart via the
-    // browser's default button activation behavior. Space should only fire in-game.
     if (e.code === "Space" || e.key === " ") {
-      e.preventDefault(); // cancels default click synthesis on keyup
-      return; // ignore
+      e.preventDefault();
+      return;
     }
-    // Allow Escape (existing confirm) to restart. Optionally we could allow Enter in future.
     if (AIHorizon.PAUSE_CONFIRM_CODES.has(e.code)) {
       e.preventDefault();
-      // Guard against extremely rapid repeats while cooldown is active.
       if (this.restartBtn && this.restartBtn.dataset && this.restartBtn.dataset.cooldown === "1")
         return;
-      // Was calling removed instance method hideGameOver(); use GameUI facade instead.
       GameUI.hideGameOver(this);
       this.startGame();
       this.startBtn.focus();
@@ -805,8 +801,6 @@ class AIHorizon {
     }
     this.resetGameState(wasGameOver);
     this.resizeCanvas();
-    // Refactored UI facade moved hideGameInfo to GameUI; instance no longer has a hideGameInfo method.
-    // Calling the old method name caused a TypeError, breaking the Start button. Use GameUI instead.
     GameUI.hideGameInfo(this);
     this.state.start();
     this.initBackground();

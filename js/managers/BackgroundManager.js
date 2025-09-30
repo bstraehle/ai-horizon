@@ -5,45 +5,50 @@ import { StarField } from "../entities/StarField.js";
 /** @typedef {import('../types.js').RNGLike} RNGLike */
 
 /**
- * BackgroundManager – initializes & renders multi-layer parallax background elements.
- *
- * Layers managed:
- * - Gradient backdrop (delegated to `Background`).
- * - Procedural nebula blobs (animated wobble + slow drift) – optional on initial menu.
- * - Star field (single or layered, depending on CONFIG.STARFIELD.LAYERS).
- *
- * Key responsibilities:
- * - Provide pure static functions so callers can feed in a lightweight context snapshot (`getGameContext`).
- * - Handle proportional resize of previously generated nebula / star data to avoid abrupt visual jumps.
- * - Keep initialization deterministic when an RNG is supplied (enables seeded replays & stable tests).
+ * @typedef {Object} ViewSize
+ * @property {number} width
+ * @property {number} height
+ */
+/**
+ * @typedef {Object} BackgroundInitContext
+ * @property {ViewSize} view Canvas dimensions
+ * @property {boolean} running True once gameplay has begun
+ * @property {boolean} isMobile Device/mobile hint
+ * @property {boolean} [isLowPower] Low power rendering hint
+ * @property {number} [starfieldScale] Optional scale multiplier
+ * @property {RNGLike} [rng] Optional deterministic RNG
+ */
+/**
+ * @typedef {Object} BackgroundResizeContext
+ * @property {ViewSize} view New canvas dimensions
+ * @property {{ nebulaConfigs?: any, starField?: any }} [background] Existing background state
+ */
+/**
+ * @typedef {Object} BackgroundDrawContext
+ * @property {CanvasRenderingContext2D} ctx 2D rendering context
+ * @property {ViewSize} view Canvas dimensions
+ * @property {boolean} running Whether gameplay started (nebula gating)
+ * @property {boolean} paused If true freezes time-based animation deltas
+ * @property {boolean} [gameOver]
+ * @property {number} animTime Accumulated animation time in ms
+ * @property {number} [timeSec] Override absolute time in seconds
+ * @property {number} [dtSec] Override frame delta in seconds
+ * @property {{ nebulaConfigs?: any, starField: any }} background Pre-initialised background assets
+ * @property {RNGLike} [rng]
+ */
+/**
+ * @typedef {{ nebulaConfigs?: any, starField: any }} BackgroundState
+ */
+
+/**
+ * BackgroundManager centralises creation, proportional resize and draw of the parallax background.
+ * All methods are pure w.r.t their inputs (no mutation of passed objects) except for direct drawing.
  */
 export class BackgroundManager {
   /**
-   * Initialize background components (nebula + star field) using a lightweight
-   * GameContext snapshot. Deterministic when an RNG is provided.
-   *
-   * Responsibilities / Behavior:
-   * - Conditionally generate nebula configs only when the game is already in a running state.
-   *   (On initial menu we skip heavy nebula generation; they appear once gameplay begins.)
-   * - Always (re)create the star field data structure via `StarField.init` which returns either
-   *   an array (legacy mode) or a layered object depending on CONFIG.STARFIELD.LAYERS.
-   * - Accept an injected RNG so seeded test harnesses can verify layout deterministically.
-   *
-   * Performance Notes:
-   * - Nebula initialization can be moderately expensive (random blob geometry & wobble seeds);
-   *   deferring creation until needed avoids cost during non-interactive screens.
-   * - Star field generation is lightweight but still benefits from pooling where internal
-   *   entity constructors avoid per-frame allocations later.
-   *
-   * Side Effects:
-   * - Pure: does not mutate the passed ctxObj; returns a new background state object.
-   *
-   * Failure Modes:
-   * - Any exception inside Nebula/StarField init surfaces upward (not caught here) so calling
-   *   code can decide whether to fallback or crash early.
-   *
-   * @param {{ view:{width:number,height:number}, running:boolean, isMobile:boolean, isLowPower?:boolean, starfieldScale?:number, rng?: RNGLike }} ctxObj Context-like object; minimal projection of GameContext.
-   * @returns {{ nebulaConfigs?: any, starField: any }} New background state to assign onto the main context.
+   * Create background layers. Nebula is only generated after gameplay starts to avoid initial cost.
+   * @param {BackgroundInitContext} ctxObj
+   * @returns {BackgroundState}
    */
   static init(ctxObj) {
     const {
@@ -65,25 +70,11 @@ export class BackgroundManager {
   }
 
   /**
-   * Produce resized background state given new view dimensions while attempting
-   * to preserve relative spatial distribution of nebula blobs and star field points.
-   *
-   * Behavior:
-   * - If prior background state missing, returns null (caller can treat as no-op).
-   * - Each sub-layer delegates proportional coordinate/radius scaling to its own resize helper.
-   * - On individual layer resize failure (defensive try/catch), falls back to previous layer data
-   *   to avoid visual popping or null references.
-   *
-   * Performance:
-   * - Scaling is O(N) over each layer's element count (nebula blobs + star count). Performed only
-   *   during resize events which are infrequent vs frame updates.
-   *
-   * Side Effects:
-   * - Pure relative to inputs: original background object is not mutated; a shallow new object is returned.
-   *
-   * @param {{ view:{width:number,height:number}, running:boolean, isMobile:boolean, rng?: RNGLike, background?:{nebulaConfigs?:any, starField:any} }} ctxObj Context containing current view + existing background.
-   * @param {{width:number,height:number}} prevView Previous view dimensions (before resize) used for proportional scaling.
-   * @returns {{ nebulaConfigs?: any, starField?: any } | null} Resized background state or null if insufficient data.
+   * Proportionally resize existing background layers to new viewport.
+   * Fails soft per-layer: on error preserves previous data for that layer.
+   * @param {BackgroundResizeContext & { rng?: RNGLike }} ctxObj
+   * @param {ViewSize} prevView Previous view dimensions
+   * @returns {BackgroundState | null}
    */
   static resize(ctxObj, prevView) {
     const { view, background } = ctxObj;
@@ -112,24 +103,8 @@ export class BackgroundManager {
   }
 
   /**
-   * Render the background layers (gradient, nebula, star field) with pause-aware
-   * animation timing semantics.
-   *
-   * Behavior:
-   * - Always draws gradient backdrop first (fills entire canvas).
-   * - Nebula only skipped on the very initial menu (i.e., before gameplay) to reduce
-   *   visual clutter and CPU on low-power devices; still shown during pause & game over.
-   * - Star field animation time is frozen while paused (dtSec=0 path inside StarField.draw).
-   * - Accepts external `timeSec`/`dtSec` overrides (tests) and falls back to animTime based computation.
-   *
-   * Performance Notes:
-   * - All heavy geometric generation already occurred during init; draw allocates no new objects.
-   * - Accepts optional RNG for rare cases where star twinkle may require deterministic variance.
-   *
-   * Side Effects:
-   * - Mutates the provided canvas 2D context by issuing draw calls only (no global state stored).
-   *
-   * @param {{ ctx: CanvasRenderingContext2D, view: {width:number,height:number}, running:boolean, paused:boolean, gameOver?: boolean, animTime:number, timeSec?:number, dtSec?:number, background:{nebulaConfigs?:any, starField:any}, rng?: RNGLike }} ctxObj Composite context with drawing state + background assets.
+   * Draw all background layers. Paused state freezes star field animation time.
+   * @param {BackgroundDrawContext} ctxObj
    */
   static draw(ctxObj) {
     const {

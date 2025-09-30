@@ -3,8 +3,12 @@ import { LeaderboardManager } from "../managers/LeaderboardManager.js";
 import { UIManager } from "../managers/UIManager.js";
 import { GameUI } from "./GameUI.js";
 
-// Extracted game over initials submission & leaderboard rendering logic.
-/** @param {import('../game.js').AIHorizon} game */
+/**
+ * Orchestrates Game Over UI workflow: optional initials capture, leaderboard refresh,
+ * layout updates, and focus management. Heavily guarded with try/catch to avoid
+ * breaking core loop termination if DOM is partially missing.
+ * @param {import('../game.js').AIHorizon} game
+ */
 export function handleGameOver(game) {
   let submittedScore = false;
   try {
@@ -36,7 +40,7 @@ export function handleGameOver(game) {
             setTimeout(() => initialsInput.classList.remove("invalid"), 0);
             initialsInput.focus({ preventScroll: true });
           } catch {
-            /* noop */
+            /* non-critical: visual invalid feedback */
           }
           return false;
         }
@@ -45,7 +49,7 @@ export function handleGameOver(game) {
           submittedScore = true;
           initialsInput.value = "";
         } catch {
-          /* noop */
+          /* ignore render errors */
         }
         return true;
       };
@@ -54,23 +58,23 @@ export function handleGameOver(game) {
         try {
           if (initialsInput) initialsInput.classList.add("hidden");
         } catch {
-          /* noop */
+          /* ignore */
         }
         try {
           if (submitBtn) submitBtn.classList.add("hidden");
         } catch {
-          /* noop */
+          /* ignore */
         }
         try {
           const l = document.getElementById("initialsLabel");
           if (l) l.classList.add("hidden");
         } catch {
-          /* noop */
+          /* ignore */
         }
         try {
           UIManager.syncInitialsSubmitFocusGuard();
         } catch {
-          /* noop */
+          /* optional UI sync */
         }
       };
 
@@ -78,18 +82,18 @@ export function handleGameOver(game) {
         try {
           if (lbEl) LeaderboardManager.render(lbEl);
         } catch {
-          /* noop */
+          /* leaderboard render optional */
         }
         hideInitialsUI();
         try {
           if (initialsScreen) initialsScreen.classList.add("hidden");
         } catch {
-          /* noop */
+          /* ignore */
         }
         try {
           if (gameOverScreen) gameOverScreen.classList.remove("hidden");
         } catch {
-          /* noop */
+          /* ignore */
         }
         GameUI.recenterLeaderboard();
         GameUI.focusRestart(game);
@@ -112,16 +116,16 @@ export function handleGameOver(game) {
                 try {
                   el.setSelectionRange(filtered.length, filtered.length);
                 } catch {
-                  /* noop */
+                  /* selection not critical */
                 }
               }
             } catch {
-              /* noop */
+              /* input handler attach optional */
             }
           };
           initialsInput.addEventListener("input", onInput);
         } catch {
-          /* noop */
+          /* addEventListener optional */
         }
 
         /** @param {MouseEvent} e */
@@ -131,7 +135,7 @@ export function handleGameOver(game) {
           try {
             e.preventDefault();
           } catch {
-            /* noop */
+            /* ignore */
           }
           if (attemptSubmit()) finalizeSubmission();
         };
@@ -143,12 +147,12 @@ export function handleGameOver(game) {
             try {
               ev.preventDefault();
             } catch {
-              /* noop */
+              /* ignore */
             }
             onClick(ev);
           });
         } catch {
-          /* ignore */
+          /* addEventListener pointerdown optional */
         }
 
         /** @param {KeyboardEvent} ev */
@@ -165,21 +169,21 @@ export function handleGameOver(game) {
             try {
               initialsInput.removeEventListener("input", onInput);
             } catch {
-              /* noop */
+              /* cleanup optional */
             }
           }, 0);
         });
       }
     }
   } catch {
-    /* noop */
+    /* outer gameOver submission logic ignored */
   }
 
   try {
     const lbEl = game.leaderboardListEl || document.getElementById("leaderboardList");
     if (lbEl) LeaderboardManager.render(lbEl);
   } catch {
-    /* noop */
+    /* leaderboard render fallback ignored */
   }
 
   GameUI.showGameOver(game, submittedScore);
