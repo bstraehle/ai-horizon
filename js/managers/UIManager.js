@@ -7,6 +7,8 @@ export class UIManager {
   static _preserveFocus = false;
   /** @type {(() => void)|null} */
   static _initialsSubmitFocusCleanup = null;
+  /** @type {null|(()=>void)} */
+  static _initialsScrollLockCleanup = null;
 
   /** @param {() => any} fn */
   static _try(fn) {
@@ -95,6 +97,93 @@ export class UIManager {
     });
     UIManager._try(() => {
       UIManager.syncInitialsSubmitFocusGuard();
+    });
+
+    UIManager._try(() => {
+      if (!visible && UIManager._initialsScrollLockCleanup) {
+        try {
+          UIManager._initialsScrollLockCleanup();
+        } catch (_) {
+          /* ignore */
+        }
+        UIManager._initialsScrollLockCleanup = null;
+        return;
+      }
+      if (visible && initialsScreen) {
+        const el = initialsScreen;
+        const touchDevice =
+          typeof navigator !== "undefined" &&
+          ((typeof navigator.maxTouchPoints === "number" && navigator.maxTouchPoints > 0) ||
+            (typeof window !== "undefined" && "ontouchstart" in window));
+        if (!touchDevice) return;
+
+        const originalOverflow = el.style.overflow;
+        /** @type {any} */ (el.style)._originalWebkitOverflowScrolling = /** @type {any} */ (
+          el.style
+        ).webkitOverflowScrolling;
+        const originalBodyOverscroll =
+          typeof document !== "undefined" && document.body
+            ? document.body.style.overscrollBehavior || ""
+            : "";
+        try {
+          el.style.overflow = "hidden";
+          /** @type {any} */ (el.style).webkitOverflowScrolling = "auto";
+        } catch (_) {
+          /* non-critical */
+        }
+        try {
+          if (document && document.body) {
+            document.body.style.overscrollBehavior = "contain";
+          }
+        } catch (_) {
+          /* ignore */
+        }
+        /** @param {Event} e */
+        const prevent = (e) => {
+          try {
+            if (e && e.cancelable) e.preventDefault();
+          } catch (_) {
+            /* ignore */
+          }
+        };
+        try {
+          el.addEventListener("touchmove", prevent, { passive: false });
+        } catch (_) {
+          /* ignore */
+        }
+        try {
+          el.addEventListener("wheel", prevent, { passive: false });
+        } catch (_) {
+          /* ignore */
+        }
+        UIManager._initialsScrollLockCleanup = () => {
+          try {
+            el.removeEventListener("touchmove", prevent, true);
+          } catch (_) {
+            /* ignore */
+          }
+          try {
+            el.removeEventListener("wheel", prevent, true);
+          } catch (_) {
+            /* ignore */
+          }
+          try {
+            el.style.overflow = originalOverflow;
+            /** @type {any} */ (el.style).webkitOverflowScrolling = /** @type {any} */ (
+              el.style
+            )._originalWebkitOverflowScrolling;
+          } catch (_) {
+            /* ignore */
+          }
+          try {
+            if (document && document.body) {
+              document.body.style.overscrollBehavior = originalBodyOverscroll;
+            }
+          } catch (_) {
+            /* ignore */
+          }
+        };
+      }
     });
   }
 
