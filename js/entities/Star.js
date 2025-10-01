@@ -8,6 +8,8 @@ import { CONFIG } from "../constants.js";
  *  - Pool ready; state is primitive & resettable.
  */
 export class Star {
+  /** @type {WeakMap<CanvasRenderingContext2D, Map<string, CanvasGradient>>} */
+  static _gradientCache;
   /**
    * Construct star instance.
    * @param {number} x Spawn x
@@ -49,20 +51,22 @@ export class Star {
     const colors = this.isRed ? CONFIG.COLORS.STAR_RED : CONFIG.COLORS.STAR;
     ctx.shadowColor = colors.BASE;
     ctx.shadowBlur = CONFIG.STAR.SHADOW_BLUR;
-
-    const starGradient = ctx.createRadialGradient(
-      centerX,
-      centerY,
-      0,
-      centerX,
-      centerY,
-      scaledSize
-    );
-    starGradient.addColorStop(0, colors.GRAD_IN);
-    starGradient.addColorStop(0.3, colors.GRAD_MID);
-    starGradient.addColorStop(1, colors.GRAD_OUT);
-
-    ctx.fillStyle = starGradient;
+    if (!Star._gradientCache) Star._gradientCache = new WeakMap();
+    let map = Star._gradientCache.get(ctx);
+    if (!map) {
+      map = new Map();
+      Star._gradientCache.set(ctx, map);
+    }
+    const key = (this.isRed ? "r" : "n") + "|" + (scaledSize | 0);
+    let g = map.get(key);
+    if (!g) {
+      g = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, scaledSize);
+      g.addColorStop(0, colors.GRAD_IN);
+      g.addColorStop(0.3, colors.GRAD_MID);
+      g.addColorStop(1, colors.GRAD_OUT);
+      map.set(key, g);
+    }
+    ctx.fillStyle = g;
     Star.drawStar(ctx, centerX, centerY, scaledSize);
     ctx.restore();
   }
