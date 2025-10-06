@@ -98,7 +98,10 @@ export class Asteroid {
         : null;
     this.speed = speedFactor ? speed * speedFactor : speed;
     this._hits = 0;
-    /** @type {{angle:number,len:number}[]} */ this._damageLines = [];
+    // Damage crack storage (fixed-size) to avoid per-hit object allocations.
+    /** @private */ this._damageLineAngles = new Float32Array(8);
+    /** @private */ this._damageLineLens = new Float32Array(8);
+    /** @private */ this._damageLineCount = 0;
   }
 
   /**
@@ -242,11 +245,12 @@ export class Asteroid {
         ctx.globalAlpha = 0.4 + 0.6 * severity;
       }
       for (let i = 0; i < lines; i++) {
-        const desc = this._damageLines && this._damageLines[i];
-        const angle = desc ? desc.angle : (i / lines) * Math.PI * 2;
-        const lenFactor = desc
-          ? desc.len
-          : 0.6 + (this._rng ? this._rng.nextFloat() : Math.random()) * 0.5;
+        const angle =
+          i < this._damageLineCount ? this._damageLineAngles[i] : (i / lines) * Math.PI * 2;
+        const lenFactor =
+          i < this._damageLineCount
+            ? this._damageLineLens[i]
+            : 0.6 + (this._rng ? this._rng.nextFloat() : Math.random()) * 0.5;
         const endFactor = Math.min(lenFactor + severity * 0.3, 0.95);
         const sx = centerX + Math.cos(angle) * radius * 0.3;
         const sy = centerY + Math.sin(angle) * radius * 0.3;
@@ -307,7 +311,7 @@ export class Asteroid {
     this.isIndestructible = !!isIndestructible;
     this._shieldFlash = 0;
     this._hits = 0;
-    this._damageLines = [];
+    this._damageLineCount = 0; // reuse typed arrays allocated in ctor
     const radius = this.width / 2;
     const rand =
       rng && typeof rng.nextFloat === "function" ? rng : { nextFloat: Math.random.bind(Math) };
@@ -319,23 +323,30 @@ export class Asteroid {
     const sizeMin = cfg.SIZE_MIN || 2;
     const sizeFactor = cfg.SIZE_FACTOR || 0.3;
     const maxR = radius * sizeFactor;
-    this._craters = [];
-    this._reserveCraters = [];
-    this._craters = Array.from({ length: count }, () => ({
-      dx: (rand.nextFloat() - 0.5) * radius * 0.8,
-      dy: (rand.nextFloat() - 0.5) * radius * 0.8,
-      r: rand.nextFloat() * maxR + sizeMin,
-      grow: 1,
-    }));
+    // Reuse crater arrays to avoid alloc churn: truncate then repopulate up to required counts.
+    if (!this._craters) this._craters = [];
+    else this._craters.length = 0;
+    for (let i = 0; i < count; i++) {
+      this._craters.push({
+        dx: (rand.nextFloat() - 0.5) * radius * 0.8,
+        dy: (rand.nextFloat() - 0.5) * radius * 0.8,
+        r: rand.nextFloat() * maxR + sizeMin,
+        grow: 1,
+      });
+    }
     const extraMax = cfg.EXTRA_MAX || 0;
-    this._reserveCraters = extraMax
-      ? Array.from({ length: extraMax }, () => ({
+    if (!this._reserveCraters) this._reserveCraters = [];
+    else this._reserveCraters.length = 0;
+    if (extraMax > 0) {
+      for (let i = 0; i < extraMax; i++) {
+        this._reserveCraters.push({
           dx: (rand.nextFloat() - 0.5) * radius * 0.85,
           dy: (rand.nextFloat() - 0.5) * radius * 0.85,
           r: rand.nextFloat() * maxR + sizeMin,
           grow: 1,
-        }))
-      : [];
+        });
+      }
+    }
     this._initialCraterCount = this._craters.length;
     this._palette = CONFIG.COLORS.ASTEROID;
     if (this.isIndestructible) {
@@ -372,13 +383,17 @@ export class Asteroid {
     if (!this.isIndestructible) return true;
     this._hits = (this._hits || 0) + 1;
     try {
-      const rand =
-        this._rng && typeof this._rng.nextFloat === "function"
-          ? this._rng
-          : { nextFloat: Math.random.bind(Math) };
-      const rawLen = 0.6 + rand.nextFloat() * 0.5;
-      const clampedLen = Math.min(rawLen, 0.9);
-      this._damageLines.push({ angle: rand.nextFloat() * Math.PI * 2, len: clampedLen });
+      if (this._damageLineCount < this._damageLineAngles.length) {
+        const rand =
+          this._rng && typeof this._rng.nextFloat === "function"
+            ? this._rng
+            : { nextFloat: Math.random.bind(Math) };
+        const rawLen = 0.6 + rand.nextFloat() * 0.5;
+        const clampedLen = Math.min(rawLen, 0.9);
+        const idx = this._damageLineCount++;
+        this._damageLineAngles[idx] = rand.nextFloat() * Math.PI * 2;
+        this._damageLineLens[idx] = clampedLen;
+      }
     } catch {
       /* noop */
     }
@@ -395,7 +410,8 @@ export class Asteroid {
         if (currentExtra < desiredExtra) {
           const toAdd = desiredExtra - currentExtra;
           for (let i = 0; i < toAdd && this._reserveCraters.length; i++) {
-            const next = this._reserveCraters.shift();
+            // Use pop() (LIFO) to avoid O(n) cost of shift(); crater ordering visual impact is negligible.
+            const next = this._reserveCraters.pop();
             if (next) {
               if (CONFIG.ASTEROID.CRATER_EMBOSS.REVEAL_TIME > 0) next.grow = 0;
               this._craters.push(next);

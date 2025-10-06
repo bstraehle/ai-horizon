@@ -30,8 +30,11 @@ export class PerformanceMonitor {
     this._defaultCooldown = opts.cooldownFrames || perf.COOLDOWN_FRAMES || 180;
     this._onLevelChange = typeof opts.onLevelChange === "function" ? opts.onLevelChange : () => {};
 
-    /** @type {number[]} */
-    this._samples = [];
+    // Ring buffer state (allocated lazily when window size known) replaces dynamic array.
+    /** @private @type {Float32Array|null} */ this._buf = null; // sample storage
+    /** @private */ this._w = 0; // write index
+    /** @private */ this._count = 0; // number of valid samples (<= window size)
+    /** @private */ this._sum = 0; // running sum of samples
     this._level = 0;
     this._cooldown = 0;
   }
@@ -39,8 +42,11 @@ export class PerformanceMonitor {
   /** Reset monitor state and optionally force level. */
   reset(level = 0) {
     this._level = Math.max(0, level | 0);
-    this._samples.length = 0;
     this._cooldown = 0;
+    // Fast reset of ring buffer statistics (retain allocated array for reuse).
+    this._w = 0;
+    this._count = 0;
+    this._sum = 0;
   }
 
   /** Current performance level (0 = default). */
@@ -57,7 +63,10 @@ export class PerformanceMonitor {
     if (!Number.isFinite(frameDtMs) || frameDtMs <= 0) return;
     const active = opts.active !== false;
     if (!active) {
-      this._samples.length = 0;
+      // Inactive sampling: clear accumulated stats without deallocating buffer.
+      this._w = 0;
+      this._count = 0;
+      this._sum = 0;
       return;
     }
 
@@ -70,20 +79,35 @@ export class PerformanceMonitor {
     const windowSize = config.sampleWindow || this._sampleWindow;
     const cooldownFrames =
       typeof config.cooldownFrames === "number" ? config.cooldownFrames : this._defaultCooldown;
-
-    this._samples.push(frameDtMs);
-    if (this._samples.length > windowSize) this._samples.shift();
-    if (this._samples.length < windowSize) return;
+    // Lazy allocate or reallocate buffer if window size changed (rare path).
+    if (!this._buf || this._buf.length !== windowSize) {
+      this._buf = new Float32Array(windowSize);
+      this._w = 0;
+      this._count = 0;
+      this._sum = 0;
+    }
+    const buf = this._buf;
+    // Remove value being overwritten from running sum (only when buffer already full).
+    const overwritten = this._count === buf.length ? buf[this._w] : 0;
+    if (this._count < buf.length) this._count++;
+    this._sum -= overwritten;
+    buf[this._w] = frameDtMs;
+    this._sum += frameDtMs;
+    this._w = (this._w + 1) % buf.length;
+    if (this._count < buf.length) return; // not enough samples yet
 
     if (this._cooldown > 0) {
       this._cooldown--;
       return;
     }
 
-    const avg = this._samples.reduce((sum, val) => sum + val, 0) / this._samples.length;
+    const avg = this._sum / this._count;
     if (avg > config.thresholdMs) {
       this._level += 1;
-      this._samples.length = 0;
+      // Reset buffer stats but keep allocation for reuse.
+      this._w = 0;
+      this._count = 0;
+      this._sum = 0;
       this._cooldown = cooldownFrames;
       try {
         this._onLevelChange(this._level, {
