@@ -1,4 +1,5 @@
 import { CONFIG } from "../constants.js";
+import { ScoringManager } from "../managers/ScoringManager.js";
 
 /**
  * EventHandlers – centralized wiring of EventBus driven gameplay side‑effects.
@@ -96,7 +97,7 @@ export const EventHandlers = {
           asteroid && asteroid.isIndestructible
             ? CONFIG.GAME.ASTEROID_SCORE_INDESTRUCTIBLE
             : CONFIG.GAME.ASTEROID_SCORE;
-        game.score += add;
+        ScoringManager.add(game, add);
         game.createExplosion(asteroid.x + asteroid.width / 2, asteroid.y + asteroid.height / 2);
         if (asteroid && asteroid.isIndestructible && typeof game.createScorePopup === "function") {
           const baseColor = CONFIG.COLORS.SCORE.DANGER_RED;
@@ -141,7 +142,7 @@ export const EventHandlers = {
       events.on("collectedStar", function (/** @type {{ star:any }} */ payload) {
         const { star } = payload;
         const add = star && star.isRed ? CONFIG.GAME.STAR_SCORE_RED : CONFIG.GAME.STAR_SCORE;
-        game.score += add;
+        ScoringManager.add(game, add);
         game.updateScore();
         if (star && star.isRed && typeof game.createScorePopup === "function") {
           const baseColor = CONFIG.COLORS.SCORE.DANGER_RED;
