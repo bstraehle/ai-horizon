@@ -45,6 +45,7 @@ const ARR_POOL_MAX = 256;
  * @property {CollisionPools['bulletPool']} [bulletPool]
  * @property {CollisionPools['asteroidPool']} [asteroidPool]
  * @property {CollisionPools['starPool']} [starPool]
+ * @property {number} [hardenedAsteroidHitBullets]
  */
 /**
  * Centralises collision detection. Stateless aside from internal small array pool.
