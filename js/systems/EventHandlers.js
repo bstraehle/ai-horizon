@@ -98,6 +98,13 @@ export const EventHandlers = {
             ? CONFIG.GAME.ASTEROID_SCORE_INDESTRUCTIBLE
             : CONFIG.GAME.ASTEROID_SCORE;
         ScoringManager.add(game, add);
+        if (asteroid) {
+          if (asteroid.isIndestructible) {
+            game.hardenedAsteroidKills = (game.hardenedAsteroidKills || 0) + 1;
+          } else {
+            game.asteroidKills = (game.asteroidKills || 0) + 1;
+          }
+        }
         game.createExplosion(asteroid.x + asteroid.width / 2, asteroid.y + asteroid.height / 2);
         if (asteroid && asteroid.isIndestructible && typeof game.createScorePopup === "function") {
           const baseColor = CONFIG.COLORS.SCORE.DANGER_RED;

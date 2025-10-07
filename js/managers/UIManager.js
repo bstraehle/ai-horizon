@@ -339,7 +339,21 @@ export class UIManager {
     preserveScroll = false,
     allowInitials = undefined
   ) {
-    if (finalScoreEl) finalScoreEl.textContent = String(score);
+    try {
+      if (finalScoreEl) {
+        const bonusAttr = finalScoreEl.dataset && finalScoreEl.dataset.accuracyBonus;
+        const accuracyBonus = bonusAttr ? Number(bonusAttr) : 0;
+        if (Number.isFinite(accuracyBonus) && accuracyBonus > 0) {
+          const total = Number(score) || 0;
+          const base = Math.max(0, total - accuracyBonus);
+          finalScoreEl.textContent = `${base}+${accuracyBonus}`;
+        } else {
+          finalScoreEl.textContent = String(score);
+        }
+      }
+    } catch {
+      if (finalScoreEl) finalScoreEl.textContent = String(score);
+    }
     if (gameOverScreen) gameOverScreen.classList.remove("hidden");
     UIManager._resetLeaderboardScroll();
 

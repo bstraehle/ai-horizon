@@ -40,6 +40,7 @@ import { GameUI } from "./ui/GameUI.js";
 import { handleGameOver } from "./ui/GameOver.js";
 import { LeaderboardManager } from "./managers/LeaderboardManager.js";
 import { ViewManager } from "./managers/ViewManager.js";
+import { ScoringManager } from "./managers/ScoringManager.js";
 
 import { ObjectPool } from "./utils/ObjectPool.js";
 import { RateLimiter } from "./utils/RateLimiter.js";
@@ -116,6 +117,13 @@ class AIHorizon {
 
     this.highScore = 0;
     this.score = 0;
+    this.shotsFired = 0;
+    this.asteroidKills = 0;
+    this.hardenedAsteroidKills = 0;
+    this.hardenedAsteroidHitBullets = 0;
+    this.accuracy = 0;
+    this.accuracyBonus = 0;
+    this._accuracyBonusApplied = false;
     try {
       this.updateHighScore();
     } catch (_e) {
@@ -678,6 +686,7 @@ class AIHorizon {
     if (!this.state.isRunning()) return;
     this.fireLimiter.try(() => {
       this.bullets.push(GameFactories.createBullet(this));
+      this.shotsFired = (this.shotsFired || 0) + 1;
     });
   }
 
@@ -843,6 +852,18 @@ class AIHorizon {
       }
     } catch {
       /* ignore */
+    }
+    try {
+      if (ScoringManager && typeof ScoringManager.applyAccuracyBonus === "function") {
+        ScoringManager.applyAccuracyBonus(this);
+        try {
+          this.updateScore();
+        } catch {
+          /* ignore */
+        }
+      }
+    } catch {
+      /* optional bonus application */
     }
     this.state.end();
     this.updateHighScore();

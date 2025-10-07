@@ -66,6 +66,43 @@ export const ScoringManager = {
       newScore: game.score,
     };
   },
+  /**
+   * Compute and apply an end-of-run accuracy bonus based on shot vs hit stats.
+   * Formula: bonus = round(baseScore * accuracy) where accuracy = hits / shotsFired.
+   * - Counts only destroyed asteroids (normal + hardened) as hits.
+   * - Safe to call multiple times; bonus applied at most once (idempotent).
+   * - Stores derived values on the game instance for UI / telemetry.
+   * @param {{ score:number, shotsFired?:number, asteroidKills?:number, hardenedAsteroidKills?:number, hardenedAsteroidHitBullets?:number, accuracyBonus?:number, accuracy?:number, _accuracyBonusApplied?:boolean }} game
+   * @returns {{ applied:boolean, baseScore:number, accuracy:number, bonus:number, newScore:number }}
+   */
+  applyAccuracyBonus(game) {
+    if (!game || typeof game.score !== "number")
+      return { applied: false, baseScore: 0, accuracy: 0, bonus: 0, newScore: 0 };
+    if (game._accuracyBonusApplied) {
+      const totalHits = (game.asteroidKills || 0) + (game.hardenedAsteroidHitBullets || 0);
+      const shots = game.shotsFired || 0;
+      const acc = shots > 0 ? totalHits / shots : 0;
+      return {
+        applied: false,
+        baseScore: game.score,
+        accuracy: acc,
+        bonus: game.accuracyBonus || 0,
+        newScore: game.score,
+      };
+    }
+    const baseScore = game.score;
+    const totalHits = (game.asteroidKills || 0) + (game.hardenedAsteroidHitBullets || 0);
+    const shots = game.shotsFired || 0;
+    const accuracy = shots > 0 ? Math.min(1, totalHits / shots) : 0;
+    const bonus = Math.round(baseScore * accuracy);
+    if (bonus > 0) {
+      game.score += bonus;
+    }
+    game.accuracy = accuracy;
+    game.accuracyBonus = bonus;
+    game._accuracyBonusApplied = true;
+    return { applied: bonus > 0, baseScore, accuracy, bonus, newScore: game.score };
+  },
 };
 
 export default ScoringManager;

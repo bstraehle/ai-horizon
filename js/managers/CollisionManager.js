@@ -180,12 +180,22 @@ export class CollisionManager {
             try {
               if (a && a.isIndestructible) {
                 if (typeof a.onBulletHit === "function") {
+                  try {
+                    game.hardenedAsteroidHitBullets = (game.hardenedAsteroidHitBullets || 0) + 1;
+                  } catch {
+                    /* ignore stat update errors */
+                  }
                   const shouldDestroy = a.onBulletHit(game);
                   if (shouldDestroy) {
                     toRemoveAsteroids.add(a);
                     emitBulletHit(a, b);
                   }
                 } else if (typeof a.onShieldHit === "function") {
+                  try {
+                    game.hardenedAsteroidHitBullets = (game.hardenedAsteroidHitBullets || 0) + 1;
+                  } catch {
+                    /* ignore stat update errors */
+                  }
                   try {
                     a.onShieldHit();
                   } catch {

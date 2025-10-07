@@ -35,6 +35,27 @@ export const GameUI = {
    * @param {boolean} submittedScore Whether a leaderboard submission just occurred.
    */
   showGameOver(game, submittedScore) {
+    try {
+      if (game.finalScoreEl) {
+        if (typeof game.accuracy === "number") {
+          game.finalScoreEl.dataset.accuracy = game.accuracy.toFixed(3);
+        }
+        if (typeof game.accuracyBonus === "number") {
+          game.finalScoreEl.dataset.accuracyBonus = String(game.accuracyBonus);
+        }
+        if (typeof game.shotsFired === "number") {
+          game.finalScoreEl.dataset.shotsFired = String(game.shotsFired);
+        }
+        if (typeof game.asteroidKills === "number") {
+          game.finalScoreEl.dataset.asteroidKills = String(game.asteroidKills);
+        }
+        if (typeof game.hardenedAsteroidKills === "number") {
+          game.finalScoreEl.dataset.hardenedAsteroidKills = String(game.hardenedAsteroidKills);
+        }
+      }
+    } catch {
+      /* dataset optional */
+    }
     UIManager.showGameOver(
       game.gameOverScreen || null,
       game.restartBtn || null,
@@ -56,7 +77,19 @@ export const GameUI = {
    * @param {AIHorizon} game
    */
   setScore(game) {
-    UIManager.setScore(game.currentScoreEl || null, game.score || 0);
+    try {
+      const total = game.score || 0;
+      const bonusApplied = !!game._accuracyBonusApplied && (game.accuracyBonus || 0) > 0;
+      if (bonusApplied) {
+        const bonus = game.accuracyBonus || 0;
+        const base = Math.max(0, total - bonus);
+        UIManager.setScore(game.currentScoreEl || null, `${base}+${bonus}`);
+      } else {
+        UIManager.setScore(game.currentScoreEl || null, total);
+      }
+    } catch {
+      UIManager.setScore(game.currentScoreEl || null, game.score || 0);
+    }
   },
   /**
    * Update the visible countdown timer.

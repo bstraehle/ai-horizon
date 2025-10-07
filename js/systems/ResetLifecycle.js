@@ -31,6 +31,13 @@ export function releaseAllDynamic(game) {
 
 export function resetCoreRuntimeState(game) {
   game.score = 0;
+  game.shotsFired = 0;
+  game.asteroidKills = 0;
+  game.hardenedAsteroidKills = 0;
+  game.hardenedAsteroidHitBullets = 0;
+  game.accuracy = 0;
+  game.accuracyBonus = 0;
+  game._accuracyBonusApplied = false;
   game.updateScore();
   game.timerRemaining = game.timerSeconds;
   try {

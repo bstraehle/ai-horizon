@@ -86,6 +86,13 @@
  * @property {HTMLElement} finalScoreEl
  * @property {number} highScore
  * @property {number} score
+ * @property {number} [shotsFired]
+ * @property {number} [asteroidKills]
+ * @property {number} [hardenedAsteroidKills]
+ * @property {number} [hardenedAsteroidHitBullets]
+ * @property {number} [accuracy]
+ * @property {number} [accuracyBonus]
+ * @property {boolean} [_accuracyBonusApplied]
  * @property {InputState} input
  * @property {EventBus} events
  * @property {GameStateMachine} state
@@ -163,6 +170,7 @@
  * @property {ObjectPoolOf<Particle>} particlePool
  * @property {RNGLike} rng
  * @property {EventBusish=} events
+ * @property {number=} hardenedAsteroidHitBullets
  */
 
 /**
