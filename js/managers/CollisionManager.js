@@ -111,30 +111,36 @@ export class CollisionManager {
    * @param {CollisionGameSlice} game
    */
   static check(game) {
-    /** @type {Map<string, any[]>} */
-    const grid = new Map();
+    if (!this._grid) {
+      /** @type {Record<number, any[] | undefined>} */
+      this._grid = Object.create(null);
+      /** @type {number[]} */
+      this._touched = [];
+    }
+    const grid = /** @type {Record<number, any[]|undefined>} */ (this._grid);
+    const touched = /** @type {number[]} */ (this._touched);
+    let touchedCount = 0;
     const cs = game.cellSize | 0;
-    /** @param {number} ax @param {number} ay @param {any} a */
-    const put = (ax, ay, a) => {
-      const key = ax + "," + ay;
-      let arr = grid.get(key);
-      if (!arr) {
-        arr = CollisionManager._getArr();
-        grid.set(key, arr);
+    /** @param {number} cx @param {number} cy @param {any} a */
+    const put = (cx, cy, a) => {
+      const key = ((cx & 0xffff) << 16) | (cy & 0xffff);
+      let bucket = grid[key];
+      if (!bucket) {
+        bucket = CollisionManager._getArr();
+        grid[key] = bucket;
+        touched[touchedCount++] = key;
       }
-      arr.push(a);
+      bucket.push(a);
     };
 
     for (let idx = 0; idx < game.asteroids.length; idx++) {
       const a = game.asteroids[idx];
-      const minCx = Math.floor(a.x / cs);
-      const minCy = Math.floor(a.y / cs);
-      const maxCx = Math.floor((a.x + a.width) / cs);
-      const maxCy = Math.floor((a.y + a.height) / cs);
+      const minCx = (a.x / cs) | 0;
+      const minCy = (a.y / cs) | 0;
+      const maxCx = ((a.x + a.width) / cs) | 0;
+      const maxCy = ((a.y + a.height) / cs) | 0;
       for (let cy = minCy; cy <= maxCy; cy++) {
-        for (let cx = minCx; cx <= maxCx; cx++) {
-          put(cx, cy, a);
-        }
+        for (let cx = minCx; cx <= maxCx; cx++) put(cx, cy, a);
       }
     }
 
@@ -145,17 +151,16 @@ export class CollisionManager {
 
     /** @param {number} x @param {number} y @param {number} w @param {number} h @returns {any[][]} */
     const neighbors = (x, y, w, h) => {
-      /** @type {any[]} */
       const res = CollisionManager._getArr();
-      const minCx = Math.floor(x / cs);
-      const minCy = Math.floor(y / cs);
-      const maxCx = Math.floor((x + w) / cs);
-      const maxCy = Math.floor((y + h) / cs);
+      const minCx = (x / cs) | 0;
+      const minCy = (y / cs) | 0;
+      const maxCx = ((x + w) / cs) | 0;
+      const maxCy = ((y + h) / cs) | 0;
       for (let cy = minCy; cy <= maxCy; cy++) {
         for (let cx = minCx; cx <= maxCx; cx++) {
-          const key = cx + "," + cy;
-          const arr = grid.get(key);
-          if (arr) res.push(arr);
+          const key = ((cx & 0xffff) << 16) | (cy & 0xffff);
+          const bucket = grid[key];
+          if (bucket) res.push(bucket);
         }
       }
       return res;
@@ -236,26 +241,36 @@ export class CollisionManager {
       }
     }
 
+    let playerHitAsteroid = null;
     for (let i = game.asteroids.length - 1; i >= 0; i--) {
       const asteroid = game.asteroids[i];
       if (CollisionManager.intersects(game.player, asteroid)) {
-        if (game.events) game.events.emit("playerHitAsteroid", { asteroid });
-        return;
+        playerHitAsteroid = asteroid;
+        break;
+      }
+    }
+    if (!playerHitAsteroid) {
+      for (let i = game.stars.length - 1; i >= 0; i--) {
+        const star = game.stars[i];
+        if (CollisionManager.intersects(game.player, star)) {
+          const s = game.stars.splice(i, 1)[0];
+          if (game.starPool) game.starPool.release(s);
+          if (game.events) game.events.emit("collectedStar", { star });
+        }
       }
     }
 
-    for (let i = game.stars.length - 1; i >= 0; i--) {
-      const star = game.stars[i];
-      if (CollisionManager.intersects(game.player, star)) {
-        const s = game.stars.splice(i, 1)[0];
-        if (game.starPool) game.starPool.release(s);
-        if (game.events) game.events.emit("collectedStar", { star });
-      }
+    for (let i = 0; i < touchedCount; i++) {
+      const key = touched[i];
+      const bucket = grid[key];
+      if (bucket) CollisionManager._releaseArr(bucket);
+      grid[key] = undefined;
     }
+    touched.length = 0;
 
-    if (grid.size > 0) {
-      for (const arr of grid.values()) CollisionManager._releaseArr(arr);
-      grid.clear();
+    if (playerHitAsteroid && game.events) {
+      game.events.emit("playerHitAsteroid", { asteroid: playerHitAsteroid });
+      return;
     }
   }
 }

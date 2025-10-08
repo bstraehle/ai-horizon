@@ -126,15 +126,17 @@ export class RenderManager {
       game.engineTrail.draw(game.ctx);
     }
     if (game.scorePopups && game.scorePopups.length > 0) {
+      const arr = game.scorePopups;
       const ctx = game.ctx;
-      for (let i = game.scorePopups.length - 1; i >= 0; i--) {
-        const p = game.scorePopups[i];
-        p.life += game._lastDtSec || 1 / 60;
-        const t = p.life / p.maxLife;
+      const dtSec = game._lastDtSec || 1 / 60;
+      let w = 0;
+      for (let r = 0, n = arr.length; r < n; r++) {
+        const p = arr[r];
+        p.life += dtSec;
         if (p.life >= p.maxLife) {
-          game.scorePopups.splice(i, 1);
           continue;
         }
+        const t = p.life / p.maxLife;
         ctx.save();
         const fontSize = p.fontSize || 18;
         const fontWeight = p.fontWeight || "700";
@@ -155,7 +157,9 @@ export class RenderManager {
         ctx.fillStyle = p.color || "#fff";
         ctx.fillText(p.text, p.x, p.y + rise);
         ctx.restore();
+        arr[w++] = p;
       }
+      if (w !== arr.length) arr.length = w;
     }
   }
 }
