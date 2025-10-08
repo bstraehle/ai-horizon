@@ -106,13 +106,17 @@ class AIHorizon {
     this.pauseScreen = /** @type {HTMLElement} */ (document.getElementById("pauseScreen"));
     this.startBtn = /** @type {HTMLButtonElement} */ (document.getElementById("startBtn"));
     this.restartBtn = /** @type {HTMLButtonElement} */ (document.getElementById("restartBtn"));
-    this.currentScoreEl = /** @type {HTMLElement} */ (document.getElementById("currentScore"));
     this.highScoreEl = /** @type {HTMLElement} */ (document.getElementById("highScore"));
     this.highScoreBox = /** @type {HTMLElement|null} */ (document.getElementById("highScoreBox"));
+    this.currentScoreEl = /** @type {HTMLElement} */ (document.getElementById("currentScore"));
+    this.currentScoreBox = /** @type {HTMLElement|null} */ (
+      document.getElementById("currentScoreBox")
+    );
+    this.timerEl = /** @type {HTMLElement|null} */ (document.getElementById("timer"));
+    this.timerBox = /** @type {HTMLElement|null} */ (document.getElementById("timerBox"));
     this.leaderboardListEl = /** @type {HTMLElement} */ (
       document.getElementById("leaderboardList")
     );
-    this.timerEl = /** @type {HTMLElement|null} */ (document.getElementById("timer"));
 
     this.highScore = 0;
     this.score = 0;
@@ -305,8 +309,13 @@ class AIHorizon {
         LeaderboardManager.IS_REMOTE = !!isRemote;
         // Reflect connection status in the high score UI border
         try {
-          const box = this.highScoreBox || document.getElementById("highScoreBox");
-          if (box) {
+          const boxes = [
+            this.highScoreBox || document.getElementById("highScoreBox"),
+            this.currentScoreBox || document.getElementById("currentScoreBox"),
+            this.timerBox || document.getElementById("timerBox"),
+          ];
+          for (const box of boxes) {
+            if (!box) continue;
             box.classList.remove("connection-online", "connection-offline");
             box.classList.add(
               LeaderboardManager.IS_REMOTE ? "connection-online" : "connection-offline"
@@ -324,8 +333,13 @@ class AIHorizon {
           LeaderboardManager.IS_REMOTE = false;
           // Mark high score as offline
           try {
-            const box = this.highScoreBox || document.getElementById("highScoreBox");
-            if (box) {
+            const boxes = [
+              this.highScoreBox || document.getElementById("highScoreBox"),
+              this.currentScoreBox || document.getElementById("currentScoreBox"),
+              this.timerBox || document.getElementById("timerBox"),
+            ];
+            for (const box of boxes) {
+              if (!box) continue;
               box.classList.remove("connection-online", "connection-offline");
               box.classList.add("connection-offline");
             }

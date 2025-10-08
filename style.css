@@ -130,12 +130,16 @@ body {
     border-color 180ms ease,
     box-shadow 180ms ease;
 }
-#highScoreBox.connection-online {
+#highScoreBox.connection-online,
+#currentScoreBox.connection-online,
+#timerBox.connection-online {
   border-color: var(--color-border);
   box-shadow: none;
   color: var(--color-connection-online);
 }
-#highScoreBox.connection-offline {
+#highScoreBox.connection-offline,
+#currentScoreBox.connection-offline,
+#timerBox.connection-offline {
   border-color: var(--color-border);
   box-shadow: none;
   color: var(--color-connection-offline);
