@@ -36,21 +36,27 @@ export const GameUI = {
    */
   showGameOver(game, submittedScore) {
     try {
-      if (game.finalScoreEl) {
+      const scoreEl = game.currentScoreEl || null;
+      if (scoreEl) {
         if (typeof game.accuracy === "number") {
-          game.finalScoreEl.dataset.accuracy = game.accuracy.toFixed(3);
+          scoreEl.dataset.accuracy = game.accuracy.toFixed(3);
         }
         if (typeof game.accuracyBonus === "number") {
-          game.finalScoreEl.dataset.accuracyBonus = String(game.accuracyBonus);
+          scoreEl.dataset.accuracyBonus = String(game.accuracyBonus);
         }
         if (typeof game.shotsFired === "number") {
-          game.finalScoreEl.dataset.shotsFired = String(game.shotsFired);
+          scoreEl.dataset.shotsFired = String(game.shotsFired);
         }
         if (typeof game.asteroidKills === "number") {
-          game.finalScoreEl.dataset.asteroidKills = String(game.asteroidKills);
+          scoreEl.dataset.asteroidKills = String(game.asteroidKills);
         }
         if (typeof game.hardenedAsteroidKills === "number") {
-          game.finalScoreEl.dataset.hardenedAsteroidKills = String(game.hardenedAsteroidKills);
+          scoreEl.dataset.hardenedAsteroidKills = String(game.hardenedAsteroidKills);
+        }
+        try {
+          scoreEl.textContent = String(game.score || 0);
+        } catch {
+          /* ignore */
         }
       }
     } catch {
@@ -59,7 +65,7 @@ export const GameUI = {
     UIManager.showGameOver(
       game.gameOverScreen || null,
       game.restartBtn || null,
-      game.finalScoreEl || null,
+      game.currentScoreEl || null,
       game.score || 0,
       submittedScore,
       undefined
@@ -80,13 +86,7 @@ export const GameUI = {
     try {
       const total = game.score || 0;
       const bonusApplied = !!game._accuracyBonusApplied && (game.accuracyBonus || 0) > 0;
-      if (bonusApplied) {
-        const bonus = game.accuracyBonus || 0;
-        const base = Math.max(0, total - bonus);
-        UIManager.setScore(game.currentScoreEl || null, `${base}+${bonus}`);
-      } else {
-        UIManager.setScore(game.currentScoreEl || null, total);
-      }
+      UIManager.setScore(game.currentScoreEl || null, total);
     } catch {
       UIManager.setScore(game.currentScoreEl || null, game.score || 0);
     }

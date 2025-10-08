@@ -330,29 +330,34 @@ export class UIManager {
     if (pauseScreen) pauseScreen.classList.add("hidden");
   }
 
-  /** @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} restartBtn @param {HTMLElement|null} finalScoreEl @param {number} score @param {boolean} [preserveScroll=false] @param {boolean|undefined} [allowInitials] */
+  /** @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} restartBtn @param {HTMLElement|null} currentScoreEl @param {number} score @param {boolean} [preserveScroll=false] @param {boolean|undefined} [allowInitials] */
   static showGameOver(
     gameOverScreen,
     restartBtn,
-    finalScoreEl,
+    currentScoreEl,
     score,
     preserveScroll = false,
     allowInitials = undefined
   ) {
     try {
-      if (finalScoreEl) {
-        const bonusAttr = finalScoreEl.dataset && finalScoreEl.dataset.accuracyBonus;
+      if (currentScoreEl) {
+        const ds = currentScoreEl.dataset || /** @type {any} */ ({});
+        const bonusAttr = ds.accuracyBonus;
+        const accuracyAttr = ds.accuracy;
+        const total = Number(score) || 0;
         const accuracyBonus = bonusAttr ? Number(bonusAttr) : 0;
-        if (Number.isFinite(accuracyBonus) && accuracyBonus > 0) {
-          const total = Number(score) || 0;
-          const base = Math.max(0, total - accuracyBonus);
-          finalScoreEl.textContent = `${base}+${accuracyBonus}`;
+        const base = Math.max(0, total - (Number.isFinite(accuracyBonus) ? accuracyBonus : 0));
+        const accuracy = accuracyAttr ? Number(accuracyAttr) : NaN;
+        const pct = Number.isFinite(accuracy) && accuracy >= 0 ? Math.round(accuracy * 100) : 0;
+
+        if (Number.isFinite(pct) && total > 0) {
+          currentScoreEl.textContent = `${base}+${accuracyBonus}=${total} AC: ${pct}%`;
         } else {
-          finalScoreEl.textContent = String(score);
+          currentScoreEl.textContent = String(score);
         }
       }
     } catch {
-      if (finalScoreEl) finalScoreEl.textContent = String(score);
+      if (currentScoreEl) currentScoreEl.textContent = String(score);
     }
     if (gameOverScreen) gameOverScreen.classList.remove("hidden");
     UIManager._resetLeaderboardScroll();

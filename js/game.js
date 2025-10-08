@@ -109,7 +109,6 @@ class AIHorizon {
     this.currentScoreEl = /** @type {HTMLElement} */ (document.getElementById("currentScore"));
     this.highScoreEl = /** @type {HTMLElement} */ (document.getElementById("highScore"));
     this.highScoreBox = /** @type {HTMLElement|null} */ (document.getElementById("highScoreBox"));
-    this.finalScoreEl = /** @type {HTMLElement} */ (document.getElementById("finalScore"));
     this.leaderboardListEl = /** @type {HTMLElement} */ (
       document.getElementById("leaderboardList")
     );
