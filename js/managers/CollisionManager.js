@@ -51,6 +51,10 @@ const ARR_POOL_MAX = 256;
  * Centralises collision detection. Stateless aside from internal small array pool.
  */
 export class CollisionManager {
+  /** @private @type {any[]|undefined} */
+  static _deadBullets;
+  /** @private @type {any[]|undefined} */
+  static _deadAsteroids;
   /**
    * Borrow an empty pooled array (length reset); caller must release via _releaseArr.
    * @returns {any[]}
@@ -144,45 +148,51 @@ export class CollisionManager {
       }
     }
 
-    /** @type {Set<any>} */
-    const toRemoveBullets = new Set();
-    /** @type {Set<any>} */
-    const toRemoveAsteroids = new Set();
+    /** @type {any[]} */
+    if (!this._deadBullets) this._deadBullets = [];
+    /** @type {any[]} */
+    if (!this._deadAsteroids) this._deadAsteroids = [];
+    /** @type {any[]} */
+    const deadBullets = /** @type {any[]} */ (this._deadBullets);
+    /** @type {any[]} */
+    const deadAsteroids = /** @type {any[]} */ (this._deadAsteroids);
+    deadBullets.length = 0;
+    deadAsteroids.length = 0;
 
-    /** @param {number} x @param {number} y @param {number} w @param {number} h @returns {any[][]} */
-    const neighbors = (x, y, w, h) => {
-      const res = CollisionManager._getArr();
-      const minCx = (x / cs) | 0;
-      const minCy = (y / cs) | 0;
-      const maxCx = ((x + w) / cs) | 0;
-      const maxCy = ((y + h) / cs) | 0;
-      for (let cy = minCy; cy <= maxCy; cy++) {
-        for (let cx = minCx; cx <= maxCx; cx++) {
-          const key = ((cx & 0xffff) << 16) | (cy & 0xffff);
-          const bucket = grid[key];
-          if (bucket) res.push(bucket);
-        }
-      }
-      return res;
-    };
+    const BULLET_FLAG = "_cmDeadBullet";
+    const AST_FLAG = "_cmDeadAsteroid";
 
     /** @param {any} a @param {any} b */
     const emitBulletHit = (a, b) => {
       if (game.events) game.events.emit("bulletHitAsteroid", { asteroid: a, bullet: b });
     };
-
+    const neighborGroups = [];
     for (let i = 0; i < game.bullets.length; i++) {
       const b = game.bullets[i];
       if (!b) continue;
-      const groups = neighbors(b.x, b.y, b.width, b.height);
+      neighborGroups.length = 0;
+      const minCx = (b.x / cs) | 0;
+      const minCy = (b.y / cs) | 0;
+      const maxCx = ((b.x + b.width) / cs) | 0;
+      const maxCy = ((b.y + b.height) / cs) | 0;
+      for (let cy = minCy; cy <= maxCy; cy++) {
+        for (let cx = minCx; cx <= maxCx; cx++) {
+          const key = ((cx & 0xffff) << 16) | (cy & 0xffff);
+          const bucket = grid[key];
+          if (bucket) neighborGroups.push(bucket);
+        }
+      }
       let hit = false;
-      for (let g = 0; g < groups.length && !hit; g++) {
-        const group = groups[g];
+      for (let g = 0; g < neighborGroups.length && !hit; g++) {
+        const group = neighborGroups[g];
         for (let k = 0; k < group.length; k++) {
           const a = group[k];
-          if (toRemoveAsteroids.has(a)) continue;
+          if (a && a[AST_FLAG]) continue;
           if (CollisionManager.intersects(b, a)) {
-            toRemoveBullets.add(b);
+            if (!b[BULLET_FLAG]) {
+              b[BULLET_FLAG] = 1;
+              deadBullets.push(b);
+            }
             try {
               if (a && a.isIndestructible) {
                 if (typeof a.onBulletHit === "function") {
@@ -192,8 +202,9 @@ export class CollisionManager {
                     /* ignore stat update errors */
                   }
                   const shouldDestroy = a.onBulletHit(game);
-                  if (shouldDestroy) {
-                    toRemoveAsteroids.add(a);
+                  if (shouldDestroy && !a[AST_FLAG]) {
+                    a[AST_FLAG] = 1;
+                    deadAsteroids.push(a);
                     emitBulletHit(a, b);
                   }
                 } else if (typeof a.onShieldHit === "function") {
@@ -205,40 +216,45 @@ export class CollisionManager {
                   try {
                     a.onShieldHit();
                   } catch {
-                    /* ignore shield side-effect errors */
+                    /* ignore */
                   }
                 }
-              } else {
-                toRemoveAsteroids.add(a);
+              } else if (a && !a[AST_FLAG]) {
+                a[AST_FLAG] = 1;
+                deadAsteroids.push(a);
                 emitBulletHit(a, b);
               }
             } catch {
-              /* ignore asteroid collision processing errors to avoid breaking loop */
+              /* ignore asteroid collision processing errors */
             }
             hit = true;
             break;
           }
         }
       }
-      CollisionManager._releaseArr(groups);
     }
 
-    if (toRemoveBullets.size > 0) {
+    if (deadBullets.length) {
       for (let i = game.bullets.length - 1; i >= 0; i--) {
         const b = game.bullets[i];
-        if (toRemoveBullets.has(b)) {
+        if (b && b[BULLET_FLAG]) {
           game.bullets.splice(i, 1);
           if (game.bulletPool) game.bulletPool.release(b);
+          b[BULLET_FLAG] = 0;
         }
       }
+      deadBullets.length = 0;
     }
-    if (toRemoveAsteroids.size > 0) {
+    if (deadAsteroids.length) {
       for (let i = game.asteroids.length - 1; i >= 0; i--) {
-        if (toRemoveAsteroids.has(game.asteroids[i])) {
-          const a = game.asteroids.splice(i, 1)[0];
+        const a = game.asteroids[i];
+        if (a && a[AST_FLAG]) {
+          game.asteroids.splice(i, 1);
           if (game.asteroidPool) game.asteroidPool.release(a);
+          a[AST_FLAG] = 0;
         }
       }
+      deadAsteroids.length = 0;
     }
 
     let playerHitAsteroid = null;
