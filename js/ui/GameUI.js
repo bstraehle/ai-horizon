@@ -85,7 +85,6 @@ export const GameUI = {
   setScore(game) {
     try {
       const total = game.score || 0;
-      const bonusApplied = !!game._accuracyBonusApplied && (game.accuracyBonus || 0) > 0;
       UIManager.setScore(game.currentScoreEl || null, total);
     } catch {
       UIManager.setScore(game.currentScoreEl || null, game.score || 0);
