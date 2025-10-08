@@ -55,6 +55,8 @@ export class CollisionManager {
   static _deadBullets;
   /** @private @type {any[]|undefined} */
   static _deadAsteroids;
+  /** @private @type {number} */
+  static _frameId = 0;
   /**
    * Borrow an empty pooled array (length reset); caller must release via _releaseArr.
    * @returns {any[]}
@@ -115,6 +117,7 @@ export class CollisionManager {
    * @param {CollisionGameSlice} game
    */
   static check(game) {
+    const frameId = ++this._frameId;
     if (!this._grid) {
       /** @type {Record<number, any[] | undefined>} */
       this._grid = Object.create(null);
@@ -159,18 +162,16 @@ export class CollisionManager {
     deadBullets.length = 0;
     deadAsteroids.length = 0;
 
-    const BULLET_FLAG = "_cmDeadBullet";
-    const AST_FLAG = "_cmDeadAsteroid";
+    const BULLET_FRAME_FLAG = "_cmDeadBulletFrame";
+    const AST_FRAME_FLAG = "_cmDeadAsteroidFrame";
 
     /** @param {any} a @param {any} b */
     const emitBulletHit = (a, b) => {
       if (game.events) game.events.emit("bulletHitAsteroid", { asteroid: a, bullet: b });
     };
-    const neighborGroups = [];
-    for (let i = 0; i < game.bullets.length; i++) {
+    bulletLoop: for (let i = 0; i < game.bullets.length; i++) {
       const b = game.bullets[i];
       if (!b) continue;
-      neighborGroups.length = 0;
       const minCx = (b.x / cs) | 0;
       const minCy = (b.y / cs) | 0;
       const maxCx = ((b.x + b.width) / cs) | 0;
@@ -179,81 +180,84 @@ export class CollisionManager {
         for (let cx = minCx; cx <= maxCx; cx++) {
           const key = ((cx & 0xffff) << 16) | (cy & 0xffff);
           const bucket = grid[key];
-          if (bucket) neighborGroups.push(bucket);
-        }
-      }
-      let hit = false;
-      for (let g = 0; g < neighborGroups.length && !hit; g++) {
-        const group = neighborGroups[g];
-        for (let k = 0; k < group.length; k++) {
-          const a = group[k];
-          if (a && a[AST_FLAG]) continue;
-          if (CollisionManager.intersects(b, a)) {
-            if (!b[BULLET_FLAG]) {
-              b[BULLET_FLAG] = 1;
-              deadBullets.push(b);
-            }
-            try {
-              if (a && a.isIndestructible) {
-                if (typeof a.onBulletHit === "function") {
-                  try {
-                    game.hardenedAsteroidHitBullets = (game.hardenedAsteroidHitBullets || 0) + 1;
-                  } catch {
-                    /* ignore stat update errors */
-                  }
-                  const shouldDestroy = a.onBulletHit(game);
-                  if (shouldDestroy && !a[AST_FLAG]) {
-                    a[AST_FLAG] = 1;
-                    deadAsteroids.push(a);
-                    emitBulletHit(a, b);
-                  }
-                } else if (typeof a.onShieldHit === "function") {
-                  try {
-                    game.hardenedAsteroidHitBullets = (game.hardenedAsteroidHitBullets || 0) + 1;
-                  } catch {
-                    /* ignore stat update errors */
-                  }
-                  try {
-                    a.onShieldHit();
-                  } catch {
-                    /* ignore */
-                  }
-                }
-              } else if (a && !a[AST_FLAG]) {
-                a[AST_FLAG] = 1;
-                deadAsteroids.push(a);
-                emitBulletHit(a, b);
+          if (!bucket) continue;
+          for (let k = 0; k < bucket.length; k++) {
+            const a = bucket[k];
+            if (a && a[AST_FRAME_FLAG] === frameId) continue;
+            if (CollisionManager.intersects(b, a)) {
+              if (b[BULLET_FRAME_FLAG] !== frameId) {
+                b[BULLET_FRAME_FLAG] = frameId;
+                deadBullets.push(b);
               }
-            } catch {
-              /* ignore asteroid collision processing errors */
+              try {
+                if (a && a.isIndestructible) {
+                  if (typeof a.onBulletHit === "function") {
+                    try {
+                      game.hardenedAsteroidHitBullets = (game.hardenedAsteroidHitBullets || 0) + 1;
+                    } catch {
+                      /* ignore stat update errors */
+                    }
+                    const shouldDestroy = a.onBulletHit(game);
+                    if (shouldDestroy && a[AST_FRAME_FLAG] !== frameId) {
+                      a[AST_FRAME_FLAG] = frameId;
+                      deadAsteroids.push(a);
+                      emitBulletHit(a, b);
+                    }
+                  } else if (typeof a.onShieldHit === "function") {
+                    try {
+                      game.hardenedAsteroidHitBullets = (game.hardenedAsteroidHitBullets || 0) + 1;
+                    } catch {
+                      /* ignore stat update errors */
+                    }
+                    try {
+                      a.onShieldHit();
+                    } catch {
+                      /* ignore */
+                    }
+                  }
+                } else if (a && a[AST_FRAME_FLAG] !== frameId) {
+                  a[AST_FRAME_FLAG] = frameId;
+                  deadAsteroids.push(a);
+                  emitBulletHit(a, b);
+                }
+              } catch {
+                /* ignore asteroid collision processing errors */
+              }
+              continue bulletLoop;
             }
-            hit = true;
-            break;
           }
         }
       }
     }
 
     if (deadBullets.length) {
-      for (let i = game.bullets.length - 1; i >= 0; i--) {
-        const b = game.bullets[i];
-        if (b && b[BULLET_FLAG]) {
-          game.bullets.splice(i, 1);
+      const arr = game.bullets;
+      let w = 0;
+      for (let r = 0, n = arr.length; r < n; r++) {
+        const b = arr[r];
+        if (b && b[BULLET_FRAME_FLAG] === frameId) {
           if (game.bulletPool) game.bulletPool.release(b);
-          b[BULLET_FLAG] = 0;
+          continue;
         }
+        if (w !== r) arr[w] = b;
+        w++;
       }
+      if (w !== arr.length) arr.length = w;
       deadBullets.length = 0;
     }
     if (deadAsteroids.length) {
-      for (let i = game.asteroids.length - 1; i >= 0; i--) {
-        const a = game.asteroids[i];
-        if (a && a[AST_FLAG]) {
-          game.asteroids.splice(i, 1);
+      const arrA = game.asteroids;
+      let wA = 0;
+      for (let r = 0, n = arrA.length; r < n; r++) {
+        const a = arrA[r];
+        if (a && a[AST_FRAME_FLAG] === frameId) {
           if (game.asteroidPool) game.asteroidPool.release(a);
-          a[AST_FLAG] = 0;
+          continue;
         }
+        if (wA !== r) arrA[wA] = a;
+        wA++;
       }
+      if (wA !== arrA.length) arrA.length = wA;
       deadAsteroids.length = 0;
     }
 
@@ -266,14 +270,19 @@ export class CollisionManager {
       }
     }
     if (!playerHitAsteroid) {
-      for (let i = game.stars.length - 1; i >= 0; i--) {
-        const star = game.stars[i];
+      const stars = game.stars;
+      let wS = 0;
+      for (let r = 0, n = stars.length; r < n; r++) {
+        const star = stars[r];
         if (CollisionManager.intersects(game.player, star)) {
-          const s = game.stars.splice(i, 1)[0];
-          if (game.starPool) game.starPool.release(s);
+          if (game.starPool) game.starPool.release(star);
           if (game.events) game.events.emit("collectedStar", { star });
+          continue;
         }
+        if (wS !== r) stars[wS] = star;
+        wS++;
       }
+      if (wS !== stars.length) stars.length = wS;
     }
 
     for (let i = 0; i < touchedCount; i++) {

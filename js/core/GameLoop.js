@@ -19,19 +19,18 @@ import { CONFIG } from "../constants.js";
  */
 export class GameLoop {
   /**
-   * Create a GameLoop.
-   * Purpose: Drive a deterministic fixed-step simulation with a decoupled render pass.
-   * Timing Model: Accumulates elapsed frame time; executes up to maxSubSteps fixed updates of size stepMs.
-   * Overrun Guard: Clamps per-frame catch-up to stepMs * maxSubSteps to avoid spiral-of-death.
-   * @param {{
-   *   update: (dtMs:number, dtSec:number) => void, // Called once per fixed step.
-   *   draw: (frameDtMs:number) => void,             // Called once per animation frame (after updates).
-   *   shouldUpdate?: () => boolean,                // Gate to pause simulation while still drawing.
-   *   stepMs?: number,                             // Fixed step size (ms).
-   *   maxSubSteps?: number                         // Max update iterations per frame.
-   * }} opts Configuration object.
+   * @typedef {Object} GameLoopOptions
+   * @property {(dtMs:number, dtSec:number)=>void} update Fixed-step simulation callback.
+   * @property {(frameDtMs:number, metrics?:GameLoopFrameMetrics)=>void} draw Per-frame render callback.
+   * @property {()=>boolean} [shouldUpdate] Predicate; when false, simulation pauses while draw still runs.
+   * @property {number} [stepMs] Fixed timestep size in ms.
+   * @property {number} [maxSubSteps] Maximum update steps processed per RAF (catch-up clamp).
+   * @property {(m:GameLoopFrameMetrics)=>void} [onMetrics] Optional per-frame metrics listener.
    */
-  constructor(opts) {
+  /**
+   * @param {GameLoopOptions} opts
+   */
+  constructor(opts /** @type {any} */) {
     this._update = opts.update;
     this._draw = opts.draw;
     this._shouldUpdate = opts.shouldUpdate || null;
@@ -42,6 +41,8 @@ export class GameLoop {
     this._running = false;
     this._rafId = 0;
     this._tick = this._tick.bind(this);
+    this._onMetrics = typeof opts.onMetrics === "function" ? opts.onMetrics : null;
+    /** @private */ this._lastMetrics = null;
   }
 
   /**
@@ -85,21 +86,65 @@ export class GameLoop {
     this._last = now;
 
     const canUpdate = !this._shouldUpdate || this._shouldUpdate();
+    let steps = 0;
+    let updateCost = 0;
     if (canUpdate) {
       const maxCatchup = this._stepMs * this._maxSubSteps;
       this._acc += Math.min(frameDt, maxCatchup);
-      let steps = 0;
+      const tUpdateStart = performance.now();
       while (this._acc >= this._stepMs && steps < this._maxSubSteps) {
         const dtMs = this._stepMs;
         this._update(dtMs, dtMs / 1000);
         this._acc -= this._stepMs;
         steps++;
       }
+      updateCost = performance.now() - tUpdateStart;
     } else {
       this._acc = 0;
     }
 
-    this._draw(frameDt);
+    const alpha = this._stepMs > 0 ? this._acc / this._stepMs : 0;
+    /** @type {{
+     *  frameDt:number, steps:number, updateMs:number, drawMs:number, alpha:number,
+     *  stepMs:number, maxSubSteps:number, now:number
+     * }} */
+    const metrics = {
+      frameDt,
+      steps,
+      updateMs: updateCost,
+      alpha,
+      stepMs: this._stepMs,
+      maxSubSteps: this._maxSubSteps,
+      now,
+      drawMs: 0,
+    };
+    const tDrawStart = performance.now();
+    try {
+      this._draw.length > 1 ? this._draw(frameDt, metrics) : this._draw(frameDt);
+    } catch (_e) {
+      /* swallow draw errors to avoid breaking loop */
+    }
+    metrics.drawMs = performance.now() - tDrawStart;
+    this._lastMetrics = metrics;
+    if (this._onMetrics) {
+      try {
+        this._onMetrics(metrics);
+      } catch (_e) {
+        /* ignore metrics listener errors */
+      }
+    }
     if (this._running) this._rafId = requestAnimationFrame(this._tick);
   }
 }
+
+/**
+ * @typedef {Object} GameLoopFrameMetrics
+ * @property {number} frameDt Raw RAF delta (ms)
+ * @property {number} steps Fixed update steps executed this frame
+ * @property {number} updateMs Time spent in fixed updates (ms)
+ * @property {number} drawMs Time spent in draw callback (ms)
+ * @property {number} alpha Interpolation ratio accumulator/step (0..1)
+ * @property {number} stepMs Fixed timestep size (ms)
+ * @property {number} maxSubSteps Max configured sub steps
+ * @property {number} now RAF high-resolution timestamp
+ */

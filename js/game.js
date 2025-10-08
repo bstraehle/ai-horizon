@@ -353,6 +353,7 @@ class AIHorizon {
         }
       });
 
+    this._frameMetrics = null;
     this.loop = new GameLoop({
       update: (dtMs, dtSec) => {
         this.timeMs += dtMs;
@@ -360,10 +361,20 @@ class AIHorizon {
         this._lastDtSec = dtSec;
         this.update(dtSec);
       },
-      draw: (frameDtMs) => this.draw(frameDtMs),
+      draw: (frameDtMs, metrics) => {
+        if (metrics) this._frameMetrics = metrics;
+        this.draw(frameDtMs);
+      },
       shouldUpdate: () => this.state.isRunning(),
       stepMs: CONFIG.TIME.STEP_MS,
       maxSubSteps: CONFIG.TIME.MAX_SUB_STEPS,
+      onMetrics: (m) => {
+        try {
+          this.performanceMonitor.sample(m.frameDt, { active: this.state.isRunning() });
+        } catch (_e) {
+          /* ignore */
+        }
+      },
     });
     AIHorizon._instance = this;
   }
