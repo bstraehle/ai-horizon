@@ -131,12 +131,14 @@ body {
     box-shadow 180ms ease;
 }
 #highScoreBox.connection-online {
-  border-color: var(--color-connection-online);
-  box-shadow: 0 0 8px rgba(36, 161, 72, 0.15);
+  border-color: var(--color-border);
+  box-shadow: none;
+  color: var(--color-connection-online);
 }
 #highScoreBox.connection-offline {
-  border-color: var(--color-connection-offline);
-  box-shadow: 0 0 8px rgba(178, 0, 0, 0.12);
+  border-color: var(--color-border);
+  box-shadow: none;
+  color: var(--color-connection-offline);
 }
 .game-info {
   backface-visibility: hidden;
