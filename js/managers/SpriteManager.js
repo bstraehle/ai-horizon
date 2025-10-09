@@ -1,4 +1,9 @@
 import { CONFIG } from "../constants.js";
+import { Bullet } from "../entities/Bullet.js";
+import { Star } from "../entities/Star.js";
+import { Explosion } from "../entities/Explosion.js";
+import { EngineTrail } from "../entities/EngineTrail.js";
+import { Nebula } from "../entities/Nebula.js";
 
 /**
  * SpriteManager – pre-renders bullet + trail and star variants to offscreen canvases (performance cache).
@@ -101,12 +106,20 @@ export class SpriteManager {
       }
     }
 
-    return {
+    const atlas = {
       bullet: bulletCanvas,
       bulletTrail: trail,
       star: starCanvas,
       starRed: starRedCanvas,
       starBaseSize,
     };
+
+    if (typeof Bullet.preloadSprites === "function") Bullet.preloadSprites();
+    if (typeof Star.preloadSprites === "function") Star.preloadSprites([starBaseSize]);
+    if (typeof Explosion.preloadSprites === "function") Explosion.preloadSprites();
+    if (typeof EngineTrail.preloadSprites === "function") EngineTrail.preloadSprites();
+    if (typeof Nebula.preloadSprites === "function") Nebula.preloadSprites();
+
+    return atlas;
   }
 }

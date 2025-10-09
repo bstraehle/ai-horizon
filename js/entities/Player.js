@@ -92,13 +92,38 @@ export class Player {
    * @param {CanvasRenderingContext2D} ctx 2D context.
    */
   draw(ctx) {
+    const sprite = Player._getSprite(this.width, this.height);
+    if (sprite) {
+      ctx.drawImage(sprite.canvas, this.x - sprite.padX, this.y - sprite.padY);
+      return;
+    }
+    Player._drawShip(ctx, this.width, this.height, this.x, this.y);
+  }
+
+  /**
+   * Provide axis-aligned bounding box (collision system input).
+   * @returns {{x:number,y:number,width:number,height:number}}
+   */
+  getBounds() {
+    return { x: this.x, y: this.y, width: this.width, height: this.height };
+  }
+
+  /** @private */
+  /**
+   * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} ctx
+   * @param {number} width
+   * @param {number} height
+   * @param {number} originX
+   * @param {number} originY
+   */
+  static _drawShip(ctx, width, height, originX, originY) {
     ctx.save();
-    const cx = this.x + this.width / 2;
-    const topY = this.y;
-    const bodyW = Math.max(8, this.width * 0.6);
-    const bodyH = Math.max(12, this.height * 0.9);
+    const cx = originX + width / 2;
+    const topY = originY;
+    const bodyW = Math.max(8, width * 0.6);
+    const bodyH = Math.max(12, height * 0.9);
     const bodyX = cx - bodyW / 2;
-    const bodyY = topY + (this.height - bodyH) / 2;
+    const bodyY = topY + (height - bodyH) / 2;
 
     const bodyGrad = ctx.createLinearGradient(bodyX, bodyY, bodyX, bodyY + bodyH);
     bodyGrad.addColorStop(0, "#ffffff");
@@ -146,7 +171,7 @@ export class Player {
     ctx.fill();
     ctx.stroke();
 
-    const winR = Math.max(3, Math.min(this.width, this.height) * 0.16);
+    const winR = Math.max(3, Math.min(width, height) * 0.16);
     const winY = bodyY + bodyH * 0.32;
     const winGrad = ctx.createLinearGradient(cx - winR, winY - winR, cx + winR, winY + winR);
     winGrad.addColorStop(0, "#8fd8ff");
@@ -168,7 +193,7 @@ export class Player {
     );
 
     const flameY = bodyY + bodyH + 2;
-    const flameH = Math.max(8, this.height * 0.25);
+    const flameH = Math.max(8, height * 0.25);
     ctx.save();
     const flameGrad = ctx.createRadialGradient(cx, flameY, 2, cx, flameY + flameH, flameH);
     flameGrad.addColorStop(0, "rgba(255,220,80,0.95)");
@@ -186,11 +211,45 @@ export class Player {
     ctx.restore();
   }
 
+  /** @private */
   /**
-   * Provide axis-aligned bounding box (collision system input).
-   * @returns {{x:number,y:number,width:number,height:number}}
+   * @param {number} width
+   * @param {number} height
+   * @returns {{ canvas: OffscreenCanvas | HTMLCanvasElement, padX: number, padY: number } | null}
    */
-  getBounds() {
-    return { x: this.x, y: this.y, width: this.width, height: this.height };
+  static _getSprite(width, height) {
+    if (typeof width !== "number" || typeof height !== "number" || width <= 0 || height <= 0) {
+      return null;
+    }
+    if (!Player._spriteCache) Player._spriteCache = new Map();
+    const key = `${width.toFixed(2)}x${height.toFixed(2)}`;
+    const cached = Player._spriteCache.get(key);
+    if (cached) return cached;
+
+    const padX = 4;
+    const padY = 4;
+    const flameH = Math.max(8, height * 0.25);
+    const canvasWidth = Math.ceil(width + padX * 2);
+    const canvasHeight = Math.ceil(height + flameH + padY * 2 + 2);
+    let canvas;
+    if (typeof OffscreenCanvas === "function") {
+      canvas = new OffscreenCanvas(canvasWidth, canvasHeight);
+    } else {
+      const elem = typeof document !== "undefined" ? document.createElement("canvas") : null;
+      if (!elem) return null;
+      elem.width = canvasWidth;
+      elem.height = canvasHeight;
+      canvas = elem;
+    }
+    const offCtx = canvas.getContext("2d");
+    if (!offCtx) return null;
+    offCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+    Player._drawShip(offCtx, width, height, padX, padY);
+    const sprite = { canvas, padX, padY };
+    Player._spriteCache.set(key, sprite);
+    return sprite;
   }
 }
+
+/** @type {Map<string, { canvas: OffscreenCanvas | HTMLCanvasElement, padX: number, padY: number }> | undefined} */
+Player._spriteCache = undefined;

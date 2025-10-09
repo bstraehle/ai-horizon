@@ -176,11 +176,6 @@ export class Nebula {
    */
   static draw(ctx, nebulaConfigs) {
     ctx.save();
-    let cache = Nebula._gradientCache.get(ctx);
-    if (!cache) {
-      cache = new Map();
-      Nebula._gradientCache.set(ctx, cache);
-    }
     for (const nebula of nebulaConfigs) {
       const blobs = nebula.blobs || [
         {
@@ -193,26 +188,25 @@ export class Nebula {
         },
       ];
       for (const b of blobs) {
+        const sprite = Nebula._getSprite(nebula.color0, nebula.color1, b.r || nebula.r);
+        const offsetX = nebula.x + (b.ox || 0);
+        const offsetY = nebula.y + (b.oy || 0);
         ctx.save();
-        ctx.translate(nebula.x + (b.ox || 0), nebula.y + (b.oy || 0));
+        ctx.translate(offsetX, offsetY);
         ctx.rotate(b.rot || 0);
         ctx.scale(b.sx || 1, b.sy || 1);
-        const radius = b.r || nebula.r;
-        const sx = b.sx || 1;
-        const sy = b.sy || 1;
-        const key = `${nebula.color0}|${nebula.color1}|${radius.toFixed(3)}|${sx.toFixed(3)}|${sy.toFixed(3)}`;
-        let grad = cache.get(key);
-        if (!grad) {
-          grad = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-          grad.addColorStop(0, nebula.color0);
-          grad.addColorStop(1, nebula.color1);
-          cache.set(key, grad);
+        if (sprite) {
+          ctx.globalCompositeOperation = "lighter";
+          ctx.drawImage(
+            sprite.canvas,
+            -sprite.halfSize,
+            -sprite.halfSize,
+            sprite.size,
+            sprite.size
+          );
+        } else {
+          Nebula._drawBlob(ctx, nebula.color0, nebula.color1, b.r || nebula.r);
         }
-        ctx.fillStyle = grad;
-        ctx.globalCompositeOperation = "lighter";
-        ctx.beginPath();
-        ctx.arc(0, 0, b.r || nebula.r, 0, PI2);
-        ctx.fill();
         ctx.restore();
       }
     }
@@ -257,4 +251,93 @@ export class Nebula {
       };
     });
   }
+
+  /**
+   * Draw a single blob directly to the current context (fallback when no sprite cached).
+   * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} ctx
+   * @param {string} color0
+   * @param {string} color1
+   * @param {number} radius
+   * @private
+   */
+  static _drawBlob(ctx, color0, color1, radius) {
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+    grad.addColorStop(0, color0);
+    grad.addColorStop(1, color1);
+    ctx.fillStyle = grad;
+    ctx.globalCompositeOperation = "lighter";
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, PI2);
+    ctx.fill();
+  }
+
+  /**
+   * Retrieve or cache a rendered nebula blob sprite by color pair + radius.
+   * @param {string} color0
+   * @param {string} color1
+   * @param {number} radius
+   * @returns {{ canvas: OffscreenCanvas | HTMLCanvasElement, size: number, halfSize: number } | null}
+   * @private
+   */
+  static _getSprite(color0, color1, radius) {
+    if (!Number.isFinite(radius) || radius <= 0) return null;
+    if (!Nebula._spriteCache) Nebula._spriteCache = new Map();
+    const quantRadius = Nebula._quantizeRadius(radius);
+    const key = `${color0}|${color1}|${quantRadius.toFixed(2)}`;
+    const cached = Nebula._spriteCache.get(key);
+    if (cached) return cached;
+
+    const size = Math.ceil(quantRadius * 2 + 4);
+    let canvas;
+    if (typeof OffscreenCanvas === "function") canvas = new OffscreenCanvas(size, size);
+    else {
+      const elem = typeof document !== "undefined" ? document.createElement("canvas") : null;
+      if (!elem) return null;
+      elem.width = size;
+      elem.height = size;
+      canvas = elem;
+    }
+    const offCtx = canvas.getContext("2d");
+    if (!offCtx) return null;
+    offCtx.clearRect(0, 0, size, size);
+    offCtx.save();
+    offCtx.translate(size / 2, size / 2);
+    Nebula._drawBlob(offCtx, color0, color1, quantRadius);
+    offCtx.restore();
+    const sprite = { canvas, size, halfSize: size / 2 };
+    Nebula._spriteCache.set(key, sprite);
+    return sprite;
+  }
+
+  /**
+   * Quantize radius to limit sprite variations.
+   * @param {number} radius
+   * @returns {number}
+   * @private
+   */
+  static _quantizeRadius(radius) {
+    const step = Nebula._RADIUS_STEP;
+    return Math.round(radius / step) * step;
+  }
+
+  /**
+   * Preload sprite variants for common radius buckets.
+   * @param {number[]} [radii]
+   */
+  static preloadSprites(radii) {
+    const list = Array.isArray(radii) && radii.length ? radii : [80, 120, 200];
+    const colors = [
+      [CONFIG.COLORS.NEBULA.N1, CONFIG.COLORS.NEBULA.N1_OUT],
+      [CONFIG.COLORS.NEBULA.N2, CONFIG.COLORS.NEBULA.N2_OUT],
+      [CONFIG.COLORS.NEBULA.N3, CONFIG.COLORS.NEBULA.N3_OUT],
+      [CONFIG.COLORS.NEBULA.N4, CONFIG.COLORS.NEBULA.N4_OUT],
+    ];
+    for (const radius of list) {
+      for (const [c0, c1] of colors) Nebula._getSprite(c0, c1, radius);
+    }
+  }
 }
+
+/** @type {Map<string, { canvas: OffscreenCanvas | HTMLCanvasElement, size: number, halfSize: number }> | undefined} */
+Nebula._spriteCache = undefined;
+Nebula._RADIUS_STEP = 8;

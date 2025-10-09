@@ -1,4 +1,16 @@
 import { CONFIG } from "../constants.js";
+import { isOnscreen } from "../utils/bounds.js";
+/**
+ * Safely derive numeric view dimensions for culling checks.
+ * @param {import('../types.js').SystemsGame} game
+ * @returns {{ width:number, height:number }}
+ */
+function getViewSize(game) {
+  const view = game && game.view ? game.view : /** @type {any} */ ({});
+  const width = typeof view.width === "number" && Number.isFinite(view.width) ? view.width : 0;
+  const height = typeof view.height === "number" && Number.isFinite(view.height) ? view.height : 0;
+  return { width, height };
+}
 
 /**
  * UpdateSystems – stateless per‑frame mutation helpers for entity arrays / pools.
@@ -43,10 +55,11 @@ import { CONFIG } from "../constants.js";
  * @param {number} [dtSec]
  */
 export function updateAsteroids(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
+  const { width: viewWidth, height: viewHeight } = getViewSize(game);
   for (let i = game.asteroids.length - 1; i >= 0; i--) {
     const asteroid = game.asteroids[i];
     asteroid.update(dtSec);
-    if (asteroid.y > game.view.height) {
+    if (!isOnscreen(asteroid, viewWidth, viewHeight)) {
       const a = game.asteroids.splice(i, 1)[0];
       game.asteroidPool.release(a);
     }
@@ -68,10 +81,11 @@ export function updateAsteroids(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
  * @param {number} [dtSec]
  */
 export function updateBullets(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
+  const { width: viewWidth, height: viewHeight } = getViewSize(game);
   for (let i = game.bullets.length - 1; i >= 0; i--) {
     const bullet = game.bullets[i];
     bullet.update(dtSec);
-    if (bullet.y + bullet.height < 0) {
+    if (!isOnscreen(bullet, viewWidth, viewHeight, 16)) {
       game.bullets.splice(i, 1);
       game.bulletPool.release(bullet);
     }
@@ -125,10 +139,11 @@ export function updateEngineTrail(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
  * @param {number} [dtSec]
  */
 export function updateExplosions(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
+  const { width: viewWidth, height: viewHeight } = getViewSize(game);
   for (let i = game.explosions.length - 1; i >= 0; i--) {
     const explosion = game.explosions[i];
     explosion.update(dtSec);
-    if (explosion.life <= 0) {
+    if (explosion.life <= 0 || !isOnscreen(explosion, viewWidth, viewHeight, 64)) {
       const e = game.explosions.splice(i, 1)[0];
       game.explosionPool.release(e);
     }
@@ -149,10 +164,11 @@ export function updateExplosions(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
  * @param {number} [dtSec]
  */
 export function updateParticles(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
+  const { width: viewWidth, height: viewHeight } = getViewSize(game);
   for (let i = game.particles.length - 1; i >= 0; i--) {
     const particle = game.particles[i];
     particle.update(dtSec);
-    if (particle.life <= 0) {
+    if (particle.life <= 0 || !isOnscreen(particle, viewWidth, viewHeight, 48)) {
       game.particles.splice(i, 1);
       game.particlePool.release(particle);
     }
@@ -173,10 +189,11 @@ export function updateParticles(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
  * @param {number} [dtSec]
  */
 export function updateStars(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
+  const { width: viewWidth, height: viewHeight } = getViewSize(game);
   for (let i = game.stars.length - 1; i >= 0; i--) {
     const star = game.stars[i];
     star.update(dtSec);
-    if (star.y > game.view.height) {
+    if (!isOnscreen(star, viewWidth, viewHeight, 24)) {
       const s = game.stars.splice(i, 1)[0];
       game.starPool.release(s);
     }

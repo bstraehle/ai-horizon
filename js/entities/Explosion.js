@@ -42,18 +42,27 @@ export class Explosion {
    * @param {CanvasRenderingContext2D} ctx 2D context.
    */
   draw(ctx) {
-    ctx.save();
-    const alpha = this.life / this.maxLife;
-    const scale = 1 + (1 - alpha) * CONFIG.EXPLOSION.SCALE_GAIN;
+    const alphaRaw = this.maxLife > 0 ? this.life / this.maxLife : 0;
+    const alpha = Math.max(0, Math.min(1, alphaRaw));
+    const quantAlpha = Explosion._quantizeAlpha(alpha);
+    const sprite = Explosion._getSprite(this.width, this.height, quantAlpha);
     const cx = this.x + this.width / 2;
     const cy = this.y + this.height / 2;
+    if (sprite) {
+      const drawX = cx - sprite.radius - sprite.pad;
+      const drawY = cy - sprite.radius - sprite.pad;
+      ctx.drawImage(sprite.canvas, drawX, drawY);
+      return;
+    }
+    ctx.save();
+    const scale = 1 + (1 - alpha) * CONFIG.EXPLOSION.SCALE_GAIN;
     const r = (this.width / 2) * scale;
-    const explosionGradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    explosionGradient.addColorStop(0, `${CONFIG.COLORS.EXPLOSION.GRAD_IN}${alpha})`);
-    explosionGradient.addColorStop(0.3, `${CONFIG.COLORS.EXPLOSION.GRAD_MID1}${alpha * 0.8})`);
-    explosionGradient.addColorStop(0.7, `${CONFIG.COLORS.EXPLOSION.GRAD_MID2}${alpha * 0.6})`);
-    explosionGradient.addColorStop(1, CONFIG.COLORS.EXPLOSION.GRAD_OUT);
-    ctx.fillStyle = explosionGradient;
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    gradient.addColorStop(0, `${CONFIG.COLORS.EXPLOSION.GRAD_IN}${alpha})`);
+    gradient.addColorStop(0.3, `${CONFIG.COLORS.EXPLOSION.GRAD_MID1}${alpha * 0.8})`);
+    gradient.addColorStop(0.7, `${CONFIG.COLORS.EXPLOSION.GRAD_MID2}${alpha * 0.6})`);
+    gradient.addColorStop(1, CONFIG.COLORS.EXPLOSION.GRAD_OUT);
+    ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, PI2);
     ctx.fill();
@@ -77,4 +86,78 @@ export class Explosion {
     this.life = life;
     this.maxLife = maxLife;
   }
+
+  /**
+   * @param {number} width
+   * @param {number} height
+   * @param {number} alpha
+   * @returns {{ canvas: OffscreenCanvas | HTMLCanvasElement, pad: number, radius: number } | null}
+   * @private
+   */
+  static _getSprite(width, height, alpha) {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      return null;
+    }
+    if (!Explosion._spriteCache) Explosion._spriteCache = new Map();
+    const key = `${width.toFixed(2)}x${height.toFixed(2)}@${alpha.toFixed(3)}`;
+    const cached = Explosion._spriteCache.get(key);
+    if (cached) return cached;
+
+    const scale = 1 + (1 - alpha) * CONFIG.EXPLOSION.SCALE_GAIN;
+    const radius = (width / 2) * scale;
+    const pad = 4;
+    const size = Math.ceil(radius * 2 + pad * 2);
+    let canvas;
+    if (typeof OffscreenCanvas === "function") {
+      canvas = new OffscreenCanvas(size, size);
+    } else {
+      const elem = typeof document !== "undefined" ? document.createElement("canvas") : null;
+      if (!elem) return null;
+      elem.width = size;
+      elem.height = size;
+      canvas = elem;
+    }
+    const offCtx = canvas.getContext("2d");
+    if (!offCtx) return null;
+    offCtx.clearRect(0, 0, size, size);
+    const center = size / 2;
+    const gradient = offCtx.createRadialGradient(center, center, 0, center, center, radius);
+    gradient.addColorStop(0, `${CONFIG.COLORS.EXPLOSION.GRAD_IN}${alpha})`);
+    gradient.addColorStop(0.3, `${CONFIG.COLORS.EXPLOSION.GRAD_MID1}${alpha * 0.8})`);
+    gradient.addColorStop(0.7, `${CONFIG.COLORS.EXPLOSION.GRAD_MID2}${alpha * 0.6})`);
+    gradient.addColorStop(1, CONFIG.COLORS.EXPLOSION.GRAD_OUT);
+    offCtx.fillStyle = gradient;
+    offCtx.beginPath();
+    offCtx.arc(center, center, radius, 0, PI2);
+    offCtx.fill();
+    const sprite = { canvas, pad, radius };
+    Explosion._spriteCache.set(key, sprite);
+    return sprite;
+  }
+
+  /**
+   * Quantize alpha to reduce sprite variants.
+   * @param {number} alpha
+   * @returns {number}
+   * @private
+   */
+  static _quantizeAlpha(alpha) {
+    const steps = Explosion._SPRITE_STEPS;
+    return steps > 0 ? Math.round(alpha * steps) / steps : alpha;
+  }
+
+  /** Pre-populate sprite cache for common explosion states. */
+  static preloadSprites() {
+    const steps = Explosion._SPRITE_STEPS;
+    const width = CONFIG.EXPLOSION.SIZE;
+    const height = CONFIG.EXPLOSION.SIZE;
+    for (let i = 0; i <= steps; i++) {
+      const alpha = i / steps;
+      Explosion._getSprite(width, height, alpha);
+    }
+  }
 }
+
+/** @type {Map<string, { canvas: OffscreenCanvas | HTMLCanvasElement, pad: number, radius: number }> | undefined} */
+Explosion._spriteCache = undefined;
+Explosion._SPRITE_STEPS = 12;

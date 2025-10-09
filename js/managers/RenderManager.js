@@ -1,4 +1,5 @@
 import { CONFIG } from "../constants.js";
+import { isOnscreen } from "../utils/bounds.js";
 
 /**
  * @typedef {Object} RenderGameContext
@@ -26,10 +27,14 @@ export class RenderManager {
    * Draw asteroids.
    * @param {CanvasRenderingContext2D} ctx
    * @param {any[]} asteroids
+   * @param {number} viewWidth
+   * @param {number} viewHeight
    */
-  static drawAsteroids(ctx, asteroids) {
+  static drawAsteroids(ctx, asteroids, viewWidth, viewHeight) {
     for (let i = 0; i < asteroids.length; i++) {
-      asteroids[i].draw(ctx);
+      const asteroid = asteroids[i];
+      if (!isOnscreen(asteroid, viewWidth, viewHeight, 32)) continue;
+      asteroid.draw(ctx);
     }
   }
 
@@ -38,8 +43,10 @@ export class RenderManager {
    * @param {CanvasRenderingContext2D} ctx
    * @param {any[]} bullets
    * @param {any} sprites
+   * @param {number} viewWidth
+   * @param {number} viewHeight
    */
-  static drawBullets(ctx, bullets, sprites) {
+  static drawBullets(ctx, bullets, sprites, viewWidth, viewHeight) {
     const spr = sprites && sprites.bullet;
     const trail = (sprites && sprites.bulletTrail) || CONFIG.BULLET.TRAIL;
     if (spr) {
@@ -47,12 +54,15 @@ export class RenderManager {
         sh = spr.height;
       for (let i = 0; i < bullets.length; i++) {
         const b = bullets[i];
+        if (!isOnscreen(b, viewWidth, viewHeight, trail || 8)) continue;
         const dh = b.height + trail;
         ctx.drawImage(spr, 0, 0, sw, sh, b.x, b.y, b.width, dh);
       }
     } else {
       for (let i = 0; i < bullets.length; i++) {
-        bullets[i].draw(ctx);
+        const bullet = bullets[i];
+        if (!isOnscreen(bullet, viewWidth, viewHeight, trail || 8)) continue;
+        bullet.draw(ctx);
       }
     }
   }
@@ -62,15 +72,25 @@ export class RenderManager {
    * @param {CanvasRenderingContext2D} ctx
    * @param {any[]} stars
    * @param {any} sprites
-   * @param {number} [timeSec]
+   * @param {number} [timeSec=0]
+   * @param {number} [viewWidth=Infinity]
+   * @param {number} [viewHeight=Infinity]
    */
-  static drawCollectibleStars(ctx, stars, sprites, timeSec = 0) {
+  static drawCollectibleStars(
+    ctx,
+    stars,
+    sprites,
+    timeSec = 0,
+    viewWidth = Infinity,
+    viewHeight = Infinity
+  ) {
     const starSpr = sprites && sprites.star;
     const starRedSpr = sprites && /** @type {any} */ (sprites).starRed;
     const base = sprites && sprites.starBaseSize;
     if (starSpr && base) {
       for (let i = 0; i < stars.length; i++) {
         const s = /** @type {any} */ (stars[i]);
+        if (!isOnscreen(s, viewWidth, viewHeight, base || 0)) continue;
         const baseSize = Math.max(1, Math.min(s.width, s.height));
         let dw = baseSize,
           dh = baseSize;
@@ -81,15 +101,24 @@ export class RenderManager {
       }
     } else {
       for (let i = 0; i < stars.length; i++) {
-        stars[i].draw(ctx, timeSec);
+        const star = stars[i];
+        if (!isOnscreen(star, viewWidth, viewHeight, 24)) continue;
+        star.draw(ctx, timeSec);
       }
     }
   }
 
-  /** Draw explosions. @param {CanvasRenderingContext2D} ctx @param {any[]} explosions */
-  static drawExplosions(ctx, explosions) {
+  /**
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {any[]} explosions
+   * @param {number} viewWidth
+   * @param {number} viewHeight
+   */
+  static drawExplosions(ctx, explosions, viewWidth, viewHeight) {
     for (let i = 0; i < explosions.length; i++) {
-      explosions[i].draw(ctx);
+      const explosion = explosions[i];
+      if (!isOnscreen(explosion, viewWidth, viewHeight, 48)) continue;
+      explosion.draw(ctx);
     }
   }
 
@@ -97,10 +126,14 @@ export class RenderManager {
    * Draw particles then restore globalAlpha.
    * @param {CanvasRenderingContext2D} ctx
    * @param {any[]} particles
+   * @param {number} viewWidth
+   * @param {number} viewHeight
    */
-  static drawParticles(ctx, particles) {
+  static drawParticles(ctx, particles, viewWidth, viewHeight) {
     for (let i = 0; i < particles.length; i++) {
-      particles[i].draw(ctx);
+      const particle = particles[i];
+      if (!isOnscreen(particle, viewWidth, viewHeight, 16)) continue;
+      particle.draw(ctx);
     }
     ctx.globalAlpha = 1;
   }
@@ -114,11 +147,25 @@ export class RenderManager {
     if (typeof game.drawBackground === "function") {
       game.drawBackground();
     }
-    RenderManager.drawAsteroids(game.ctx, game.asteroids);
-    RenderManager.drawBullets(game.ctx, game.bullets, game.sprites);
-    RenderManager.drawCollectibleStars(game.ctx, game.stars, game.sprites, game.timeSec);
-    RenderManager.drawExplosions(game.ctx, game.explosions);
-    RenderManager.drawParticles(game.ctx, game.particles);
+    const canvas =
+      game.ctx && game.ctx.canvas
+        ? game.ctx.canvas
+        : /** @type {{ width?:number, height?:number }} */ ({});
+    const viewWidth = typeof canvas.width === "number" ? canvas.width : Infinity;
+    const viewHeight = typeof canvas.height === "number" ? canvas.height : Infinity;
+
+    RenderManager.drawAsteroids(game.ctx, game.asteroids, viewWidth, viewHeight);
+    RenderManager.drawBullets(game.ctx, game.bullets, game.sprites, viewWidth, viewHeight);
+    RenderManager.drawCollectibleStars(
+      game.ctx,
+      game.stars,
+      game.sprites,
+      game.timeSec,
+      viewWidth,
+      viewHeight
+    );
+    RenderManager.drawExplosions(game.ctx, game.explosions, viewWidth, viewHeight);
+    RenderManager.drawParticles(game.ctx, game.particles, viewWidth, viewHeight);
     if (game.player && typeof game.player.draw === "function") {
       game.player.draw(game.ctx);
     }
@@ -134,6 +181,10 @@ export class RenderManager {
         const p = arr[r];
         p.life += dtSec;
         if (p.life >= p.maxLife) {
+          continue;
+        }
+        if (!isOnscreen(p, viewWidth, viewHeight, 48)) {
+          arr[w++] = p;
           continue;
         }
         const t = p.life / p.maxLife;
