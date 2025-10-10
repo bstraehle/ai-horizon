@@ -346,7 +346,7 @@ export class UIManager {
         const accuracyAttr = ds.accuracy;
         const total = Number(score) || 0;
         const accuracyBonus = bonusAttr ? Number(bonusAttr) : 0;
-        const base = Math.max(0, total - (Number.isFinite(accuracyBonus) ? accuracyBonus : 0));
+        //const base = Math.max(0, total - (Number.isFinite(accuracyBonus) ? accuracyBonus : 0));
         const accuracy = accuracyAttr ? Number(accuracyAttr) : NaN;
         const pct = Number.isFinite(accuracy) && accuracy >= 0 ? Math.round(accuracy * 100) : 0;
 
