@@ -342,7 +342,7 @@ export class UIManager {
     try {
       if (currentScoreEl) {
         const ds = currentScoreEl.dataset || /** @type {any} */ ({});
-        const bonusAttr = ds.accuracyBonus;
+        //const bonusAttr = ds.accuracyBonus;
         const accuracyAttr = ds.accuracy;
         const total = Number(score) || 0;
         //const accuracyBonus = bonusAttr ? Number(bonusAttr) : 0;
