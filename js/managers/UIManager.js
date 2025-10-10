@@ -351,7 +351,7 @@ export class UIManager {
         const pct = Number.isFinite(accuracy) && accuracy >= 0 ? Math.round(accuracy * 100) : 0;
 
         if (Number.isFinite(pct) && total > 0) {
-          currentScoreEl.textContent = `${base}+${accuracyBonus}=${total} AC: ${pct}%`;
+          currentScoreEl.textContent = `${total} | ${pct}%`;
         } else {
           currentScoreEl.textContent = String(score);
         }
