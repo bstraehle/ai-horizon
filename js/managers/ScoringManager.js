@@ -26,21 +26,49 @@ import { CONFIG } from "../constants.js";
 export const ScoringManager = {
   /**
    * Add base points and apply milestone bonuses.
-   * @param {{ score:number }} game Game-like object exposing mutable numeric 'score'.
+   * Also applies a time-based finale multiplier when within the final N seconds of the timer.
+   * @param {{ score:number, timerRemaining?:number }} game Game-like object exposing mutable numeric 'score'.
    * @param {number} points Base points to add (must be finite & > 0).
-   * @returns {{base:number, bonusCount:number, bonusPoints:number, totalAdded:number, newScore:number}}
+   * @returns {{base:number, bonusCount:number, bonusPoints:number, totalAdded:number, newScore:number, appliedMultiplier:number}}
    */
   add(game, points) {
     if (!game || typeof game.score !== "number") {
-      return { base: 0, bonusCount: 0, bonusPoints: 0, totalAdded: 0, newScore: 0 };
+      return {
+        base: 0,
+        bonusCount: 0,
+        bonusPoints: 0,
+        totalAdded: 0,
+        newScore: 0,
+        appliedMultiplier: 1,
+      };
     }
     if (typeof points !== "number" || !Number.isFinite(points) || points <= 0) {
-      return { base: 0, bonusCount: 0, bonusPoints: 0, totalAdded: 0, newScore: game.score };
+      return {
+        base: 0,
+        bonusCount: 0,
+        bonusPoints: 0,
+        totalAdded: 0,
+        newScore: game.score,
+        appliedMultiplier: 1,
+      };
     }
+    const finaleWindow = CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS || 0;
+    const finaleMult = CONFIG.GAME.FINALE_BONUS_MULTIPLIER || 1;
+    let appliedMultiplier = 1;
+    if (
+      finaleWindow > 0 &&
+      finaleMult > 1 &&
+      typeof game.timerRemaining === "number" &&
+      game.timerRemaining <= finaleWindow &&
+      game.timerRemaining > 0
+    ) {
+      appliedMultiplier = finaleMult;
+    }
+    const effectivePoints = points * appliedMultiplier;
     const threshold = CONFIG.GAME.SCORING_BONUS_THRESHOLD || 0;
     const bonusPer = CONFIG.GAME.SCORING_BONUS_POINTS || 0;
     const before = game.score;
-    game.score = before + points;
+    game.score = before + effectivePoints;
     let bonusCount = 0;
     if (threshold > 0 && bonusPer > 0) {
       const prevBuckets = Math.floor(before / threshold);
@@ -50,20 +78,22 @@ export const ScoringManager = {
         const bonusTotal = bonusCount * bonusPer;
         game.score += bonusTotal;
         return {
-          base: points,
+          base: effectivePoints,
           bonusCount,
           bonusPoints: bonusTotal,
-          totalAdded: points + bonusTotal,
+          totalAdded: effectivePoints + bonusTotal,
           newScore: game.score,
+          appliedMultiplier,
         };
       }
     }
     return {
-      base: points,
+      base: effectivePoints,
       bonusCount: 0,
       bonusPoints: 0,
-      totalAdded: points,
+      totalAdded: effectivePoints,
       newScore: game.score,
+      appliedMultiplier,
     };
   },
   /**

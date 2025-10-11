@@ -100,7 +100,7 @@ export const EventHandlers = {
             ? CONFIG.GAME.ASTEROID_SCORE_GOLDEN
             : CONFIG.GAME.ASTEROID_SCORE_INDESTRUCTIBLE;
         }
-        ScoringManager.add(game, add);
+        const r = ScoringManager.add(game, add);
         if (asteroid) {
           if (asteroid.isIndestructible) {
             game.hardenedAsteroidKills = (game.hardenedAsteroidKills || 0) + 1;
@@ -124,7 +124,7 @@ export const EventHandlers = {
           game.createScorePopup(
             asteroid.x + asteroid.width / 2,
             asteroid.y + asteroid.height / 2,
-            add,
+            r && typeof r.base === "number" ? r.base : add,
             opts
           );
         }
@@ -152,7 +152,7 @@ export const EventHandlers = {
       events.on("collectedStar", function (/** @type {{ star:any }} */ payload) {
         const { star } = payload;
         const add = star && star.isRed ? CONFIG.GAME.STAR_SCORE_RED : CONFIG.GAME.STAR_SCORE;
-        ScoringManager.add(game, add);
+        const r = ScoringManager.add(game, add);
         game.updateScore();
         if (star && star.isRed && typeof game.createScorePopup === "function") {
           const baseColor = CONFIG.COLORS.SCORE.DANGER_RED;
@@ -166,7 +166,12 @@ export const EventHandlers = {
             stroke: "rgba(0,0,0,0.85)",
             maxLife: 1.2,
           };
-          game.createScorePopup(star.x + star.width / 2, star.y + star.height / 2, add, opts);
+          game.createScorePopup(
+            star.x + star.width / 2,
+            star.y + star.height / 2,
+            r && typeof r.base === "number" ? r.base : add,
+            opts
+          );
         }
       })
     );
