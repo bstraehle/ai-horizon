@@ -205,7 +205,7 @@ class AIHorizon {
       /* intentionally empty */
     }
     this.initBackground();
-    this.drawBackground();
+    this.drawBackground({ suppressNebula: true });
 
     this.sprites = SpriteManager.createSprites();
     this.cellSize = CONFIG.ASTEROID.MIN_SIZE + CONFIG.ASTEROID.SIZE_VARIATION;
@@ -795,7 +795,7 @@ class AIHorizon {
       }
       if (this.state.isPaused()) this._pausedFrameRendered = false;
       if (!this.state.isRunning()) {
-        this.drawBackground();
+        this.drawBackground({ suppressNebula: true });
       }
     });
   }
@@ -958,8 +958,8 @@ class AIHorizon {
   /**
    * Draw the background.
    */
-  drawBackground() {
-    drawBackgroundLifecycle(this);
+  drawBackground(options) {
+    drawBackgroundLifecycle(this, options);
   }
 }
 

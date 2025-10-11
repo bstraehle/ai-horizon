@@ -31,6 +31,7 @@ import { StarField } from "../entities/StarField.js";
  * @property {boolean} running Whether gameplay started (nebula gating)
  * @property {boolean} paused If true freezes time-based animation deltas
  * @property {boolean} [gameOver]
+ * @property {boolean} [suppressNebula] If true, skip drawing nebula even when otherwise visible
  * @property {number} animTime Accumulated animation time in ms
  * @property {number} [timeSec] Override absolute time in seconds
  * @property {number} [dtSec] Override frame delta in seconds
@@ -123,10 +124,11 @@ export class BackgroundManager {
       view: { width, height },
       paused,
       animTime,
+      suppressNebula,
       background: { nebulaConfigs, starField },
     } = ctxObj;
     Background.draw(ctx, width, height);
-    if (nebulaConfigs && (ctxObj.running || ctxObj.paused || ctxObj.gameOver)) {
+    if (!suppressNebula && nebulaConfigs && (ctxObj.running || ctxObj.paused || ctxObj.gameOver)) {
       Nebula.draw(ctx, nebulaConfigs);
     }
     const timeSec = typeof ctxObj.timeSec === "number" ? ctxObj.timeSec : (animTime || 0) / 1000;

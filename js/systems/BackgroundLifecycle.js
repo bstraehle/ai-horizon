@@ -48,6 +48,10 @@ export function initBackgroundLifecycle(game) {
  * Draw only the background (nebula/starfield layers) for the current frame.
  * @param {AIHorizon} game
  */
-export function drawBackgroundLifecycle(game) {
-  BackgroundManager.draw(getGameContext(game));
+export function drawBackgroundLifecycle(game, options) {
+  const ctx = getGameContext(game);
+  if (options && options.suppressNebula) {
+    /** @type {any} */ (ctx).suppressNebula = true;
+  }
+  BackgroundManager.draw(/** @type {any} */ (ctx));
 }

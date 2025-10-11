@@ -109,7 +109,7 @@ export function fullReset(game) {
     /* ignore */
   }
   try {
-    game.drawBackground();
+    game.drawBackground({ suppressNebula: true });
   } catch {
     /* ignore */
   }
