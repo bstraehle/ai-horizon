@@ -1,4 +1,5 @@
 import { CONFIG } from "../constants.js";
+import { BackgroundManager } from "../managers/BackgroundManager.js";
 
 /**
  * Star – falling collectible / background glow with optional red variant.
@@ -119,7 +120,14 @@ export class Star {
     const centerX = originX + width / 2;
     const centerY = originY + height / 2;
     const radius = width / 2;
-    const colors = isRed ? CONFIG.COLORS.STAR_RED : CONFIG.COLORS.STAR;
+    let colors = CONFIG.COLORS.STAR;
+    if (isRed) {
+      const palette = BackgroundManager.getCurrentNebulaPalette();
+      colors =
+        palette === "blue" && CONFIG.COLORS.STAR_BLUE
+          ? CONFIG.COLORS.STAR_BLUE
+          : CONFIG.COLORS.STAR_RED;
+    }
     ctx.shadowColor = colors.BASE;
     ctx.shadowBlur = CONFIG.STAR.SHADOW_BLUR;
     const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);

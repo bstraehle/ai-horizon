@@ -11,7 +11,7 @@ import { Nebula } from "../entities/Nebula.js";
  */
 export class SpriteManager {
   /**
-   * Build sprite atlas (bullet + trail, star, red star). Pure function of CONFIG colors.
+   * Build sprite atlas (bullet + trail, star, blue star, red star). Pure function of CONFIG colors.
    * @returns {import('../types.js').SpriteAtlas}
    */
   static createSprites() {
@@ -106,10 +106,44 @@ export class SpriteManager {
       }
     }
 
+    const starBlueCanvas = document.createElement("canvas");
+    starBlueCanvas.width = starBaseSize;
+    starBlueCanvas.height = starBaseSize;
+    {
+      const c = starBlueCanvas.getContext("2d");
+      if (!c) {
+        /* intentionally empty */
+      } else {
+        const cx = starBaseSize / 2;
+        const cy = starBaseSize / 2;
+        const size = starBaseSize * 0.45;
+        const grad = c.createRadialGradient(cx, cy, 0, cx, cy, size);
+        grad.addColorStop(0, CONFIG.COLORS.STAR_BLUE.GRAD_IN);
+        grad.addColorStop(0.3, CONFIG.COLORS.STAR_BLUE.GRAD_MID);
+        grad.addColorStop(1, CONFIG.COLORS.STAR_BLUE.GRAD_OUT);
+        c.fillStyle = grad;
+        c.beginPath();
+        for (let i = 0; i < 5; i++) {
+          const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+          const x1 = cx + size * Math.cos(angle);
+          const y1 = cy + size * Math.sin(angle);
+          if (i === 0) c.moveTo(x1, y1);
+          else c.lineTo(x1, y1);
+          const innerAngle = angle + Math.PI / 5;
+          const x2 = cx + size * 0.4 * Math.cos(innerAngle);
+          const y2 = cy + size * 0.4 * Math.sin(innerAngle);
+          c.lineTo(x2, y2);
+        }
+        c.closePath();
+        c.fill();
+      }
+    }
+
     const atlas = {
       bullet: bulletCanvas,
       bulletTrail: trail,
       star: starCanvas,
+      starBlue: starBlueCanvas,
       starRed: starRedCanvas,
       starBaseSize,
     };

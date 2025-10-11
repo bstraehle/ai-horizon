@@ -1,5 +1,6 @@
 import { CONFIG } from "../constants.js";
 import { ScoringManager } from "../managers/ScoringManager.js";
+import { BackgroundManager } from "../managers/BackgroundManager.js";
 
 /**
  * EventHandlers – centralized wiring of EventBus driven gameplay side‑effects.
@@ -208,7 +209,14 @@ export const EventHandlers = {
               CONFIG.STAR.PARTICLE_LIFE,
               CONFIG.STAR.PARTICLE_LIFE,
               rng.range(0, CONFIG.STAR.PARTICLE_SIZE_VARIATION) + CONFIG.STAR.PARTICLE_SIZE_MIN,
-              star && star.isRed ? CONFIG.COLORS.STAR_RED.BASE : CONFIG.COLORS.STAR.BASE
+              (function () {
+                const isRed = star && star.isRed;
+                if (!isRed) return CONFIG.COLORS.STAR.BASE;
+                const palette = BackgroundManager.getCurrentNebulaPalette();
+                if (palette === "blue" && CONFIG.COLORS.STAR_BLUE)
+                  return CONFIG.COLORS.STAR_BLUE.BASE;
+                return CONFIG.COLORS.STAR_RED.BASE;
+              })()
             )
           );
         }

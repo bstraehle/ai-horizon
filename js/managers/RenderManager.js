@@ -1,4 +1,5 @@
 import { CONFIG } from "../constants.js";
+import { BackgroundManager } from "./BackgroundManager.js";
 import { isOnscreen } from "../utils/bounds.js";
 
 /**
@@ -85,7 +86,9 @@ export class RenderManager {
     viewHeight = Infinity
   ) {
     const starSpr = sprites && sprites.star;
+    const starBlueSpr = sprites && /** @type {any} */ (sprites).starBlue;
     const starRedSpr = sprites && /** @type {any} */ (sprites).starRed;
+    const palette = BackgroundManager.getCurrentNebulaPalette();
     const base = sprites && sprites.starBaseSize;
     if (starSpr && base) {
       for (let i = 0; i < stars.length; i++) {
@@ -96,7 +99,11 @@ export class RenderManager {
           dh = baseSize;
         const cx = s.x + s.width / 2;
         const cy = s.y + s.height / 2;
-        const spr = s.isRed && starRedSpr ? starRedSpr : starSpr;
+        let spr = starSpr;
+        if (s.isRed) {
+          if (palette === "blue" && starBlueSpr) spr = starBlueSpr;
+          else if (starRedSpr) spr = starRedSpr;
+        }
         ctx.drawImage(spr, 0, 0, base, base, cx - dw / 2, cy - dh / 2, dw, dh);
       }
     } else {

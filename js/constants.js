@@ -133,10 +133,16 @@ const COLORS = deepFreeze({
     GRAD_OUT: "#909090",
   },
   STAR_RED: {
-    BASE: "#c4c4c4",
-    GRAD_IN: "#c4c4c4",
-    GRAD_MID: "#7a0c0c",
-    GRAD_OUT: "#7a0c0c",
+    BASE: "#dc143c",
+    GRAD_IN: "#dc143c",
+    GRAD_MID: "#8b0000",
+    GRAD_OUT: "#1a0000",
+  },
+  STAR_BLUE: {
+    BASE: "#00aadc",
+    GRAD_IN: "#00aadc",
+    GRAD_MID: "#006eb4",
+    GRAD_OUT: "#003c78",
   },
   UI: {
     OVERLAY_BACKDROP: "rgba(0,0,0,0.5)",
