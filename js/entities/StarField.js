@@ -128,10 +128,6 @@ export class StarField {
   ) {
     if (!starField) return;
     ctx.save();
-    ctx.fillStyle = CONFIG.COLORS.STAR.GRAD_IN;
-    ctx.shadowColor = CONFIG.COLORS.STAR.GRAD_IN;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
     const blurMult = CONFIG.STARFIELD.SHADOW_BLUR_MULT;
 
     /**
@@ -141,7 +137,6 @@ export class StarField {
      */
     const drawStars = (stars, twinkleRate, twinkleXFactor) => {
       let prevAlpha = -1;
-      let prevBlur = -1;
       for (let i = 0; i < stars.length; i++) {
         const star = stars[i];
         if (!paused) {
@@ -162,15 +157,19 @@ export class StarField {
           ctx.globalAlpha = alpha;
           prevAlpha = alpha;
         }
-        const blur = star.size * blurMult;
-        if (Math.abs(blur - prevBlur) > 0.01) {
-          ctx.shadowBlur = blur;
-          prevBlur = blur;
+        const sprite = StarField._getSprite(star.size, blurMult);
+        if (sprite) {
+          ctx.drawImage(sprite.canvas, star.x - sprite.offset, star.y - sprite.offset);
+        } else {
+          ctx.save();
+          ctx.fillStyle = CONFIG.COLORS.STAR.GRAD_IN;
+          ctx.shadowColor = CONFIG.COLORS.STAR.GRAD_IN;
+          ctx.shadowBlur = star.size * blurMult;
+          ctx.fillRect(star.x, star.y, star.size, star.size);
+          ctx.restore();
         }
-        ctx.fillRect(star.x, star.y, star.size, star.size);
       }
       ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
     };
 
     if (Array.isArray(starField)) {
@@ -245,4 +244,64 @@ export class StarField {
     }
     return starField;
   }
+
+  /**
+   * Retrieve or cache a pre-blurred star sprite for a given size bucket.
+   * The sprite embeds the glow (shadow blur) so per-frame drawing is a fast drawImage.
+   * @param {number} size
+   * @param {number} blurMult
+   * @returns {{ canvas: OffscreenCanvas | HTMLCanvasElement, offset: number } | null}
+   * @private
+   */
+  static _getSprite(size, blurMult) {
+    if (!Number.isFinite(size) || size <= 0) return null;
+    if (!StarField._spriteCache) StarField._spriteCache = new Map();
+    const qSize = StarField._quantizeSize(size);
+    const key = qSize.toFixed(2);
+    const cached = StarField._spriteCache.get(key);
+    if (cached) return cached;
+
+    const blur = qSize * blurMult;
+    const pad = Math.ceil(blur + 2);
+    const width = Math.ceil(qSize + pad * 2);
+    const height = Math.ceil(qSize + pad * 2);
+    let canvas;
+    if (typeof OffscreenCanvas === "function") canvas = new OffscreenCanvas(width, height);
+    else {
+      const elem = typeof document !== "undefined" ? document.createElement("canvas") : null;
+      if (!elem) return null;
+      elem.width = width;
+      elem.height = height;
+      canvas = elem;
+    }
+    const off = canvas.getContext("2d");
+    if (!off) return null;
+    off.clearRect(0, 0, width, height);
+    off.save();
+    off.fillStyle = CONFIG.COLORS.STAR.GRAD_IN;
+    off.shadowColor = CONFIG.COLORS.STAR.GRAD_IN;
+    off.shadowOffsetX = 0;
+    off.shadowOffsetY = 0;
+    off.shadowBlur = blur;
+    off.fillRect(pad, pad, qSize, qSize);
+    off.restore();
+    const sprite = { canvas, offset: pad };
+    StarField._spriteCache.set(key, sprite);
+    return sprite;
+  }
+
+  /**
+   * Quantize star size to limit sprite variants.
+   * @param {number} size
+   * @returns {number}
+   * @private
+   */
+  static _quantizeSize(size) {
+    const step = StarField._SIZE_STEP;
+    return Math.max(0.25, Math.round(size / step) * step);
+  }
 }
+
+/** @type {Map<string, { canvas: OffscreenCanvas | HTMLCanvasElement, offset: number }> | undefined} */
+StarField._spriteCache = undefined;
+StarField._SIZE_STEP = 0.25;

@@ -154,8 +154,8 @@ const COLORS = deepFreeze({
 export const CONFIG = deepFreeze({
   TWO_PI: Math.PI * 2,
   VIEW: {
-    DPR_MIN: 1,
-    DPR_MAX: 3,
+    DPR_MIN: 1.0,
+    DPR_MAX: 2.0,
     DPR_MOBILE_MAX: 1.5,
   },
   PERFORMANCE: {
