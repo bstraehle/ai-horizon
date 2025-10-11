@@ -66,12 +66,14 @@ export class BackgroundManager {
     const state = {};
     if (running) {
       const palette = BackgroundManager._getAndFlipNebulaPalette(nebulaPalette);
+      BackgroundManager._nebulaCurrentPalette = palette;
       state.nebulaConfigs = Nebula.init(width, height, mobileHint, rng, palette);
     } else {
       const palette =
         typeof nebulaPalette === "string"
           ? nebulaPalette
           : BackgroundManager._nebulaNextPalette || "red";
+      BackgroundManager._nebulaCurrentPalette = palette;
       state.nebulaConfigs = Nebula.init(width, height, mobileHint, rng, palette);
     }
     state.starField = StarField.init(width, height, rng, mobileHint, scale);
@@ -135,6 +137,16 @@ export class BackgroundManager {
 
 /** @type {"red"|"blue"} */
 BackgroundManager._nebulaNextPalette = "red";
+/** @type {"red"|"blue"} */
+BackgroundManager._nebulaCurrentPalette = "red";
+
+/**
+ * Get the palette currently used for the nebula.
+ * @returns {"red"|"blue"}
+ */
+BackgroundManager.getCurrentNebulaPalette = function () {
+  return this._nebulaCurrentPalette === "blue" ? "blue" : "red";
+};
 
 /**
  * Resolve the current nebula palette and toggle for next game.

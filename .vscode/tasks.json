@@ -7,6 +7,14 @@
       "command": "npm run format",
       "isBackground": false,
       "group": "build"
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "npm test --silent",
+      "isBackground": false,
+      "problemMatcher": ["$eslint-stylish"],
+      "group": "build"
     }
   ]
 }

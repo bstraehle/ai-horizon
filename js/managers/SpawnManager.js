@@ -1,4 +1,5 @@
 import { CONFIG } from "../constants.js";
+import { BackgroundManager } from "./BackgroundManager.js";
 import { Asteroid } from "../entities/Asteroid.js";
 import { Star } from "../entities/Star.js";
 /** @typedef {import('../types.js').RNGLike} RNGLike */
@@ -55,7 +56,8 @@ import { Star } from "../entities/Star.js";
  *   planetIndex: number,
  *   planetUsed: Set<number>,
  *   goldenSpawned: number,
- *   goldenWindow: number
+ *   nextGoldenTimeSec: number,
+ *   startTimeSec: number
  * }} SpawnState
  */
 export class SpawnManager {
@@ -72,7 +74,11 @@ export class SpawnManager {
         planetIndex: 0,
         planetUsed: new Set(),
         goldenSpawned: 0,
-        goldenWindow: -1,
+        nextGoldenTimeSec: CONFIG.GAME.GOLDEN_INTERVAL_SECONDS | 0 || 15,
+        startTimeSec:
+          typeof (/** @type {any} */ (game).timeSec) === "number"
+            ? Math.max(0, /** @type {any} */ (game).timeSec)
+            : 0,
       };
       this.#STATE.set(game, st);
     }
@@ -81,7 +87,21 @@ export class SpawnManager {
 
   /** Reset per-game spawn cadence/palette state. @param {object} game */
   static reset(game) {
-    this.#STATE.delete(game);
+    const interval = CONFIG.GAME.GOLDEN_INTERVAL_SECONDS | 0 || 15;
+    const currentSec =
+      typeof (/** @type {any} */ (game).timeSec) === "number"
+        ? Math.max(0, /** @type {any} */ (game).timeSec)
+        : 0;
+    const st = {
+      yellowCount: 0,
+      normalAsteroidCount: 0,
+      planetIndex: 0,
+      planetUsed: new Set(),
+      goldenSpawned: 0,
+      nextGoldenTimeSec: interval,
+      startTimeSec: currentSec,
+    };
+    this.#STATE.set(game, st);
   }
 
   /**
@@ -128,21 +148,19 @@ export class SpawnManager {
     let isGolden = false;
     if (isIndestructible) {
       const maxGolden = CONFIG.GAME.GOLDEN_ASTEROID_COUNT | 0;
-      const prob =
-        typeof CONFIG.GAME.GOLDEN_ASTEROID_PROB === "number"
-          ? Math.max(0, Math.min(1, CONFIG.GAME.GOLDEN_ASTEROID_PROB))
-          : 0.5;
-      if (maxGolden > 0 && st.goldenSpawned < maxGolden) {
-        const total = CONFIG.GAME.TIMER_SECONDS | 0 || 60;
-        const elapsed =
-          typeof game.timeSec === "number" ? Math.max(0, Math.min(game.timeSec, total)) : 0;
-        const windowSize = Math.max(1, Math.floor(total / Math.max(1, maxGolden))); // e.g., 20s windows for 3
-        const currentWindow = Math.floor(elapsed / windowSize);
-        const canSpawnInWindow = currentWindow > (st.goldenWindow | 0);
-        if (canSpawnInWindow && rng.nextFloat() < prob) {
+      const interval = CONFIG.GAME.GOLDEN_INTERVAL_SECONDS | 0 || 15;
+      if (maxGolden > 0 && st.goldenSpawned < maxGolden && interval > 0) {
+        const currentSec = typeof game.timeSec === "number" ? Math.max(0, game.timeSec) : 0;
+        const start = st.startTimeSec | 0;
+        const elapsed = Math.max(0, currentSec - start);
+        if (elapsed >= (st.nextGoldenTimeSec | 0)) {
           isGolden = true;
           st.goldenSpawned++;
-          st.goldenWindow = currentWindow;
+          let next = st.nextGoldenTimeSec | 0;
+          do {
+            next += interval;
+          } while (next <= elapsed);
+          st.nextGoldenTimeSec = next;
         }
       }
     }
@@ -160,7 +178,9 @@ export class SpawnManager {
     const x = minX + rng.nextFloat() * (maxX - minX);
     let paletteOverride = null;
     if (isGolden) {
-      paletteOverride = CONFIG.COLORS.ASTEROID_GOLD || null;
+      const nebulaPalette = BackgroundManager.getCurrentNebulaPalette();
+      const useBlue = nebulaPalette === "blue";
+      paletteOverride = useBlue ? CONFIG.COLORS.ASTEROID_BLUE : CONFIG.COLORS.ASTEROID_RED;
     } else if (isIndestructible) {
       const planets = CONFIG.COLORS.ASTEROID_PLANETS;
       if (Array.isArray(planets) && planets.length > 0) {
