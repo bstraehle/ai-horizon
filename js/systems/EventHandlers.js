@@ -93,10 +93,12 @@ export const EventHandlers = {
        */
       events.on("bulletHitAsteroid", function (/** @type {{ asteroid:any }} */ payload) {
         const { asteroid } = payload;
-        const add =
-          asteroid && asteroid.isIndestructible
-            ? CONFIG.GAME.ASTEROID_SCORE_INDESTRUCTIBLE
-            : CONFIG.GAME.ASTEROID_SCORE;
+        let add = CONFIG.GAME.ASTEROID_SCORE;
+        if (asteroid && asteroid.isIndestructible) {
+          add = asteroid.isGolden
+            ? CONFIG.GAME.ASTEROID_SCORE_GOLDEN
+            : CONFIG.GAME.ASTEROID_SCORE_INDESTRUCTIBLE;
+        }
         ScoringManager.add(game, add);
         if (asteroid) {
           if (asteroid.isIndestructible) {

@@ -7,6 +7,7 @@
  * - Enable lightweight refactors by centralizing shape documentation (update here → propagate hints).
  *
  * Notes:
+ * @property {number} [timeSec]
  * - This file intentionally exports no runtime values (aside from an empty module export) to avoid bundle weight.
  * - Keep unions & event maps narrow and intention‑revealing; broad `any` leakage should be avoided upstream.
  */

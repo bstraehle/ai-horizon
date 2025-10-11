@@ -49,6 +49,8 @@ export class Asteroid {
     this.height = height;
     this.speed = speed;
     this.isIndestructible = !!isIndestructible;
+    /** @type {boolean} */
+    this.isGolden = false;
     this._shieldFlash = 0;
     const radius = this.width / 2;
     const rand =
@@ -309,9 +311,10 @@ export class Asteroid {
     this.height = height;
     this.speed = speed;
     this.isIndestructible = !!isIndestructible;
+    this.isGolden = false;
     this._shieldFlash = 0;
     this._hits = 0;
-    this._damageLineCount = 0; // reuse typed arrays allocated in ctor
+    this._damageLineCount = 0;
     const radius = this.width / 2;
     const rand =
       rng && typeof rng.nextFloat === "function" ? rng : { nextFloat: Math.random.bind(Math) };

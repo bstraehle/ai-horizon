@@ -29,6 +29,7 @@ import { Star } from "../entities/Star.js";
  * @property {number} asteroidSpeed
  * @property {AsteroidPool | null | undefined} [asteroidPool]
  * @property {number} [_normalAsteroidCount]
+ * @property {number} [timeSec]
  */
 
 /**
@@ -52,7 +53,9 @@ import { Star } from "../entities/Star.js";
  *   yellowCount: number,
  *   normalAsteroidCount: number,
  *   planetIndex: number,
- *   planetUsed: Set<number>
+ *   planetUsed: Set<number>,
+ *   goldenSpawned: number,
+ *   goldenWindow: number
  * }} SpawnState
  */
 export class SpawnManager {
@@ -63,7 +66,14 @@ export class SpawnManager {
   static #state(game) {
     let st = this.#STATE.get(game);
     if (!st) {
-      st = { yellowCount: 0, normalAsteroidCount: 0, planetIndex: 0, planetUsed: new Set() };
+      st = {
+        yellowCount: 0,
+        normalAsteroidCount: 0,
+        planetIndex: 0,
+        planetUsed: new Set(),
+        goldenSpawned: 0,
+        goldenWindow: -1,
+      };
       this.#STATE.set(game, st);
     }
     return st;
@@ -73,6 +83,7 @@ export class SpawnManager {
   static reset(game) {
     this.#STATE.delete(game);
   }
+
   /**
    * Per-tick probabilistic spawn (asteroids & stars) using Poisson approximation.
    * @param {SpawnGameSlice} game
@@ -113,7 +124,28 @@ export class SpawnManager {
     const st = /** @type {any} */ (this.#state(game));
     const asteroidThreshold = CONFIG.GAME.ASTEROID_NORMAL_BEFORE_INDESTRUCTIBLE | 0 || 10;
     const count = st.normalAsteroidCount | 0;
-    const isIndestructible = count >= asteroidThreshold;
+    let isIndestructible = count >= asteroidThreshold;
+    let isGolden = false;
+    if (isIndestructible) {
+      const maxGolden = CONFIG.GAME.GOLDEN_ASTEROID_COUNT | 0;
+      const prob =
+        typeof CONFIG.GAME.GOLDEN_ASTEROID_PROB === "number"
+          ? Math.max(0, Math.min(1, CONFIG.GAME.GOLDEN_ASTEROID_PROB))
+          : 0.5;
+      if (maxGolden > 0 && st.goldenSpawned < maxGolden) {
+        const total = CONFIG.GAME.TIMER_SECONDS | 0 || 60;
+        const elapsed =
+          typeof game.timeSec === "number" ? Math.max(0, Math.min(game.timeSec, total)) : 0;
+        const windowSize = Math.max(1, Math.floor(total / Math.max(1, maxGolden))); // e.g., 20s windows for 3
+        const currentWindow = Math.floor(elapsed / windowSize);
+        const canSpawnInWindow = currentWindow > (st.goldenWindow | 0);
+        if (canSpawnInWindow && rng.nextFloat() < prob) {
+          isGolden = true;
+          st.goldenSpawned++;
+          st.goldenWindow = currentWindow;
+        }
+      }
+    }
     st.normalAsteroidCount = isIndestructible ? 0 : count + 1;
 
     const baseSize = CONFIG.ASTEROID.MIN_SIZE + rng.nextFloat() * CONFIG.ASTEROID.SIZE_VARIATION;
@@ -127,7 +159,9 @@ export class SpawnManager {
     const maxX = Math.max(minX, game.view.width - width - CONFIG.ASTEROID.HORIZONTAL_MARGIN / 2);
     const x = minX + rng.nextFloat() * (maxX - minX);
     let paletteOverride = null;
-    if (isIndestructible) {
+    if (isGolden) {
+      paletteOverride = CONFIG.COLORS.ASTEROID_GOLD || null;
+    } else if (isIndestructible) {
       const planets = CONFIG.COLORS.ASTEROID_PLANETS;
       if (Array.isArray(planets) && planets.length > 0) {
         const n = planets.length;
@@ -147,7 +181,7 @@ export class SpawnManager {
       }
     }
 
-    return game.asteroidPool
+    const asteroid = game.asteroidPool
       ? game.asteroidPool.acquire(
           x,
           CONFIG.ASTEROID.SPAWN_Y,
@@ -168,6 +202,14 @@ export class SpawnManager {
           isIndestructible,
           paletteOverride
         );
+    if (isGolden) {
+      try {
+        asteroid.isGolden = true;
+      } catch {
+        /* ignore */
+      }
+    }
+    return asteroid;
   }
 
   /** Create/acquire star; cadence spawns red variant after threshold. @param {StarCreateSlice} game @returns {Star} */
