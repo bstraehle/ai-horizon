@@ -123,12 +123,31 @@ body {
   padding: var(--space-1) var(--space-2);
   position: relative;
 }
-
-/* Connection status border for the High Score box */
+@keyframes timer-flash {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 80, 80, 0);
+    transform: translateZ(0);
+  }
+  50% {
+    box-shadow:
+      0 0 16px var(--finale-glow1, rgba(255, 60, 60, 0.7)),
+      0 0 32px var(--finale-glow2, rgba(255, 0, 0, 0.3));
+    transform: translateZ(0) scale(1.02);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 80, 80, 0);
+    transform: translateZ(0);
+  }
+}
+#timerBox.finale,
+#timer.finale {
+  animation: timer-flash 750ms ease-in-out infinite;
+  border-color: var(--finale-color, #ff4d4d);
+}
 #highScoreBox {
   transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease;
+    border-color 175ms ease,
+    box-shadow 175ms ease;
 }
 #highScoreBox.connection-online,
 #currentScoreBox.connection-online,
@@ -421,7 +440,8 @@ body.about-body,
   max-width: 720px;
   text-align: left;
 }
-.about-content ul {
+.about-content ul,
+.about-content ol {
   margin: 8px auto 0;
   max-width: 720px;
   padding-left: 1.2em;

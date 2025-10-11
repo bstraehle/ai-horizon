@@ -3,6 +3,8 @@
  * All methods are static and defensive (try/catch) to tolerate non-browser / partial DOM environments.
  */
 import { LeaderboardManager } from "./LeaderboardManager.js";
+import { CONFIG } from "../constants.js";
+import { BackgroundManager } from "./BackgroundManager.js";
 export class UIManager {
   static _preserveFocus = false;
   /** @type {(() => void)|null} */
@@ -309,6 +311,30 @@ export class UIManager {
   }
 
   /**
+   * Ensure the countdown timer uses regular styling (no finale flash).
+   * Call when the game stops early (e.g., player ends before timer hits 0).
+   * @param {HTMLElement|null} [timerEl] Optional reference to the timer element.
+   */
+  static clearFinaleTimer(timerEl) {
+    try {
+      /** @type {HTMLElement|null} */
+      const container = /** @type {HTMLElement|null} */ (
+        (typeof document !== "undefined" && document.getElementById("timerBox")) ||
+          (timerEl && timerEl.parentElement) ||
+          null
+      );
+      /** @type {HTMLElement|null} */
+      const timer = /** @type {HTMLElement|null} */ (
+        (typeof document !== "undefined" && document.getElementById("timer")) || timerEl || null
+      );
+      if (container && container.classList) container.classList.remove("finale");
+      if (timer && timer.classList) timer.classList.remove("finale");
+    } catch (_) {
+      /* non-critical UI affordance */
+    }
+  }
+
+  /**
    * @param {HTMLElement|null} timerEl Timer display element.
    * @param {number} secondsRemaining Seconds (float) remaining; negative values clamped to 0.
    */
@@ -318,6 +344,69 @@ export class UIManager {
     const mins = Math.floor(s / 60);
     const secs = s % 60;
     timerEl.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
+
+    try {
+      const finaleWindow = (CONFIG && CONFIG.GAME && CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS) || 0;
+      const active = finaleWindow > 0 && secondsRemaining > 0 && secondsRemaining <= finaleWindow;
+      /** @type {HTMLElement|null} */
+      const container = /** @type {HTMLElement|null} */ (
+        (typeof document !== "undefined" && document.getElementById("timerBox")) ||
+          timerEl.parentElement ||
+          null
+      );
+      if (container && container.classList) {
+        if (active) container.classList.add("finale");
+        else container.classList.remove("finale");
+      } else if (timerEl && timerEl.classList) {
+        if (active) timerEl.classList.add("finale");
+        else timerEl.classList.remove("finale");
+      }
+
+      if (active && (container || timerEl)) {
+        const target = container || timerEl;
+        /** @type {"red"|"blue"} */
+        const palette =
+          typeof BackgroundManager?.getCurrentNebulaPalette === "function"
+            ? BackgroundManager.getCurrentNebulaPalette()
+            : "red";
+        const baseHex =
+          palette === "blue" ? CONFIG.COLORS.STAR_BLUE.BASE : CONFIG.COLORS.STAR_RED.BASE;
+        const rgb = (function hexToRgb(hex) {
+          try {
+            const h = hex.replace("#", "");
+            const v =
+              h.length === 3
+                ? h
+                    .split("")
+                    .map((/** @type {string} */ c) => c + c)
+                    .join("")
+                : h.padEnd(6, "0");
+            const r = parseInt(v.slice(0, 2), 16);
+            const g = parseInt(v.slice(2, 4), 16);
+            const b = parseInt(v.slice(4, 6), 16);
+            if ([r, g, b].some((n) => Number.isNaN(n))) return null;
+            return { r, g, b };
+          } catch (_) {
+            return null;
+          }
+        })(baseHex);
+        if (rgb) {
+          const glow1 = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)`;
+          const glow2 = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`;
+          const textHi = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.9)`;
+          try {
+            target.style.setProperty("--finale-color", baseHex);
+            target.style.setProperty("--finale-glow1", glow1);
+            target.style.setProperty("--finale-glow2", glow2);
+            target.style.setProperty("--finale-text", textHi);
+          } catch (_) {
+            /* ignore */
+          }
+        }
+      }
+    } catch (_) {
+      /* non-critical UI affordance */
+    }
   }
 
   /** @param {HTMLElement|null} pauseScreen */
@@ -339,6 +428,11 @@ export class UIManager {
     preserveScroll = false,
     allowInitials = undefined
   ) {
+    try {
+      UIManager.clearFinaleTimer(null);
+    } catch (_) {
+      /* ignore */
+    }
     try {
       if (currentScoreEl) {
         const ds = currentScoreEl.dataset || /** @type {any} */ ({});
