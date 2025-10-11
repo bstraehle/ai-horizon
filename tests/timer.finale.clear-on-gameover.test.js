@@ -12,7 +12,7 @@ function setupDOM() {
   globalThis.document = dom.window.document;
   try {
     globalThis.localStorage = dom.window.localStorage;
-  } catch (_) {
+  } catch {
     /* ignore */
   }
 }
