@@ -17,6 +17,7 @@ import { StarField } from "../entities/StarField.js";
  * @property {boolean} [isLowPower] Low power rendering hint
  * @property {number} [starfieldScale] Optional scale multiplier
  * @property {RNGLike} [rng] Optional deterministic RNG
+ * @property {"red"|"blue"} [nebulaPalette] Optional palette override
  */
 /**
  * @typedef {Object} BackgroundResizeContext
@@ -58,12 +59,20 @@ export class BackgroundManager {
       isLowPower,
       starfieldScale,
       rng,
+      nebulaPalette,
     } = ctxObj;
     const mobileHint = isMobile || !!isLowPower;
     const scale = typeof starfieldScale === "number" ? starfieldScale : 1;
     const state = {};
     if (running) {
-      state.nebulaConfigs = Nebula.init(width, height, mobileHint, rng);
+      const palette = BackgroundManager._getAndFlipNebulaPalette(nebulaPalette);
+      state.nebulaConfigs = Nebula.init(width, height, mobileHint, rng, palette);
+    } else {
+      const palette =
+        typeof nebulaPalette === "string"
+          ? nebulaPalette
+          : BackgroundManager._nebulaNextPalette || "red";
+      state.nebulaConfigs = Nebula.init(width, height, mobileHint, rng, palette);
     }
     state.starField = StarField.init(width, height, rng, mobileHint, scale);
     return state;
@@ -123,3 +132,18 @@ export class BackgroundManager {
     StarField.draw(ctx, width, height, starField, timeSec, paused, dtSec, ctxObj.rng);
   }
 }
+
+/** @type {"red"|"blue"} */
+BackgroundManager._nebulaNextPalette = "red";
+
+/**
+ * Resolve the current nebula palette and toggle for next game.
+ * @param {"red"|"blue"} [override]
+ * @returns {"red"|"blue"}
+ */
+BackgroundManager._getAndFlipNebulaPalette = function (override) {
+  let palette = override === "red" || override === "blue" ? override : this._nebulaNextPalette;
+  if (palette !== "red" && palette !== "blue") palette = "red";
+  this._nebulaNextPalette = palette === "red" ? "blue" : "red";
+  return palette;
+};

@@ -57,15 +57,24 @@ export class Nebula {
    * @param {number} height Canvas height.
    * @param {boolean} isMobile Mobile flag (affects counts & size ranges).
    * @param {import('../types.js').RNGLike} [rng] Optional RNG for determinism (must expose nextFloat()).
+   * @param {"red"|"blue"} [palette="red"] Palette to use for nebula color variants.
    * @returns {NebulaConfig[]} Array of nebula runtime configs.
    */
-  static init(width, height, isMobile, rng) {
-    const nebulaColors = [
-      { color0: CONFIG.COLORS.NEBULA.N1, color1: CONFIG.COLORS.NEBULA.N1_OUT },
-      { color0: CONFIG.COLORS.NEBULA.N2, color1: CONFIG.COLORS.NEBULA.N2_OUT },
-      { color0: CONFIG.COLORS.NEBULA.N3, color1: CONFIG.COLORS.NEBULA.N3_OUT },
-      { color0: CONFIG.COLORS.NEBULA.N4, color1: CONFIG.COLORS.NEBULA.N4_OUT },
-    ];
+  static init(width, height, isMobile, rng, palette = "red") {
+    const useBlue = palette === "blue";
+    const nebulaColors = useBlue
+      ? [
+          { color0: CONFIG.COLORS.NEBULA_BLUE.B1, color1: CONFIG.COLORS.NEBULA_BLUE.B1_OUT },
+          { color0: CONFIG.COLORS.NEBULA_BLUE.B2, color1: CONFIG.COLORS.NEBULA_BLUE.B2_OUT },
+          { color0: CONFIG.COLORS.NEBULA_BLUE.B3, color1: CONFIG.COLORS.NEBULA_BLUE.B3_OUT },
+          { color0: CONFIG.COLORS.NEBULA_BLUE.B4, color1: CONFIG.COLORS.NEBULA_BLUE.B4_OUT },
+        ]
+      : [
+          { color0: CONFIG.COLORS.NEBULA.N1, color1: CONFIG.COLORS.NEBULA.N1_OUT },
+          { color0: CONFIG.COLORS.NEBULA.N2, color1: CONFIG.COLORS.NEBULA.N2_OUT },
+          { color0: CONFIG.COLORS.NEBULA.N3, color1: CONFIG.COLORS.NEBULA.N3_OUT },
+          { color0: CONFIG.COLORS.NEBULA.N4, color1: CONFIG.COLORS.NEBULA.N4_OUT },
+        ];
     const count = isMobile ? CONFIG.NEBULA.COUNT_MOBILE : CONFIG.NEBULA.COUNT_DESKTOP;
     const radiusMin = isMobile ? CONFIG.NEBULA.RADIUS_MIN_MOBILE : CONFIG.NEBULA.RADIUS_MIN_DESKTOP;
     const radiusMax = isMobile ? CONFIG.NEBULA.RADIUS_MAX_MOBILE : CONFIG.NEBULA.RADIUS_MAX_DESKTOP;
@@ -331,6 +340,10 @@ export class Nebula {
       [CONFIG.COLORS.NEBULA.N2, CONFIG.COLORS.NEBULA.N2_OUT],
       [CONFIG.COLORS.NEBULA.N3, CONFIG.COLORS.NEBULA.N3_OUT],
       [CONFIG.COLORS.NEBULA.N4, CONFIG.COLORS.NEBULA.N4_OUT],
+      [CONFIG.COLORS.NEBULA_BLUE.B1, CONFIG.COLORS.NEBULA_BLUE.B1_OUT],
+      [CONFIG.COLORS.NEBULA_BLUE.B2, CONFIG.COLORS.NEBULA_BLUE.B2_OUT],
+      [CONFIG.COLORS.NEBULA_BLUE.B3, CONFIG.COLORS.NEBULA_BLUE.B3_OUT],
+      [CONFIG.COLORS.NEBULA_BLUE.B4, CONFIG.COLORS.NEBULA_BLUE.B4_OUT],
     ];
     for (const radius of list) {
       for (const [c0, c1] of colors) Nebula._getSprite(c0, c1, radius);
