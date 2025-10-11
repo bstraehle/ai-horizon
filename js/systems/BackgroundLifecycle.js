@@ -10,6 +10,15 @@ import { RNG } from "../utils/RNG.js";
  * @param {AIHorizon} game
  */
 export function initBackgroundLifecycle(game) {
+  try {
+    const isGameOver =
+      game && game.state && typeof game.state.isGameOver === "function" && game.state.isGameOver();
+    if (isGameOver && game.nebulaConfigs && game.starField) {
+      return;
+    }
+  } catch {
+    /* ignore state checks; fall through to init */
+  }
   const ctx = getGameContext(game);
   ctx.starfieldScale = game._starfieldScale;
   ctx.isLowPower = game._isLowPowerMode;

@@ -30,7 +30,7 @@
   --color-btn-gradient-hover-start: #555;
   --color-btn-gradient-start: #333;
   --color-connection-online: var(--color-text);
-  --color-connection-offline: var(--color-btn-focus-outline);
+  --color-connection-offline: var(--color-text);
   --color-text: #fff;
   --color-text-secondary: #ddd;
   --color-title-shadow: #ddd;
