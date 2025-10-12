@@ -13,23 +13,23 @@ function makeGame() {
 }
 
 describe("Golden (red) asteroid timing gates", () => {
-  it("never spawns golden before 15s elapsed (relative to session start)", () => {
+  it("never spawns golden before 10s elapsed (relative to session start)", () => {
     const game = makeGame();
     game.timeSec = 100;
     SpawnManager.reset(game);
-    game.timeSec = 100 + 10;
+    game.timeSec = 100 + 9;
     for (let i = 0; i < 20; i++) {
       const a = SpawnManager.createAsteroid(game);
       expect(!!a.isGolden).toBe(false);
     }
   });
 
-  it("spawns golden on/after 15s, aligned to the indestructible cadence", () => {
+  it("spawns golden on/after 10s, aligned to the indestructible cadence", () => {
     const game = makeGame();
     game.timeSec = 200;
     SpawnManager.reset(game);
 
-    game.timeSec = 200 + 12;
+    game.timeSec = 200 + 9;
     for (let i = 0; i < 4 /* ASTEROID_NORMAL_BEFORE_INDESTRUCTIBLE */; i++) {
       const a = SpawnManager.createAsteroid(game);
       expect(a.isGolden).toBe(false);
@@ -37,12 +37,36 @@ describe("Golden (red) asteroid timing gates", () => {
     let a = SpawnManager.createAsteroid(game);
     expect(a.isGolden).toBe(false);
 
-    game.timeSec = 200 + 15;
+    game.timeSec = 200 + 10;
     for (let i = 0; i < 4; i++) {
       const normal = SpawnManager.createAsteroid(game);
       expect(normal.isGolden).toBe(false);
     }
     a = SpawnManager.createAsteroid(game);
     expect(a.isGolden).toBe(true);
+  });
+
+  it("caps golden spawns at 5 total, every 10s thereafter", () => {
+    const game = makeGame();
+    const start = 300;
+    game.timeSec = start;
+    SpawnManager.reset(game);
+
+    const spawnBlock = () => {
+      for (let i = 0; i < 4; i++) {
+        const n = SpawnManager.createAsteroid(game);
+        expect(!!n.isGolden).toBe(false);
+      }
+      const indestructible = SpawnManager.createAsteroid(game);
+      return !!indestructible.isGolden;
+    };
+
+    for (let k = 1; k <= 5; k++) {
+      game.timeSec = start + k * 10;
+      expect(spawnBlock()).toBe(true);
+    }
+
+    game.timeSec = start + 60;
+    expect(spawnBlock()).toBe(false);
   });
 });
