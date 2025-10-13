@@ -921,7 +921,7 @@ class AIHorizon {
    */
   _logRunSummary(accuracySummary) {
     if (typeof console === "undefined" || typeof console.log !== "function") return;
-    const accuracyValue =
+    const accuracyRaw =
       typeof this.accuracy === "number"
         ? this.accuracy
         : accuracySummary && typeof accuracySummary.accuracy === "number"
@@ -968,6 +968,11 @@ class AIHorizon {
           : this.score || 0;
     const summary = {
       highScore: this.highScore || 0,
+      score: {
+        current: typeof this.score === "number" ? this.score : this.score || 0,
+        base: baseScore,
+        accuracyRaw,
+      },
       time: {
         totalSeconds: totalSecondsInt,
         remainingSeconds: remainingSecondsInt,

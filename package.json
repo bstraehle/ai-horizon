@@ -19,6 +19,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "ci:verify": "npm run lint:ci && npm test --silent",
     "ci:local": "npm run lint:ci && npm run format:check && npm run typecheck && npm test",
     "prepare": "husky || echo 'husky skipped'"
   },

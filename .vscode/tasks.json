@@ -11,7 +11,7 @@
     {
       "label": "test",
       "type": "shell",
-      "command": "npm test --silent",
+      "command": "npm run ci:verify",
       "isBackground": false,
       "problemMatcher": ["$eslint-stylish"],
       "group": "build"
