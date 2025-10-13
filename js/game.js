@@ -130,7 +130,6 @@ class AIHorizon {
     this.bonusStarsCollected = 0;
     this.accuracy = 0;
     this.accuracyBonus = 0;
-    this._accuracyBonusApplied = false;
     try {
       this.updateHighScore();
     } catch (_e) {
@@ -921,12 +920,6 @@ class AIHorizon {
    */
   _logRunSummary(accuracySummary) {
     if (typeof console === "undefined" || typeof console.log !== "function") return;
-    const accuracyRaw =
-      typeof this.accuracy === "number"
-        ? this.accuracy
-        : accuracySummary && typeof accuracySummary.accuracy === "number"
-          ? accuracySummary.accuracy
-          : null;
     const accuracySummaryRounded = (() => {
       if (!accuracySummary) return null;
       const { applied: _applied, newScore, ...rest } = accuracySummary;
@@ -960,19 +953,15 @@ class AIHorizon {
     } else if (Number.isFinite(runtimeSeconds)) {
       runtimeSecondsInt = toSeconds(runtimeSeconds, "round");
     }
-    const baseScore =
-      accuracySummary && typeof accuracySummary.baseScore === "number"
-        ? accuracySummary.baseScore
-        : typeof this.accuracyBonus === "number"
-          ? Math.max(0, (this.score || 0) - this.accuracyBonus)
-          : this.score || 0;
     const summary = {
+      timestamp: (() => {
+        try {
+          return new Date().toISOString();
+        } catch (_e) {
+          return null;
+        }
+      })(),
       highScore: this.highScore || 0,
-      score: {
-        current: typeof this.score === "number" ? this.score : this.score || 0,
-        base: baseScore,
-        accuracyRaw,
-      },
       time: {
         totalSeconds: totalSecondsInt,
         remainingSeconds: remainingSecondsInt,
@@ -996,7 +985,7 @@ class AIHorizon {
         bonusAsteroidHitBullets:
           typeof this.bonusAsteroidHitBullets === "number" ? this.bonusAsteroidHitBullets : null,
       },
-      browser: (() => {
+      device: (() => {
         try {
           const ua = typeof navigator !== "undefined" ? navigator.userAgent : null;
           const width = typeof window !== "undefined" ? window.innerWidth : null;
@@ -1018,13 +1007,6 @@ class AIHorizon {
             timeZone: null,
             platform: null,
           };
-        }
-      })(),
-      timestamp: (() => {
-        try {
-          return new Date().toISOString();
-        } catch (_e) {
-          return null;
         }
       })(),
     };
