@@ -29,11 +29,11 @@ describe("Finale bonus (last N seconds) doubles base scoring", () => {
 
   it("doubles hardened asteroid and red star appropriately", () => {
     const game = makeGame(1.0);
-    ScoringManager.add(game, CONFIG.GAME.ASTEROID_SCORE_INDESTRUCTIBLE);
-    ScoringManager.add(game, CONFIG.GAME.STAR_SCORE_RED);
+    ScoringManager.add(game, CONFIG.GAME.ASTEROID_SCORE_HARDENED);
+    ScoringManager.add(game, CONFIG.GAME.STAR_SCORE_BONUS);
     expect(game.score).toBe(
-      CONFIG.GAME.ASTEROID_SCORE_INDESTRUCTIBLE * CONFIG.GAME.FINALE_BONUS_MULTIPLIER +
-        CONFIG.GAME.STAR_SCORE_RED * CONFIG.GAME.FINALE_BONUS_MULTIPLIER
+      CONFIG.GAME.ASTEROID_SCORE_HARDENED * CONFIG.GAME.FINALE_BONUS_MULTIPLIER +
+        CONFIG.GAME.STAR_SCORE_BONUS * CONFIG.GAME.FINALE_BONUS_MULTIPLIER
     );
   });
 

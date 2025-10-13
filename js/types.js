@@ -91,9 +91,13 @@
  * @property {number} [asteroidKills]
  * @property {number} [hardenedAsteroidKills]
  * @property {number} [hardenedAsteroidHitBullets]
+ * @property {number} [bonusAsteroidKills]
+ * @property {number} [bonusAsteroidHitBullets]
  * @property {number} [accuracy]
  * @property {number} [accuracyBonus]
  * @property {boolean} [_accuracyBonusApplied]
+ * @property {number} [starsCollected]
+ * @property {number} [bonusStarsCollected]
  * @property {InputState} input
  * @property {EventBus} events
  * @property {GameStateMachine} state
@@ -172,6 +176,7 @@
  * @property {RNGLike} rng
  * @property {EventBusish=} events
  * @property {number=} hardenedAsteroidHitBullets
+ * @property {number=} bonusAsteroidHitBullets
  */
 
 /**

@@ -10,6 +10,10 @@ function makeRng() {
       this._i = (this._i + 0.37) % 1;
       return this._i;
     },
+    /**
+     * @param {number} a
+     * @param {number} _b
+     */
     range(a, _b) {
       return a;
     },
@@ -35,15 +39,15 @@ function makeGame() {
 describe("Planet palette rotation", () => {
   it("cycles through all planet palettes without repetition until exhausted", () => {
     const g = makeGame();
-    // Create indestructible asteroids until we've collected one per palette
-    const n = (CONFIG.COLORS.ASTEROID_PLANETS || []).length || 0;
+    // Create hardened asteroids until we've collected one per palette
+    const n = (CONFIG.COLORS.ASTEROID_HARDENED || []).length || 0;
     const names = [];
     const maxIter = 200; // safety cap to avoid infinite loop
     let iter = 0;
     while (names.length < n && iter < maxIter) {
       const a = SpawnManager.createAsteroid(g);
       g.asteroids.push(a);
-      if (a.isIndestructible) {
+      if (a.isHardened) {
         names.push(a._palette && a._palette.NAME);
       }
       iter++;

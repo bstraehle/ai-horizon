@@ -39,7 +39,7 @@ export const GameUI = {
       const scoreEl = game.currentScoreEl || null;
       if (scoreEl) {
         if (typeof game.accuracy === "number") {
-          scoreEl.dataset.accuracy = game.accuracy.toFixed(3);
+          scoreEl.dataset.accuracy = game.accuracy.toFixed(2);
         }
         if (typeof game.accuracyBonus === "number") {
           scoreEl.dataset.accuracyBonus = String(game.accuracyBonus);

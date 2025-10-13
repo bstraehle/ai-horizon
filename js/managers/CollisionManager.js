@@ -46,6 +46,7 @@ const ARR_POOL_MAX = 256;
  * @property {CollisionPools['asteroidPool']} [asteroidPool]
  * @property {CollisionPools['starPool']} [starPool]
  * @property {number} [hardenedAsteroidHitBullets]
+ * @property {number} [bonusAsteroidHitBullets]
  */
 /**
  * Centralises collision detection. Stateless aside from internal small array pool.
@@ -190,13 +191,19 @@ export class CollisionManager {
                 deadBullets.push(b);
               }
               try {
-                if (a && a.isIndestructible) {
-                  if (typeof a.onBulletHit === "function") {
+                if (a && a.isHardened) {
+                  const markHardenedHit = () => {
                     try {
                       game.hardenedAsteroidHitBullets = (game.hardenedAsteroidHitBullets || 0) + 1;
+                      if (a.isBonus) {
+                        game.bonusAsteroidHitBullets = (game.bonusAsteroidHitBullets || 0) + 1;
+                      }
                     } catch {
                       /* ignore stat update errors */
                     }
+                  };
+                  if (typeof a.onBulletHit === "function") {
+                    markHardenedHit();
                     const shouldDestroy = a.onBulletHit(game);
                     if (shouldDestroy && a[AST_FRAME_FLAG] !== frameId) {
                       a[AST_FRAME_FLAG] = frameId;
@@ -204,11 +211,7 @@ export class CollisionManager {
                       emitBulletHit(a, b);
                     }
                   } else if (typeof a.onShieldHit === "function") {
-                    try {
-                      game.hardenedAsteroidHitBullets = (game.hardenedAsteroidHitBullets || 0) + 1;
-                    } catch {
-                      /* ignore stat update errors */
-                    }
+                    markHardenedHit();
                     try {
                       a.onShieldHit();
                     } catch {

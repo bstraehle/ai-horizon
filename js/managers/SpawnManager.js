@@ -45,7 +45,7 @@ import { Star } from "../entities/Star.js";
 /**
  * SpawnManager – probabilistic spawner for asteroids & stars.
  * Uses Poisson approximation: p = 1 - exp(-lambda * dt).
- * Tracks cadence counters (indestructible asteroids, red stars) and supports pools.
+ * Tracks cadence counters (hardened asteroids, red stars) and supports pools.
  * Per-game state isolated in WeakMap (no surface mutations).
  */
 /**
@@ -55,8 +55,8 @@ import { Star } from "../entities/Star.js";
  *   normalAsteroidCount: number,
  *   planetIndex: number,
  *   planetUsed: Set<number>,
- *   goldenSpawned: number,
- *   nextGoldenTimeSec: number,
+ *   bonusSpawned: number,
+ *   nextBonusTimeSec: number,
  *   startTimeSec: number
  * }} SpawnState
  */
@@ -73,8 +73,8 @@ export class SpawnManager {
         normalAsteroidCount: 0,
         planetIndex: 0,
         planetUsed: new Set(),
-        goldenSpawned: 0,
-        nextGoldenTimeSec: CONFIG.GAME.GOLDEN_INTERVAL_SECONDS | 0 || 15,
+        bonusSpawned: 0,
+        nextBonusTimeSec: CONFIG.GAME.BONUS_INTERVAL_SECONDS | 0 || 15,
         startTimeSec:
           typeof (/** @type {any} */ (game).timeSec) === "number"
             ? Math.max(0, /** @type {any} */ (game).timeSec)
@@ -87,7 +87,7 @@ export class SpawnManager {
 
   /** Reset per-game spawn cadence/palette state. @param {object} game */
   static reset(game) {
-    const interval = CONFIG.GAME.GOLDEN_INTERVAL_SECONDS | 0 || 15;
+    const interval = CONFIG.GAME.BONUS_INTERVAL_SECONDS | 0 || 15;
     const currentSec =
       typeof (/** @type {any} */ (game).timeSec) === "number"
         ? Math.max(0, /** @type {any} */ (game).timeSec)
@@ -97,8 +97,8 @@ export class SpawnManager {
       normalAsteroidCount: 0,
       planetIndex: 0,
       planetUsed: new Set(),
-      goldenSpawned: 0,
-      nextGoldenTimeSec: interval,
+      bonusSpawned: 0,
+      nextBonusTimeSec: interval,
       startTimeSec: currentSec,
     };
     this.#STATE.set(game, st);
@@ -138,37 +138,37 @@ export class SpawnManager {
     if (rng.nextFloat() < pStar) game.stars.push(this.createStar(game));
   }
 
-  /** Create/acquire asteroid; manages cadence for indestructible variant + palette cycling. @param {AsteroidCreateSlice} game @returns {Asteroid} */
+  /** Create/acquire asteroid; manages cadence for hardened variant + palette cycling. @param {AsteroidCreateSlice} game @returns {Asteroid} */
   static createAsteroid(game) {
     const rng = game.rng;
     const st = /** @type {any} */ (this.#state(game));
-    const asteroidThreshold = CONFIG.GAME.ASTEROID_NORMAL_BEFORE_INDESTRUCTIBLE | 0 || 10;
+    const asteroidThreshold = CONFIG.GAME.ASTEROID_NORMAL_BEFORE_HARDENED | 0 || 10;
     const count = st.normalAsteroidCount | 0;
-    let isIndestructible = count >= asteroidThreshold;
-    let isGolden = false;
-    if (isIndestructible) {
-      const maxGolden = CONFIG.GAME.GOLDEN_ASTEROID_COUNT | 0;
-      const interval = CONFIG.GAME.GOLDEN_INTERVAL_SECONDS | 0 || 15;
-      if (maxGolden > 0 && st.goldenSpawned < maxGolden && interval > 0) {
+    let isHardened = count >= asteroidThreshold;
+    let isBonus = false;
+    if (isHardened) {
+      const maxBonus = CONFIG.GAME.BONUS_ASTEROID_COUNT | 0;
+      const interval = CONFIG.GAME.BONUS_INTERVAL_SECONDS | 0 || 15;
+      if (maxBonus > 0 && st.bonusSpawned < maxBonus && interval > 0) {
         const currentSec = typeof game.timeSec === "number" ? Math.max(0, game.timeSec) : 0;
         const start = st.startTimeSec | 0;
         const elapsed = Math.max(0, currentSec - start);
-        if (elapsed >= (st.nextGoldenTimeSec | 0)) {
-          isGolden = true;
-          st.goldenSpawned++;
-          let next = st.nextGoldenTimeSec | 0;
+        if (elapsed >= (st.nextBonusTimeSec | 0)) {
+          isBonus = true;
+          st.bonusSpawned++;
+          let next = st.nextBonusTimeSec | 0;
           do {
             next += interval;
           } while (next <= elapsed);
-          st.nextGoldenTimeSec = next;
+          st.nextBonusTimeSec = next;
         }
       }
     }
-    st.normalAsteroidCount = isIndestructible ? 0 : count + 1;
+    st.normalAsteroidCount = isHardened ? 0 : count + 1;
 
     const baseSize = CONFIG.ASTEROID.MIN_SIZE + rng.nextFloat() * CONFIG.ASTEROID.SIZE_VARIATION;
-    const sizeFactor = isIndestructible
-      ? CONFIG.ASTEROID.INDESTRUCTIBLE_SIZE_FACTOR
+    const sizeFactor = isHardened
+      ? CONFIG.ASTEROID.HARDENED_SIZE_FACTOR
       : CONFIG.ASTEROID.REGULAR_SIZE_FACTOR;
     const width = Math.max(4, Math.round(baseSize * sizeFactor));
     const height = Math.max(4, Math.round(baseSize * sizeFactor));
@@ -177,12 +177,12 @@ export class SpawnManager {
     const maxX = Math.max(minX, game.view.width - width - CONFIG.ASTEROID.HORIZONTAL_MARGIN / 2);
     const x = minX + rng.nextFloat() * (maxX - minX);
     let paletteOverride = null;
-    if (isGolden) {
+    if (isBonus) {
       const nebulaPalette = BackgroundManager.getCurrentNebulaPalette();
       const useBlue = nebulaPalette === "blue";
       paletteOverride = useBlue ? CONFIG.COLORS.ASTEROID_BLUE : CONFIG.COLORS.ASTEROID_RED;
-    } else if (isIndestructible) {
-      const planets = CONFIG.COLORS.ASTEROID_PLANETS;
+    } else if (isHardened) {
+      const planets = CONFIG.COLORS.ASTEROID_HARDENED;
       if (Array.isArray(planets) && planets.length > 0) {
         const n = planets.length;
         if ((st.planetUsed.size || 0) >= n) st.planetUsed.clear();
@@ -209,7 +209,7 @@ export class SpawnManager {
           height,
           speed,
           rng,
-          isIndestructible,
+          isHardened,
           paletteOverride
         )
       : new Asteroid(
@@ -219,12 +219,12 @@ export class SpawnManager {
           height,
           speed,
           rng,
-          isIndestructible,
+          isHardened,
           paletteOverride
         );
-    if (isGolden) {
+    if (isBonus) {
       try {
-        asteroid.isGolden = true;
+        asteroid.isBonus = true;
       } catch {
         /* ignore */
       }
@@ -244,7 +244,7 @@ export class SpawnManager {
     const minX = CONFIG.STAR.HORIZONTAL_MARGIN / 2;
     const maxX = Math.max(minX, game.view.width - width - CONFIG.STAR.HORIZONTAL_MARGIN / 2);
     const x = minX + rng.nextFloat() * (maxX - minX);
-    const starThreshold = CONFIG.GAME.STAR_YELLOW_BEFORE_RED | 0 || 10;
+    const starThreshold = CONFIG.GAME.STAR_NORMAL_BEFORE_BONUS | 0 || 10;
     const count = st.yellowCount | 0;
     const isRed = count >= starThreshold;
     st.yellowCount = isRed ? 0 : count + 1;

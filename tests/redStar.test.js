@@ -42,7 +42,7 @@ describe("Red star cadence and scoring", () => {
     game.events.emit("collectedStar", { star: { x: 0, y: 0, width: 10, height: 10 } });
     expect(game.score).toBe(CONFIG.GAME.STAR_SCORE);
     game.events.emit("collectedStar", { star: { x: 0, y: 0, width: 10, height: 10, isRed: true } });
-    expect(game.score).toBe(CONFIG.GAME.STAR_SCORE + CONFIG.GAME.STAR_SCORE_RED);
+    expect(game.score).toBe(CONFIG.GAME.STAR_SCORE + CONFIG.GAME.STAR_SCORE_BONUS);
     unsub();
   });
 });

@@ -1,6 +1,6 @@
 ## AI HORIZON
 
-Fast, responsive HTML5 Canvas space shooter written in modern (native ESM) vanilla JavaScript. Collect stars, survive escalating asteroid waves (including indestructible "planet" variants), and chase a local + optional remote leaderboard.
+Fast, responsive HTML5 Canvas space shooter written in modern (native ESM) vanilla JavaScript. Collect stars, survive escalating asteroid waves (including hardened "planet" variants), and chase a local + optional remote leaderboard.
 
 For player‑facing controls & scoring details see `about.html`. This document is for developers: setup, architecture, configuration surface, extension points, and contribution standards.
 
@@ -110,7 +110,7 @@ Bypass (rare, last resort) with `--no-verify` on commit or push.
 Gameplay / visuals:
 
 - Layered starfield + nebula fog with parallax
-- Indestructible planetary asteroids (shield + multi-hit) altering pacing & scoring
+- Hardened planetary asteroids (shield + multi-hit) altering pacing & scoring
 - Particle FX: explosions, engine trail, crater dust puffs, score popups
 
 Systems / architecture:
@@ -180,7 +180,7 @@ All ephemeral game objects implement `reset()` for reuse. `ObjectPool` supports 
 
 ### Spawning & pacing
 
-`SpawnManager` schedules asteroids/stars with difficulty ramps (desktop vs mobile rates in `CONFIG.GAME.*_DESKTOP/MOBILE`). Planetary (indestructible) asteroids inserted after a threshold (`ASTEROID_NORMAL_BEFORE_INDESTRUCTIBLE`).
+`SpawnManager` schedules asteroids/stars with difficulty ramps (desktop vs mobile rates in `CONFIG.GAME.*_DESKTOP/MOBILE`). Planetary (hardened) asteroids inserted after a threshold (`ASTEROID_NORMAL_BEFORE_HARDENED`).
 
 ### Collision & scoring
 
@@ -231,19 +231,19 @@ All gameplay + visual tuning lives centrally in `js/constants.js` exporting a de
 Guidelines:
 
 - Never sprinkle magic numbers in feature code—add or reuse a named constant.
-- Favor ratios / factors (e.g. `INDESTRUCTIBLE_SPEED_FACTOR`) over repeating absolute speeds so balance changes cascade predictably.
+- Favor ratios / factors (e.g. `HARDENED_SPEED_FACTOR`) over repeating absolute speeds so balance changes cascade predictably.
 - Document rationale inline for non-obvious numbers (spawn pacing thresholds, performance caps) so future adjustments remain intentional.
 - Use existing variation keys (`*_VAR`, `*_VARIATION`) to express randomness bounds; keep naming consistent.
 
 Common adjustments:
 
-| Goal                                  | Knobs                                                                                              |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Increase difficulty ramp              | Decrease `GAME.ASTEROID_NORMAL_BEFORE_INDESTRUCTIBLE`, increase `GAME.ASTEROID_SPAWN_RATE_DESKTOP` |
-| Shorter session                       | Lower `GAME.TIMER_SECONDS`                                                                         |
-| More red stars                        | Decrease `GAME.STAR_YELLOW_BEFORE_RED`                                                             |
-| Cap visual density on low-end devices | Reduce `GAME.STARFIELD_COUNT_MOBILE`, `NEBULA.COUNT_MOBILE`, adjust `VIEW.DPR_MOBILE_MAX`          |
-| Faster player                         | Increase `SPEEDS.PLAYER` (watch collision balance)                                                 |
+| Goal                                  | Knobs                                                                                        |
+| ------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Increase difficulty ramp              | Decrease `GAME.ASTEROID_NORMAL_BEFORE_HARDENED`, increase `GAME.ASTEROID_SPAWN_RATE_DESKTOP` |
+| Shorter session                       | Lower `GAME.TIMER_SECONDS`                                                                   |
+| More bonus stars                      | Decrease `GAME.STAR_NORMAL_BEFORE_BONUS`                                                     |
+| Cap visual density on low-end devices | Reduce `GAME.STARFIELD_COUNT_MOBILE`, `NEBULA.COUNT_MOBILE`, adjust `VIEW.DPR_MOBILE_MAX`    |
+| Faster player                         | Increase `SPEEDS.PLAYER` (watch collision balance)                                           |
 
 Adding a new constant: add under the appropriate namespace, maintain UPPER_SNAKE_CASE, and ensure tests referencing balance still pass. Because `CONFIG` is deeply frozen, attempts to mutate at runtime will throw in strict mode, surfacing mistakes early.
 

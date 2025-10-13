@@ -16,7 +16,7 @@ export class Asteroid {
    * Construct a new asteroid / planet entity (or reset template when pooled).
    *
    * Purpose:
-   *  - Represent a falling obstacle with optional indestructible (planet) styling.
+   *  - Represent a falling obstacle with optional hardened (planet) styling.
    *  - Optionally generate textured crater emboss geometry (visual only) with reveal animation.
    *  - Parameterize color palette & speed via palette overrides or randomized planet palettes.
    *
@@ -25,8 +25,8 @@ export class Asteroid {
    *  - Reserve list preallocated when EXTRA_MAX > 0 to allow progressive damage reveal on planets.
    *  - Each crater stores relative offset (dx,dy), radius r, and transient grow factor for reveal.
    *
-   * Indestructible Planets:
-   *  - Use alternate palette list (ASTEROID_PLANETS) or provided override for thematic variety.
+   * Hardened Asteroids:
+   *  - Use alternate palette list (ASTEROID_HARDENED) or provided override for thematic variety.
    *  - Track hits to drive crack line rendering & crater activation.
    *
    * Performance Notes:
@@ -39,18 +39,18 @@ export class Asteroid {
    * @param {number} height Diameter proxy (kept for symmetry with other entities; should match width)
    * @param {number} speed Downward speed (pixels/sec before palette speed factor)
    * @param {import('../types.js').RNGLike} [rng] Optional deterministic RNG (nextFloat())
-   * @param {boolean} [isIndestructible=false] If true behaves like a multi‑hit planet
+   * @param {boolean} [isHardened=false] If true behaves like a multi‑hit planet
    * @param {any} [paletteOverride] Optional palette object to force style (used for curated planets)
    */
-  constructor(x, y, width, height, speed, rng, isIndestructible = false, paletteOverride = null) {
+  constructor(x, y, width, height, speed, rng, isHardened = false, paletteOverride = null) {
     this.x = x;
     this.y = y;
     this.width = width;
     this.height = height;
     this.speed = speed;
-    this.isIndestructible = !!isIndestructible;
+    this.isHardened = !!isHardened;
     /** @type {boolean} */
-    this.isGolden = false;
+    this.isBonus = false;
     this._shieldFlash = 0;
     const radius = this.width / 2;
     const rand =
@@ -82,10 +82,10 @@ export class Asteroid {
       : [];
     this._initialCraterCount = this._craters.length;
     this._palette = CONFIG.COLORS.ASTEROID;
-    if (this.isIndestructible) {
+    if (this.isHardened) {
       if (paletteOverride && typeof paletteOverride === "object") this._palette = paletteOverride;
       else {
-        const planets = CONFIG.COLORS.ASTEROID_PLANETS;
+        const planets = CONFIG.COLORS.ASTEROID_HARDENED;
         if (Array.isArray(planets) && planets.length > 0) {
           const idx = this._rng
             ? Math.floor(this._rng.nextFloat() * planets.length)
@@ -133,7 +133,7 @@ export class Asteroid {
    * Rendering Pipeline:
    *  1. Body radial gradient (palette GRAD_*).
    *  2. Optional crater base fill + inner shadow + highlight arcs (per crater).
-   *  3. Outline stroke (thicker if indestructible).
+   *  3. Outline stroke (thicker if hardened).
    *  4. Damage crack splines proportional to hit severity (planets only).
    *
    * Perf Considerations:
@@ -175,8 +175,8 @@ export class Asteroid {
       const shStart = shadowCenter - arcSpan / 2;
       const shEnd = shadowCenter + arcSpan / 2;
       const severity =
-        this.isIndestructible && this._hits > 0
-          ? Math.min(1, this._hits / (CONFIG.ASTEROID.INDESTRUCTIBLE_HITS || 10))
+        this.isHardened && this._hits > 0
+          ? Math.min(1, this._hits / (CONFIG.ASTEROID.HARDENED_HITS || 10))
           : 0;
       const darkenScale = cfg.SHADOW_DARKEN_SCALE || 0;
       const fadeScale = cfg.HIGHLIGHT_FADE_SCALE || 0;
@@ -225,11 +225,11 @@ export class Asteroid {
       }
     }
     ctx.strokeStyle = palette.OUTLINE;
-    ctx.lineWidth = this.isIndestructible ? 3 : 2;
+    ctx.lineWidth = this.isHardened ? 3 : 2;
     ctx.stroke();
-    if (this.isIndestructible && this._hits > 0) {
+    if (this.isHardened && this._hits > 0) {
       ctx.save();
-      const severity = Math.min(1, this._hits / (CONFIG.ASTEROID.INDESTRUCTIBLE_HITS || 10));
+      const severity = Math.min(1, this._hits / (CONFIG.ASTEROID.HARDENED_HITS || 10));
       const lines = 1 + Math.floor(severity * 4);
       let damageColor;
       if (palette && palette.NAME === "ICE") damageColor = "rgba(255,255,255,0.85)";
@@ -301,17 +301,17 @@ export class Asteroid {
    * @param {number} height Diameter proxy
    * @param {number} speed Base downward speed
    * @param {import('../types.js').RNGLike} [rng] Optional deterministic RNG
-   * @param {boolean} [isIndestructible=false] Planet mode flag
+   * @param {boolean} [isHardened=false] Planet mode flag
    * @param {any} [paletteOverride] Optional palette override
    */
-  reset(x, y, width, height, speed, rng, isIndestructible = false, paletteOverride = null) {
+  reset(x, y, width, height, speed, rng, isHardened = false, paletteOverride = null) {
     this.x = x;
     this.y = y;
     this.width = width;
     this.height = height;
     this.speed = speed;
-    this.isIndestructible = !!isIndestructible;
-    this.isGolden = false;
+    this.isHardened = !!isHardened;
+    this.isBonus = false;
     this._shieldFlash = 0;
     this._hits = 0;
     this._damageLineCount = 0;
@@ -352,10 +352,10 @@ export class Asteroid {
     }
     this._initialCraterCount = this._craters.length;
     this._palette = CONFIG.COLORS.ASTEROID;
-    if (this.isIndestructible) {
+    if (this.isHardened) {
       if (paletteOverride && typeof paletteOverride === "object") this._palette = paletteOverride;
       else {
-        const planets = CONFIG.COLORS.ASTEROID_PLANETS;
+        const planets = CONFIG.COLORS.ASTEROID_HARDENED;
         if (Array.isArray(planets) && planets.length) {
           const idx = this._rng
             ? Math.floor(this._rng.nextFloat() * planets.length)
@@ -376,14 +376,14 @@ export class Asteroid {
    *
    * Behavior:
    *  - Destructible asteroid: returns true immediately (caller should remove it) and no visual cracks.
-   *  - Indestructible planet: increments hit counter, adds damage line (capped), may activate extra craters.
+   *  - Hardened planet: increments hit counter, adds damage line (capped), may activate extra craters.
    *  - Spawns crater dust particles for newly activated craters if puff feature enabled.
    *
    * @param {any} [game] Minimal game facade providing particlePool / particles array (optional). If absent, dust ignored.
    * @returns {boolean} true when entity should be destroyed (regular) or when planet reached max hits.
    */
   onBulletHit(game) {
-    if (!this.isIndestructible) return true;
+    if (!this.isHardened) return true;
     this._hits = (this._hits || 0) + 1;
     try {
       if (this._damageLineCount < this._damageLineAngles.length) {
@@ -404,7 +404,7 @@ export class Asteroid {
     try {
       const cfg = CONFIG.ASTEROID.CRATER_EMBOSS;
       if (cfg && this._reserveCraters && this._reserveCraters.length) {
-        const maxHits = CONFIG.ASTEROID.INDESTRUCTIBLE_HITS || 10;
+        const maxHits = CONFIG.ASTEROID.HARDENED_HITS || 10;
         const severity = Math.min(1, this._hits / maxHits);
         const extraMax = cfg.EXTRA_MAX || 0;
         const desiredExtra = Math.min(extraMax, Math.floor(severity * extraMax + 0.00001));
@@ -429,7 +429,7 @@ export class Asteroid {
     if (newCraters.length && game) {
       for (const c of newCraters) this._spawnCraterDust(c, game);
     }
-    return this._hits >= (CONFIG.ASTEROID.INDESTRUCTIBLE_HITS || 10);
+    return this._hits >= (CONFIG.ASTEROID.HARDENED_HITS || 10);
   }
 
   /**

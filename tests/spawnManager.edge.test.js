@@ -16,7 +16,7 @@ function makeGame(rng) {
 }
 
 describe("SpawnManager counters", () => {
-  it("creates indestructible asteroid every 11th asteroid", () => {
+  it("creates hardened asteroid every 11th asteroid", () => {
     const rng = { nextFloat: () => 0.0, range: (a, _b) => a };
     const g = makeGame(rng);
 
@@ -26,9 +26,9 @@ describe("SpawnManager counters", () => {
       results.push(SpawnManager.createAsteroid(g));
     }
 
-    const indestructible = results.filter((a) => a.isIndestructible);
-    // With the lowered threshold expect multiple indestructibles in 12 spawns
-    expect(indestructible.length).toBeGreaterThanOrEqual(2);
+    const hardened = /** @type {any[]} */ (results).filter((a) => a.isHardened);
+    // With the lowered threshold expect multiple hardened asteroids in 12 spawns
+    expect(hardened.length).toBeGreaterThanOrEqual(2);
   });
 
   it("creates a red star after 10 yellow stars", () => {

@@ -13,7 +13,7 @@ import { BackgroundManager } from "../managers/BackgroundManager.js";
  *
  * Behavior & Covered Events
  * -------------------------
- * - bulletHitAsteroid: Awards score (different value for indestructible asteroids), spawns an
+ * - bulletHitAsteroid: Awards score (different value for hardened asteroids), spawns an
  *   explosion entity and optionally a score popup.
  * - playerHitAsteroid: Triggers the game over sequence exactly once per emission chain.
  * - collectedStar (score path): Awards score (bonus for red stars) and shows a popup for red stars.
@@ -42,7 +42,7 @@ import { BackgroundManager } from "../managers/BackgroundManager.js";
  * -------------------------------
  * - Missing properties on payload objects are gracefully ignored (guards check existence).
  * - If popup helpers are absent, scoring still proceeds without throwing.
- * - Indestructible asteroid handling defaults to a dedicated score constant.
+ * - Hardened asteroid handling defaults to a dedicated score constant.
  *
  * Testing
  * -------
@@ -83,10 +83,10 @@ export const EventHandlers = {
       // @ts-ignore
       /**
        * bulletHitAsteroid handler
-       *
-       * Payload Shape: { asteroid: { x:number, y:number, width:number, height:number, isIndestructible?:boolean } }
+       
+       * Payload Shape: { asteroid: { x:number, y:number, width:number, height:number, isHardened?:boolean } }
        * Effects: Mutates score, triggers explosion entity creation, optional score popup (+100) when
-       *           asteroid is indestructible, then invokes score UI refresh.
+       *           asteroid is hardened, then invokes score UI refresh.
        * Determinism: Explosion position derived from asteroid center (pure). Score constant selection
        *              is branch‑based (no randomness). Popup styling fixed.
        * Failure Modes: If asteroid missing, handler becomes a no‑op except safe `updateScore` call.
@@ -95,21 +95,24 @@ export const EventHandlers = {
       events.on("bulletHitAsteroid", function (/** @type {{ asteroid:any }} */ payload) {
         const { asteroid } = payload;
         let add = CONFIG.GAME.ASTEROID_SCORE;
-        if (asteroid && asteroid.isIndestructible) {
-          add = asteroid.isGolden
-            ? CONFIG.GAME.ASTEROID_SCORE_GOLDEN
-            : CONFIG.GAME.ASTEROID_SCORE_INDESTRUCTIBLE;
+        if (asteroid && asteroid.isHardened) {
+          add = asteroid.isBonus
+            ? CONFIG.GAME.ASTEROID_SCORE_BONUS
+            : CONFIG.GAME.ASTEROID_SCORE_HARDENED;
         }
         const r = ScoringManager.add(game, add);
         if (asteroid) {
-          if (asteroid.isIndestructible) {
+          if (asteroid.isHardened) {
             game.hardenedAsteroidKills = (game.hardenedAsteroidKills || 0) + 1;
+            if (asteroid.isBonus) {
+              game.bonusAsteroidKills = (game.bonusAsteroidKills || 0) + 1;
+            }
           } else {
             game.asteroidKills = (game.asteroidKills || 0) + 1;
           }
         }
         game.createExplosion(asteroid.x + asteroid.width / 2, asteroid.y + asteroid.height / 2);
-        if (asteroid && asteroid.isIndestructible && typeof game.createScorePopup === "function") {
+        if (asteroid && asteroid.isHardened && typeof game.createScorePopup === "function") {
           const baseColor = CONFIG.COLORS.SCORE.DANGER_RED;
           const opts = {
             color: baseColor,
@@ -151,8 +154,16 @@ export const EventHandlers = {
        */
       events.on("collectedStar", function (/** @type {{ star:any }} */ payload) {
         const { star } = payload;
-        const add = star && star.isRed ? CONFIG.GAME.STAR_SCORE_RED : CONFIG.GAME.STAR_SCORE;
+        const add = star && star.isRed ? CONFIG.GAME.STAR_SCORE_BONUS : CONFIG.GAME.STAR_SCORE;
         const r = ScoringManager.add(game, add);
+        try {
+          game.starsCollected = (game.starsCollected || 0) + 1;
+          if (star && star.isRed) {
+            game.bonusStarsCollected = (game.bonusStarsCollected || 0) + 1;
+          }
+        } catch {
+          /* stat increments optional */
+        }
         game.updateScore();
         if (star && star.isRed && typeof game.createScorePopup === "function") {
           const baseColor = CONFIG.COLORS.SCORE.DANGER_RED;

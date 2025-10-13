@@ -15,7 +15,7 @@ describe("CollisionManager stress grid", () => {
       for (let c = 0; c < cols; c++) {
         const x = c * 28 + 5;
         const y = r * 28 + 200;
-        asteroids.push({ x, y, width: 24, height: 24, isIndestructible: false });
+        asteroids.push({ x, y, width: 24, height: 24, isHardened: false });
         // bullet aimed at center
         bullets.push({ x: x + 10, y: y + 10, width: 2, height: 4 });
       }

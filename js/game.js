@@ -124,6 +124,10 @@ class AIHorizon {
     this.asteroidKills = 0;
     this.hardenedAsteroidKills = 0;
     this.hardenedAsteroidHitBullets = 0;
+    this.bonusAsteroidKills = 0;
+    this.bonusAsteroidHitBullets = 0;
+    this.starsCollected = 0;
+    this.bonusStarsCollected = 0;
     this.accuracy = 0;
     this.accuracyBonus = 0;
     this._accuracyBonusApplied = false;
@@ -236,8 +240,8 @@ class AIHorizon {
       { maxSize: 4096 }
     );
     this.asteroidPool = /* @__PURE__ */ new ObjectPool(
-      (x, y, w, h, speed, rng, isIndestructible = false, paletteOverride = null) =>
-        new Asteroid(x, y, w, h, speed, rng, isIndestructible, paletteOverride),
+      (x, y, w, h, speed, rng, isHardened = false, paletteOverride = null) =>
+        new Asteroid(x, y, w, h, speed, rng, isHardened, paletteOverride),
       undefined,
       { maxSize: 256 }
     );
@@ -870,6 +874,8 @@ class AIHorizon {
    * End the game.
    */
   gameOver() {
+    /** @type {{ applied:boolean, baseScore:number, accuracy:number, bonus:number, newScore:number }|null} */
+    let accuracySummary = null;
     try {
       if (this.input && this.input.fireHeld) {
         this._uiTouchGuardActive = true;
@@ -883,7 +889,7 @@ class AIHorizon {
     }
     try {
       if (ScoringManager && typeof ScoringManager.applyAccuracyBonus === "function") {
-        ScoringManager.applyAccuracyBonus(this);
+        accuracySummary = ScoringManager.applyAccuracyBonus(this);
         try {
           this.updateScore();
         } catch {
@@ -897,9 +903,146 @@ class AIHorizon {
     this.updateHighScore();
     GameUI.hidePause(this);
     handleGameOver(this);
+    try {
+      this._logRunSummary(accuracySummary);
+    } catch (_e) {
+      /* non-critical telemetry log */
+    }
     if (this.loop) {
       this.loop.stop();
       this._loopRunning = false;
+    }
+  }
+
+  /**
+   * Emit an aggregated run summary to the console for downstream AI/analytics ingestion.
+   * @param {{ applied:boolean, baseScore:number, accuracy:number, bonus:number, newScore:number }|null} accuracySummary
+   * @private
+   */
+  _logRunSummary(accuracySummary) {
+    if (typeof console === "undefined" || typeof console.log !== "function") return;
+    const accuracyValue =
+      typeof this.accuracy === "number"
+        ? this.accuracy
+        : accuracySummary && typeof accuracySummary.accuracy === "number"
+          ? accuracySummary.accuracy
+          : null;
+    const accuracySummaryRounded = (() => {
+      if (!accuracySummary) return null;
+      const { applied: _applied, newScore, ...rest } = accuracySummary;
+      const roundedAccuracy =
+        typeof accuracySummary.accuracy === "number"
+          ? Math.max(0, Math.min(1, Math.round(accuracySummary.accuracy * 100) / 100))
+          : accuracySummary.accuracy;
+      return {
+        ...rest,
+        accuracy: roundedAccuracy,
+        score: typeof newScore === "number" ? newScore : (newScore ?? null),
+      };
+    })();
+    const timerInitialRaw = Number.isFinite(this.timerSeconds) ? this.timerSeconds : null;
+    const timerRemainingRaw = Number.isFinite(this.timerRemaining) ? this.timerRemaining : null;
+    /**
+     * @param {number|null} value
+     * @param {"round"|"floor"} mode
+     */
+    const toSeconds = (value, mode = "round") => {
+      if (!Number.isFinite(value)) return null;
+      if (mode === "floor") return Math.max(0, Math.floor(/** @type {number} */ (value)));
+      return Math.max(0, Math.round(/** @type {number} */ (value)));
+    };
+    let runtimeSeconds = Number.isFinite(this.timeSec) ? this.timeSec : null;
+    const totalSecondsInt = toSeconds(timerInitialRaw, "round");
+    const remainingSecondsInt = toSeconds(timerRemainingRaw, "floor");
+    let runtimeSecondsInt = null;
+    if (typeof totalSecondsInt === "number" && typeof remainingSecondsInt === "number") {
+      runtimeSecondsInt = Math.max(0, totalSecondsInt - remainingSecondsInt);
+    } else if (Number.isFinite(runtimeSeconds)) {
+      runtimeSecondsInt = toSeconds(runtimeSeconds, "round");
+    }
+    const baseScore =
+      accuracySummary && typeof accuracySummary.baseScore === "number"
+        ? accuracySummary.baseScore
+        : typeof this.accuracyBonus === "number"
+          ? Math.max(0, (this.score || 0) - this.accuracyBonus)
+          : this.score || 0;
+    const summary = {
+      highScore: this.highScore || 0,
+      time: {
+        totalSeconds: totalSecondsInt,
+        remainingSeconds: remainingSecondsInt,
+        runtimeSeconds: runtimeSecondsInt,
+      },
+      accuracy: accuracySummaryRounded,
+      stats: {
+        starsCollected: typeof this.starsCollected === "number" ? this.starsCollected : null,
+        bonusStarsCollected:
+          typeof this.bonusStarsCollected === "number" ? this.bonusStarsCollected : null,
+        shotsFired: typeof this.shotsFired === "number" ? this.shotsFired : null,
+        asteroidKills: typeof this.asteroidKills === "number" ? this.asteroidKills : null,
+        hardenedAsteroidKills:
+          typeof this.hardenedAsteroidKills === "number" ? this.hardenedAsteroidKills : null,
+        hardenedAsteroidHitBullets:
+          typeof this.hardenedAsteroidHitBullets === "number"
+            ? this.hardenedAsteroidHitBullets
+            : null,
+        bonusAsteroidKills:
+          typeof this.bonusAsteroidKills === "number" ? this.bonusAsteroidKills : null,
+        bonusAsteroidHitBullets:
+          typeof this.bonusAsteroidHitBullets === "number" ? this.bonusAsteroidHitBullets : null,
+      },
+      browser: (() => {
+        try {
+          const ua = typeof navigator !== "undefined" ? navigator.userAgent : null;
+          const width = typeof window !== "undefined" ? window.innerWidth : null;
+          const height = typeof window !== "undefined" ? window.innerHeight : null;
+          const locale =
+            typeof navigator !== "undefined" && navigator.language ? navigator.language : null;
+          const timeZone =
+            typeof Intl !== "undefined" && Intl.DateTimeFormat
+              ? new Intl.DateTimeFormat().resolvedOptions().timeZone || null
+              : null;
+          const platform = typeof navigator !== "undefined" ? navigator.platform : null;
+          return { userAgent: ua, width, height, locale, timeZone, platform };
+        } catch (_e) {
+          return {
+            userAgent: null,
+            width: null,
+            height: null,
+            locale: null,
+            timeZone: null,
+            platform: null,
+          };
+        }
+      })(),
+      timestamp: (() => {
+        try {
+          return new Date().toISOString();
+        } catch (_e) {
+          return null;
+        }
+      })(),
+    };
+    let summaryJson = null;
+    try {
+      summaryJson = JSON.stringify(summary, null, 2);
+    } catch (_e) {
+      summaryJson = null;
+    }
+    if (typeof console.groupCollapsed === "function" && typeof console.groupEnd === "function") {
+      console.groupCollapsed("[AI Horizon] Run summary");
+      if (summaryJson) {
+        console.log(summaryJson);
+      } else {
+        console.log(summary);
+      }
+      console.groupEnd();
+      return;
+    }
+    if (summaryJson) {
+      console.log(`[AI Horizon] Run summary\n${summaryJson}`);
+    } else {
+      console.log("[AI Horizon] Run summary", summary);
     }
   }
 

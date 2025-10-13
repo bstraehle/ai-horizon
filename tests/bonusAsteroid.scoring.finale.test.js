@@ -17,30 +17,30 @@ function makeGame(timerRemaining) {
   };
 }
 
-describe("Golden asteroid scoring during finale", () => {
-  it("doubles golden asteroid points within the finale window", () => {
+describe("Bonus asteroid scoring during finale", () => {
+  it("doubles bonus asteroid points within the finale window", () => {
     const game = makeGame(Math.max(0.1, (CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS || 5) - 0.1));
     const unsub = EventHandlers.register(game);
 
-    const asteroid = { x: 0, y: 0, width: 10, height: 10, isIndestructible: true, isGolden: true };
+    const asteroid = { x: 0, y: 0, width: 10, height: 10, isHardened: true, isBonus: true };
     game.events.emit("bulletHitAsteroid", { asteroid });
 
     expect(game.score).toBe(
-      (CONFIG.GAME.ASTEROID_SCORE_GOLDEN || 250) * (CONFIG.GAME.FINALE_BONUS_MULTIPLIER || 2)
+      (CONFIG.GAME.ASTEROID_SCORE_BONUS || 250) * (CONFIG.GAME.FINALE_BONUS_MULTIPLIER || 2)
     );
 
     unsub();
   });
 
-  it("does not double golden asteroid points before finale window", () => {
+  it("does not double bonus asteroid points before finale window", () => {
     const windowSeconds = CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS || 5;
     const game = makeGame(windowSeconds + 1);
     const unsub = EventHandlers.register(game);
 
-    const asteroid = { x: 0, y: 0, width: 10, height: 10, isIndestructible: true, isGolden: true };
+    const asteroid = { x: 0, y: 0, width: 10, height: 10, isHardened: true, isBonus: true };
     game.events.emit("bulletHitAsteroid", { asteroid });
 
-    expect(game.score).toBe(CONFIG.GAME.ASTEROID_SCORE_GOLDEN || 250);
+    expect(game.score).toBe(CONFIG.GAME.ASTEROID_SCORE_BONUS || 250);
 
     unsub();
   });
