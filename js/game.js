@@ -161,6 +161,7 @@ class AIHorizon {
     this._dprOverride = null;
     this._engineTrailModulo = 1;
     this._engineTrailStep = 0;
+    this._mouseDown = false;
 
     this.asteroidSpeed = this._isMobile
       ? CONFIG.SPEEDS.ASTEROID_MOBILE
@@ -600,17 +601,20 @@ class AIHorizon {
   /** Begin continuous fire (mouse). */
   handleMouseDown() {
     if (!this.state.isRunning()) return;
+    this._mouseDown = true;
     this.input.fireHeld = true;
     this.shoot();
   }
 
   /** End continuous fire (mouse). */
   handleMouseUp() {
+    this._mouseDown = false;
     this.input.fireHeld = false;
   }
 
   /** Cancel continuous fire if pointer leaves canvas. */
   handleMouseLeave() {
+    if (this._mouseDown) return;
     this.input.fireHeld = false;
   }
 
