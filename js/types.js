@@ -17,7 +17,7 @@
 /** @typedef {{ nextFloat:()=>number, range?:(min:number,max:number)=>number, nextInt?:(max:number)=>number, pick?:(arr:any[])=>any }} RNGLike */
 
 /** Basic logical view size for the canvas. */
-/** @typedef {{ width:number, height:number, dpr?: number }} ViewSize */
+/** @typedef {{ width:number, height:number, dpr?: number, resolutionScale?: number }} ViewSize */
 
 /**
  * @typedef {Object} EntityLike

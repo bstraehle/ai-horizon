@@ -7,7 +7,7 @@ import { CONFIG, clamp } from "../constants.js";
 export class ViewManager {
   /**
    * Resize & reposition preserving relative player center/bottom when running; otherwise recenter + spawn offset.
-   * @param {{ canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, view: {width:number,height:number,dpr:number}, player:{x:number,y:number,width:number,height:number}, canvasRect?:DOMRect, state: import('../core/GameStateMachine.js').GameStateMachine }} game
+   * @param {{ canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, view: {width:number,height:number,dpr:number,resolutionScale?:number}, player:{x:number,y:number,width:number,height:number}, canvasRect?:DOMRect, state: import('../core/GameStateMachine.js').GameStateMachine }} game
    */
   static resize(game) {
     const { canvas, ctx, view, player } = game;
@@ -42,15 +42,32 @@ export class ViewManager {
       ? Math.min(CONFIG.VIEW.DPR_MAX, perfDprOverride)
       : CONFIG.VIEW.DPR_MAX;
     const dpr = Math.max(CONFIG.VIEW.DPR_MIN, Math.min(maxDpr, deviceDpr));
-    view.dpr = dpr;
-    view.width = Math.round(window.innerWidth);
-    view.height = Math.round(window.innerHeight);
+    const cssWidth = Math.round(window.innerWidth);
+    const cssHeight = Math.round(window.innerHeight);
+    view.width = cssWidth;
+    view.height = cssHeight;
 
-    canvas.style.width = view.width + "px";
-    canvas.style.height = view.height + "px";
-    canvas.width = Math.round(view.width * dpr);
-    canvas.height = Math.round(view.height * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const pixelBudget = CONFIG.VIEW.MAX_CANVAS_PIXELS || 0;
+    const minResolutionScale = Math.max(0.3, CONFIG.VIEW.MIN_RESOLUTION_SCALE || 0.7);
+    let resolutionScale = 1;
+    const area = cssWidth * cssHeight;
+    if (pixelBudget > 0 && area > 0) {
+      const targetPixels = area * dpr * dpr;
+      if (targetPixels > pixelBudget) {
+        const scaled = Math.sqrt(pixelBudget / targetPixels);
+        resolutionScale = Math.max(minResolutionScale, Math.min(1, scaled));
+      }
+    }
+
+    const effectiveDpr = dpr * resolutionScale;
+    view.dpr = effectiveDpr;
+    view.resolutionScale = resolutionScale;
+
+    canvas.style.width = cssWidth + "px";
+    canvas.style.height = cssHeight + "px";
+    canvas.width = Math.max(1, Math.round(cssWidth * effectiveDpr));
+    canvas.height = Math.max(1, Math.round(cssHeight * effectiveDpr));
+    ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
 
     if (wasRunning && prevW > 0 && prevH > 0) {
       const newCenterX = relCenterX * view.width;

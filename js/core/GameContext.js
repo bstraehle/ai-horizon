@@ -5,6 +5,7 @@ import { CONFIG } from "../constants.js";
  * @property {number} width
  * @property {number} height
  * @property {number} [dpr]
+ * @property {number} [resolutionScale]
  */
 
 /**

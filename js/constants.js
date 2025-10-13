@@ -157,6 +157,8 @@ export const CONFIG = deepFreeze({
     DPR_MIN: 1.0,
     DPR_MAX: 2.0,
     DPR_MOBILE_MAX: 1.5,
+    MAX_CANVAS_PIXELS: 9000000,
+    MIN_RESOLUTION_SCALE: 0.5,
   },
   PERFORMANCE: {
     SAMPLE_WINDOW: 90,
