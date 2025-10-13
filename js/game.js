@@ -121,13 +121,18 @@ class AIHorizon {
     this.highScore = 0;
     this.score = 0;
     this.shotsFired = 0;
-    this.asteroidKills = 0;
-    this.hardenedAsteroidKills = 0;
+    this.asteroidsKilled = 0;
+    this.hardenedAsteroidsKilled = 0;
     this.hardenedAsteroidHitBullets = 0;
-    this.bonusAsteroidKills = 0;
+    this.bonusAsteroidsKilled = 0;
     this.bonusAsteroidHitBullets = 0;
     this.starsCollected = 0;
     this.bonusStarsCollected = 0;
+    this.starsSpawned = 0;
+    this.bonusStarsSpawned = 0;
+    this.asteroidsSpawned = 0;
+    this.bonusAsteroidsSpawned = 0;
+    this.hardenedAsteroidsSpawned = 0;
     this.accuracy = 0;
     this.accuracyBonus = 0;
     try {
@@ -920,17 +925,35 @@ class AIHorizon {
    */
   _logRunSummary(accuracySummary) {
     if (typeof console === "undefined" || typeof console.log !== "function") return;
-    const accuracySummaryRounded = (() => {
+    let shotsFiredAccuracy = 0;
+    const scoreSummary = (() => {
       if (!accuracySummary) return null;
-      const { applied: _applied, newScore, ...rest } = accuracySummary;
+      const {
+        applied: _applied,
+        newScore,
+        accuracy: rawAccuracy,
+        baseScore = null,
+        bonus = null,
+        ...rest
+      } = accuracySummary;
       const roundedAccuracy =
-        typeof accuracySummary.accuracy === "number"
-          ? Math.max(0, Math.min(1, Math.round(accuracySummary.accuracy * 100) / 100))
-          : accuracySummary.accuracy;
+        typeof rawAccuracy === "number"
+          ? Math.max(0, Math.min(1, Math.round(rawAccuracy * 100) / 100))
+          : 0;
+      shotsFiredAccuracy = roundedAccuracy;
+      const finalScoreNormalized = typeof newScore === "number" ? newScore : (newScore ?? null);
+      const highScoreValue = Number.isFinite(this.highScore) ? this.highScore : null;
+      const scoreDifference =
+        typeof highScoreValue === "number" && typeof finalScoreNormalized === "number"
+          ? highScoreValue - finalScoreNormalized
+          : null;
       return {
+        baseScore,
+        bonus,
+        finalScore: finalScoreNormalized,
+        highScore: highScoreValue,
+        scoreDifference,
         ...rest,
-        accuracy: roundedAccuracy,
-        score: typeof newScore === "number" ? newScore : (newScore ?? null),
       };
     })();
     const timerInitialRaw = Number.isFinite(this.timerSeconds) ? this.timerSeconds : null;
@@ -953,6 +976,30 @@ class AIHorizon {
     } else if (Number.isFinite(runtimeSeconds)) {
       runtimeSecondsInt = toSeconds(runtimeSeconds, "round");
     }
+    /**
+     * @param {number|null|undefined} numerator
+     * @param {number|null|undefined} denominator
+     */
+    const ratioOrNull = (numerator, denominator) => {
+      if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0)
+        return 0;
+      const clamped = Math.max(0, Math.min(1, numerator / denominator));
+      return Math.round(clamped * 100) / 100;
+    };
+    const starsCollectedAccuracy = ratioOrNull(this.starsCollected, this.starsSpawned);
+    const bonusStarsCollectedAccuracy = ratioOrNull(
+      this.bonusStarsCollected,
+      this.bonusStarsSpawned
+    );
+    const asteroidsKilledAccuracy = ratioOrNull(this.asteroidsKilled, this.asteroidsSpawned);
+    const hardenedAsteroidsKilledAccuracy = ratioOrNull(
+      this.hardenedAsteroidsKilled,
+      this.hardenedAsteroidsSpawned
+    );
+    const bonusAsteroidsKilledAccuracy = ratioOrNull(
+      this.bonusAsteroidsKilled,
+      this.bonusAsteroidsSpawned
+    );
     const summary = {
       timestamp: (() => {
         try {
@@ -961,29 +1008,42 @@ class AIHorizon {
           return null;
         }
       })(),
-      highScore: this.highScore || 0,
-      time: {
+      timer: {
         totalSeconds: totalSecondsInt,
-        remainingSeconds: remainingSecondsInt,
         runtimeSeconds: runtimeSecondsInt,
+        remainingSeconds: remainingSecondsInt,
       },
-      accuracy: accuracySummaryRounded,
+      score: scoreSummary,
       stats: {
+        starsSpawned: typeof this.starsSpawned === "number" ? this.starsSpawned : null,
         starsCollected: typeof this.starsCollected === "number" ? this.starsCollected : null,
+        starsCollectedAccuracy: starsCollectedAccuracy,
+        bonusStarsSpawned:
+          typeof this.bonusStarsSpawned === "number" ? this.bonusStarsSpawned : null,
         bonusStarsCollected:
           typeof this.bonusStarsCollected === "number" ? this.bonusStarsCollected : null,
-        shotsFired: typeof this.shotsFired === "number" ? this.shotsFired : null,
-        asteroidKills: typeof this.asteroidKills === "number" ? this.asteroidKills : null,
-        hardenedAsteroidKills:
-          typeof this.hardenedAsteroidKills === "number" ? this.hardenedAsteroidKills : null,
+        bonusStarsCollectedAccuracy: bonusStarsCollectedAccuracy,
+        asteroidsSpawned: typeof this.asteroidsSpawned === "number" ? this.asteroidsSpawned : null,
+        asteroidsKilled: typeof this.asteroidsKilled === "number" ? this.asteroidsKilled : null,
+        asteroidsKilledAccuracy: asteroidsKilledAccuracy,
+        hardenedAsteroidsSpawned:
+          typeof this.hardenedAsteroidsSpawned === "number" ? this.hardenedAsteroidsSpawned : null,
+        hardenedAsteroidsKilled:
+          typeof this.hardenedAsteroidsKilled === "number" ? this.hardenedAsteroidsKilled : null,
+        hardenedAsteroidsKilledAccuracy: hardenedAsteroidsKilledAccuracy,
+        bonusAsteroidsSpawned:
+          typeof this.bonusAsteroidsSpawned === "number" ? this.bonusAsteroidsSpawned : null,
+        bonusAsteroidsKilled:
+          typeof this.bonusAsteroidsKilled === "number" ? this.bonusAsteroidsKilled : null,
+        bonusAsteroidsKilledAccuracy: bonusAsteroidsKilledAccuracy,
         hardenedAsteroidHitBullets:
           typeof this.hardenedAsteroidHitBullets === "number"
             ? this.hardenedAsteroidHitBullets
             : null,
-        bonusAsteroidKills:
-          typeof this.bonusAsteroidKills === "number" ? this.bonusAsteroidKills : null,
         bonusAsteroidHitBullets:
           typeof this.bonusAsteroidHitBullets === "number" ? this.bonusAsteroidHitBullets : null,
+        shotsFired: typeof this.shotsFired === "number" ? this.shotsFired : null,
+        shotsFiredAccuracy: shotsFiredAccuracy,
       },
       device: (() => {
         try {

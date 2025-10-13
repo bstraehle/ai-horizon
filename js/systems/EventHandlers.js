@@ -103,12 +103,12 @@ export const EventHandlers = {
         const r = ScoringManager.add(game, add);
         if (asteroid) {
           if (asteroid.isHardened) {
-            game.hardenedAsteroidKills = (game.hardenedAsteroidKills || 0) + 1;
+            game.hardenedAsteroidsKilled = (game.hardenedAsteroidsKilled || 0) + 1;
             if (asteroid.isBonus) {
-              game.bonusAsteroidKills = (game.bonusAsteroidKills || 0) + 1;
+              game.bonusAsteroidsKilled = (game.bonusAsteroidsKilled || 0) + 1;
             }
           } else {
-            game.asteroidKills = (game.asteroidKills || 0) + 1;
+            game.asteroidsKilled = (game.asteroidsKilled || 0) + 1;
           }
         }
         game.createExplosion(asteroid.x + asteroid.width / 2, asteroid.y + asteroid.height / 2);

@@ -47,11 +47,11 @@ export const GameUI = {
         if (typeof game.shotsFired === "number") {
           scoreEl.dataset.shotsFired = String(game.shotsFired);
         }
-        if (typeof game.asteroidKills === "number") {
-          scoreEl.dataset.asteroidKills = String(game.asteroidKills);
+        if (typeof game.asteroidsKilled === "number") {
+          scoreEl.dataset.asteroidsKilled = String(game.asteroidsKilled);
         }
-        if (typeof game.hardenedAsteroidKills === "number") {
-          scoreEl.dataset.hardenedAsteroidKills = String(game.hardenedAsteroidKills);
+        if (typeof game.hardenedAsteroidsKilled === "number") {
+          scoreEl.dataset.hardenedAsteroidsKilled = String(game.hardenedAsteroidsKilled);
         }
         try {
           scoreEl.textContent = String(game.score || 0);

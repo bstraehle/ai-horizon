@@ -88,16 +88,21 @@
  * @property {number} highScore
  * @property {number} score
  * @property {number} [shotsFired]
- * @property {number} [asteroidKills]
- * @property {number} [hardenedAsteroidKills]
+ * @property {number} [asteroidsKilled]
+ * @property {number} [hardenedAsteroidsKilled]
  * @property {number} [hardenedAsteroidHitBullets]
- * @property {number} [bonusAsteroidKills]
+ * @property {number} [bonusAsteroidsKilled]
  * @property {number} [bonusAsteroidHitBullets]
  * @property {number} [accuracy]
  * @property {number} [accuracyBonus]
  * @property {boolean} [_accuracyBonusApplied]
  * @property {number} [starsCollected]
  * @property {number} [bonusStarsCollected]
+ * @property {number} [starsSpawned]
+ * @property {number} [bonusStarsSpawned]
+ * @property {number} [asteroidsSpawned]
+ * @property {number} [bonusAsteroidsSpawned]
+ * @property {number} [hardenedAsteroidsSpawned]
  * @property {InputState} input
  * @property {EventBus} events
  * @property {GameStateMachine} state

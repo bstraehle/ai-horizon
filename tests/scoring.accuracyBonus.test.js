@@ -4,23 +4,29 @@ import { ScoringManager } from "../js/managers/ScoringManager.js";
 function makeGame({
   score = 0,
   shotsFired = 0,
-  asteroidKills = 0,
-  hardenedAsteroidKills = 0,
+  asteroidsKilled = 0,
+  hardenedAsteroidsKilled = 0,
   hardenedAsteroidHitBullets = 0,
 } = {}) {
-  return { score, shotsFired, asteroidKills, hardenedAsteroidKills, hardenedAsteroidHitBullets };
+  return {
+    score,
+    shotsFired,
+    asteroidsKilled,
+    hardenedAsteroidsKilled,
+    hardenedAsteroidHitBullets,
+  };
 }
 
 describe("ScoringManager.applyAccuracyBonus", () => {
   it("applies no bonus when no shots fired", () => {
-    const game = makeGame({ score: 1000, shotsFired: 0, asteroidKills: 0 });
+    const game = makeGame({ score: 1000, shotsFired: 0, asteroidsKilled: 0 });
     const r = ScoringManager.applyAccuracyBonus(game);
     expect(r.bonus).toBe(0);
     expect(game.score).toBe(1000);
   });
 
   it("applies proportional bonus based on accuracy", () => {
-    const game = makeGame({ score: 1000, shotsFired: 10, asteroidKills: 7 });
+    const game = makeGame({ score: 1000, shotsFired: 10, asteroidsKilled: 7 });
     const { bonus, accuracy, newScore } = ScoringManager.applyAccuracyBonus(game);
     expect(Math.abs(accuracy - 0.7)).toBeLessThan(1e-9);
     expect(bonus).toBe(700);
@@ -31,7 +37,7 @@ describe("ScoringManager.applyAccuracyBonus", () => {
     const game = makeGame({
       score: 500,
       shotsFired: 5,
-      asteroidKills: 2,
+      asteroidsKilled: 2,
       hardenedAsteroidHitBullets: 10,
     });
     const { bonus, accuracy, newScore } = ScoringManager.applyAccuracyBonus(game);
@@ -41,7 +47,7 @@ describe("ScoringManager.applyAccuracyBonus", () => {
   });
 
   it("is idempotent (second call no extra bonus)", () => {
-    const game = makeGame({ score: 1000, shotsFired: 4, asteroidKills: 4 });
+    const game = makeGame({ score: 1000, shotsFired: 4, asteroidsKilled: 4 });
     const first = ScoringManager.applyAccuracyBonus(game);
     const second = ScoringManager.applyAccuracyBonus(game);
     expect(first.bonus).toBe(1000);

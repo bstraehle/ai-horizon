@@ -21,6 +21,11 @@ import { Star } from "../entities/Star.js";
  * @property {StarPool | null | undefined} [starPool]
  * @property {Asteroid[]} asteroids
  * @property {Star[]} stars
+ * @property {number} [starsSpawned]
+ * @property {number} [bonusStarsSpawned]
+ * @property {number} [asteroidsSpawned]
+ * @property {number} [bonusAsteroidsSpawned]
+ * @property {number} [hardenedAsteroidsSpawned]
  */
 
 /**
@@ -134,8 +139,33 @@ export class SpawnManager {
 
     const pAst = 1 - Math.exp(-asteroidRate * dt);
     const pStar = 1 - Math.exp(-starRate * dt);
-    if (rng.nextFloat() < pAst) game.asteroids.push(this.createAsteroid(game));
-    if (rng.nextFloat() < pStar) game.stars.push(this.createStar(game));
+    if (rng.nextFloat() < pAst) {
+      const asteroid = this.createAsteroid(game);
+      game.asteroids.push(asteroid);
+      try {
+        game.asteroidsSpawned = (game.asteroidsSpawned || 0) + 1;
+        if (asteroid && asteroid.isBonus) {
+          game.bonusAsteroidsSpawned = (game.bonusAsteroidsSpawned || 0) + 1;
+        }
+        if (asteroid && asteroid.isHardened) {
+          game.hardenedAsteroidsSpawned = (game.hardenedAsteroidsSpawned || 0) + 1;
+        }
+      } catch {
+        /* stats optional */
+      }
+    }
+    if (rng.nextFloat() < pStar) {
+      const star = this.createStar(game);
+      game.stars.push(star);
+      try {
+        game.starsSpawned = (game.starsSpawned || 0) + 1;
+        if (star && star.isRed) {
+          game.bonusStarsSpawned = (game.bonusStarsSpawned || 0) + 1;
+        }
+      } catch {
+        /* stats optional */
+      }
+    }
   }
 
   /** Create/acquire asteroid; manages cadence for hardened variant + palette cycling. @param {AsteroidCreateSlice} game @returns {Asteroid} */

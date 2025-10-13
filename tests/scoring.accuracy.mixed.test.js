@@ -6,8 +6,8 @@ describe("ScoringManager hardened + regular mixed accuracy", () => {
     const game = {
       score: 1000,
       shotsFired: 18,
-      asteroidKills: 1,
-      hardenedAsteroidKills: 1,
+      asteroidsKilled: 1,
+      hardenedAsteroidsKilled: 1,
       hardenedAsteroidHitBullets: 13,
     };
     const r = ScoringManager.applyAccuracyBonus(game);
