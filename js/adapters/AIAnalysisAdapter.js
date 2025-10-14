@@ -74,7 +74,7 @@ export class AIAnalysisAdapter {
       bullets.push("Destroy more asteroids");
     }
     return {
-      title: "✨ AI analysis is not available",
+      title: "✨ AI analysis coming soon! ✨",
       bullets,
     };
   }
