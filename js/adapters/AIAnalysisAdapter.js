@@ -13,7 +13,8 @@ export class AIAnalysisAdapter {
     // Simulate slight network latency to align with future REST behavior
     await new Promise((r) => setTimeout(r, 60));
     /** @type {any} */
-    //const payload = input || {};
+    const payload = input || {};
+    console.log("AI analysis payload:", payload);
     /** @type {any} */
     //const runSummary = payload && payload.runSummary ? payload.runSummary : null;
     /** @type {any} */
