@@ -34,7 +34,7 @@ export class AIAnalysisManager {
             "Play full 60 seconds",
             "Collect more bonus stars",
             "Destroy all bonus asteroids",
-            "Increase accuracy with short bursts",
+            "Increase shot accuracy with short bursts",
             "Maximize double points in last 10 seconds",
           ],
         };
@@ -105,7 +105,7 @@ export class AIAnalysisManager {
               "Play full 60 seconds",
               "Collect more bonus stars",
               "Destroy all bonus asteroids",
-              "Increase accuracy with short bursts",
+              "Increase shot accuracy with short bursts",
               "Maximize double points in last 10 seconds",
             ],
           });

@@ -14,7 +14,7 @@ export class AIAnalysisAdapter {
     await new Promise((r) => setTimeout(r, 60));
     /** @type {any} */
     const payload = input || {};
-    console.log("AI analysis payload:", payload);
+    //console.log("AI analysis payload:", payload);
     /** @type {any} */
     //const runSummary = payload && payload.runSummary ? payload.runSummary : null;
     /** @type {any} */
@@ -26,10 +26,10 @@ export class AIAnalysisAdapter {
     bullets.push("Play full 60 seconds");
     bullets.push("Collect more bonus stars");
     bullets.push("Destroy all bonus asteroids");
-    bullets.push("Increase accuracy with short bursts");
+    bullets.push("Increase shot accuracy with short bursts");
     bullets.push("Maximize double points in last 10 seconds");
     return {
-      title: "✨ AI analysis is coming soon",
+      title: "✨ AI analysis is not available",
       bullets,
     };
   }

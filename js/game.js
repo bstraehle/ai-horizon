@@ -102,8 +102,10 @@ class AIHorizon {
     this.view = { width: 0, height: 0, dpr: 1 };
     this._lastOrientation = null;
     this.gameInfo = /** @type {HTMLElement} */ (document.getElementById("gameInfo"));
+    this.leaderboardScreen = /** @type {HTMLElement} */ (
+      document.getElementById("leaderboardScreen")
+    );
     this.gameOverScreen = /** @type {HTMLElement} */ (document.getElementById("gameOverScreen"));
-    this.postGameScreen = /** @type {HTMLElement} */ (document.getElementById("postGameScreen"));
     this.pauseScreen = /** @type {HTMLElement} */ (document.getElementById("pauseScreen"));
     this.startBtn = /** @type {HTMLButtonElement} */ (document.getElementById("startBtn"));
     this.restartBtn = /** @type {HTMLButtonElement} */ (document.getElementById("restartBtn"));
@@ -494,11 +496,11 @@ class AIHorizon {
         document.getElementById("initialsScreen")
       );
       const gameOverVisible = !!(
-        this.gameOverScreen && !this.gameOverScreen.classList.contains("hidden")
+        this.leaderboardScreen && !this.leaderboardScreen.classList.contains("hidden")
       );
       const startVisible = !!(this.gameInfo && !this.gameInfo.classList.contains("hidden"));
       const postGameVisible = !!(
-        this.postGameScreen && !this.postGameScreen.classList.contains("hidden")
+        this.gameOverScreen && !this.gameOverScreen.classList.contains("hidden")
       );
       const initialsVisible = !!(initialsScreen && !initialsScreen.classList.contains("hidden"));
       if (gameOverVisible || postGameVisible || initialsVisible || startVisible) return false;
@@ -528,9 +530,9 @@ class AIHorizon {
   handleGameOverFocusGuard(e) {
     UIManager.handleGameOverFocusGuard(
       e,
-      this.gameOverScreen,
+      this.leaderboardScreen,
       this.restartBtn,
-      this.postGameScreen,
+      this.gameOverScreen,
       this.okBtn
     );
   }
@@ -571,9 +573,9 @@ class AIHorizon {
     UIManager.handleVisibilityChange(
       this.gameInfo,
       this.startBtn,
-      this.gameOverScreen,
+      this.leaderboardScreen,
       this.restartBtn,
-      this.postGameScreen,
+      this.gameOverScreen,
       this.okBtn
     );
   }
@@ -1132,7 +1134,7 @@ class AIHorizon {
         if (
           t &&
           typeof t.closest === "function" &&
-          (t.closest("#postGameScreen") ||
+          (t.closest("#gameOverScreen") ||
             t.closest("#initialsScreen") ||
             t.closest("#okBtn") ||
             t.closest("#submitScoreBtn"))

@@ -64,19 +64,19 @@ export const GameUI = {
       /* dataset optional */
     }
     UIManager.showGameOver(
-      game.gameOverScreen || null,
+      game.leaderboardScreen || null,
       game.restartBtn || null,
       game.currentScoreEl || null,
       game.score || 0,
       submittedScore,
       undefined,
-      game.postGameScreen || null
+      game.gameOverScreen || null
     );
 
     try {
       const postGame =
-        game.postGameScreen ||
-        /** @type {HTMLElement|null} */ (document.getElementById("postGameScreen"));
+        game.gameOverScreen ||
+        /** @type {HTMLElement|null} */ (document.getElementById("gameOverScreen"));
       const msg = /** @type {HTMLElement|null} */ (document.getElementById("postGameMessage"));
       const visible = !!(postGame && !postGame.classList.contains("hidden"));
       if (visible && msg) {
@@ -146,14 +146,14 @@ export const GameUI = {
    * @param {AIHorizon} game
    */
   hideGameOver(game) {
-    UIManager.hideGameOver(game.gameOverScreen || null, game.postGameScreen || null);
+    UIManager.hideGameOver(game.leaderboardScreen || null, game.gameOverScreen || null);
   },
   /**
    * Hide the post-game overlay without touching the main modal.
    * @param {AIHorizon} game
    */
   hidePostGame(game) {
-    UIManager.hidePostGame(game.postGameScreen || null);
+    UIManager.hidePostGame(game.gameOverScreen || null);
   },
   /**
    * Update the visible score.

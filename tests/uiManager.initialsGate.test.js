@@ -3,11 +3,10 @@ import { JSDOM } from "jsdom";
 import { LeaderboardManager } from "../js/managers/LeaderboardManager.js";
 import { UIManager } from "../js/managers/UIManager.js";
 
-// Helper to build the Game Over overlay DOM structure used by UIManager.showGameOver
 function setupDOM() {
   const dom = new JSDOM(
     `<!doctype html><html><body>
-    <div id="gameOverScreen" class="game-over-overlay">
+    <div id="leaderboardScreen" class="game-over-overlay">
       <div class="initials-entry hidden">
         <label id="initialsLabel" class="hidden" for="initialsInput">Initials</label>
         <input id="initialsInput" class="hidden" maxlength="3" />
@@ -26,21 +25,19 @@ function setupDOM() {
   return dom;
 }
 
-// Ensure remote mode isn't making network calls in tests.
 LeaderboardManager.IS_REMOTE = false;
 
 describe("UIManager.showGameOver initials gating", () => {
   beforeEach(() => {
     setupDOM();
-    // Reset cached leaderboard state between tests
     LeaderboardManager._cacheEntries = [];
   });
 
   it("shows initials form when leaderboard has space (fewer than MAX_ENTRIES)", () => {
     LeaderboardManager._cacheEntries = [{ id: "AAA", score: 300 }];
-    const score = 250; // any positive score should qualify because list not full
+    const score = 250;
     UIManager.showGameOver(
-      document.getElementById("gameOverScreen"),
+      document.getElementById("leaderboardScreen"),
       document.getElementById("restartBtn"),
       document.getElementById("finalScore"),
       score
@@ -50,17 +47,16 @@ describe("UIManager.showGameOver initials gating", () => {
   });
 
   it("hides initials form when board is full and score does not beat cutoff", () => {
-    // Create a full leaderboard (descending scores). Cutoff will be the lowest score (100).
     LeaderboardManager._cacheEntries = Array.from(
       { length: LeaderboardManager.MAX_ENTRIES },
       (_, i) => ({
         id: `A${String(i).padStart(2, "0")}`.slice(0, 3),
-        score: (LeaderboardManager.MAX_ENTRIES - i) * 100, // e.g., 2500..100 when max=25
+        score: (LeaderboardManager.MAX_ENTRIES - i) * 100,
       })
     );
-    const score = 100; // equal to cutoff (tie should NOT qualify)
+    const score = 100;
     UIManager.showGameOver(
-      document.getElementById("gameOverScreen"),
+      document.getElementById("leaderboardScreen"),
       document.getElementById("restartBtn"),
       document.getElementById("finalScore"),
       score
@@ -75,9 +71,9 @@ describe("UIManager.showGameOver initials gating", () => {
       { id: "BBB", score: 800 },
       { id: "CCC", score: 100 },
     ];
-    const score = 500; // should displace 100
+    const score = 500;
     UIManager.showGameOver(
-      document.getElementById("gameOverScreen"),
+      document.getElementById("leaderboardScreen"),
       document.getElementById("restartBtn"),
       document.getElementById("finalScore"),
       score
@@ -88,14 +84,14 @@ describe("UIManager.showGameOver initials gating", () => {
 
   it("respects explicit allowInitials=false override even if qualifying", () => {
     LeaderboardManager._cacheEntries = [{ id: "AAA", score: 10 }];
-    const score = 999; // would qualify
+    const score = 999;
     UIManager.showGameOver(
-      document.getElementById("gameOverScreen"),
+      document.getElementById("leaderboardScreen"),
       document.getElementById("restartBtn"),
       document.getElementById("finalScore"),
       score,
       false,
-      false // override
+      false
     );
     const initialsInput = document.getElementById("initialsInput");
     expect(initialsInput.classList.contains("hidden")).toBe(true);
@@ -107,14 +103,14 @@ describe("UIManager.showGameOver initials gating", () => {
       { id: "BBB", score: 800 },
       { id: "CCC", score: 700 },
     ];
-    const score = 100; // does not qualify
+    const score = 100;
     UIManager.showGameOver(
-      document.getElementById("gameOverScreen"),
+      document.getElementById("leaderboardScreen"),
       document.getElementById("restartBtn"),
       document.getElementById("finalScore"),
       score,
       false,
-      true // override
+      true
     );
     const initialsInput = document.getElementById("initialsInput");
     expect(initialsInput.classList.contains("hidden")).toBe(false);

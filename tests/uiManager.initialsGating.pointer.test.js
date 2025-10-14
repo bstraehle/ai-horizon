@@ -6,7 +6,7 @@ import { LeaderboardManager } from "../js/managers/LeaderboardManager.js";
 function createDom() {
   return new JSDOM(
     `<!doctype html><html><body>
-      <div id="gameOverScreen" class="game-over-screen hidden">
+      <div id="leaderboardScreen" class="game-over-screen hidden">
         <div class="game-over-content">
           <div id="leaderboard" class="leaderboard">
             <ol id="leaderboardList"></ol>
@@ -73,11 +73,11 @@ describe("UIManager initials pointer gating until 3 chars", () => {
   afterEach(() => cleanup && cleanup());
 
   it("blocks background clicks & submit focus until 3 chars entered", async () => {
-    const gameOverScreen = document.getElementById("gameOverScreen");
+    const leaderboardScreen = document.getElementById("leaderboardScreen");
     const restartBtn = document.getElementById("restartBtn");
     const finalScoreEl = document.getElementById("finalScore");
 
-    UIManager.showGameOver(gameOverScreen, restartBtn, finalScoreEl, 500);
+    UIManager.showGameOver(leaderboardScreen, restartBtn, finalScoreEl, 500);
 
     const initialsScreen = document.getElementById("initialsScreen");
     const initialsInput = /** @type {HTMLInputElement} */ (

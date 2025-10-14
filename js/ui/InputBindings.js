@@ -51,11 +51,11 @@ export const InputBindings = {
     InputManager.setup(
       /** @type {HTMLCanvasElement} */ (game.canvas),
       /** @type {HTMLElement} */ (game.gameInfo || document.createElement("div")),
-      /** @type {HTMLElement} */ (game.gameOverScreen || document.createElement("div")),
+      /** @type {HTMLElement} */ (game.leaderboardScreen || document.createElement("div")),
       /** @type {HTMLButtonElement} */ (game.startBtn || document.createElement("button")),
       /** @type {HTMLButtonElement} */ (game.restartBtn || document.createElement("button")),
       /** @type {HTMLButtonElement|null} */ (game.okBtn || null),
-      /** @type {HTMLElement|null} */ (game.postGameScreen || null),
+      /** @type {HTMLElement|null} */ (game.gameOverScreen || null),
       {
         handleKeyDown: game.handleKeyDown,
         handleKeyUp: game.handleKeyUp,
@@ -79,9 +79,9 @@ export const InputBindings = {
           UIManager.handleWindowFocus(
             /** @type {HTMLElement|null} */ (game.gameInfo || null),
             /** @type {HTMLButtonElement|null} */ (game.startBtn || null),
-            /** @type {HTMLElement|null} */ (game.gameOverScreen || null),
+            /** @type {HTMLElement|null} */ (game.leaderboardScreen || null),
             /** @type {HTMLButtonElement|null} */ (game.restartBtn || null),
-            /** @type {HTMLElement|null} */ (game.postGameScreen || null),
+            /** @type {HTMLElement|null} */ (game.gameOverScreen || null),
             /** @type {HTMLButtonElement|null} */ (game.okBtn || null)
           ),
         handleVisibilityChange: game.handleVisibilityChange,
@@ -90,9 +90,9 @@ export const InputBindings = {
             e,
             /** @type {HTMLElement|null} */ (game.gameInfo || null),
             /** @type {HTMLButtonElement|null} */ (game.startBtn || null),
-            /** @type {HTMLElement|null} */ (game.gameOverScreen || null),
+            /** @type {HTMLElement|null} */ (game.leaderboardScreen || null),
             /** @type {HTMLButtonElement|null} */ (game.restartBtn || null),
-            /** @type {HTMLElement|null} */ (game.postGameScreen || null),
+            /** @type {HTMLElement|null} */ (game.gameOverScreen || null),
             /** @type {HTMLButtonElement|null} */ (game.okBtn || null)
           ),
         handleScroll: game.handleScroll,

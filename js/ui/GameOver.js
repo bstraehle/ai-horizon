@@ -24,11 +24,21 @@ export function handleGameOver(game) {
       const initialsScreen = /** @type {HTMLElement|null} */ (
         document.getElementById("initialsScreen")
       );
-      const _gameOverScreen = /** @type {HTMLElement|null} */ (
-        document.getElementById("gameOverScreen")
+      const _leaderboardScreen = /** @type {HTMLElement|null} */ (
+        document.getElementById("leaderboardScreen")
       );
-      const initialsEntry = document.querySelector(".initials-entry");
-      if (initialsEntry) initialsEntry.classList.add("hidden");
+      try {
+        const initialsEntries = document.querySelectorAll(".initials-entry:not(.post-game-entry)");
+        initialsEntries.forEach((el) => {
+          try {
+            el.classList.add("hidden");
+          } catch {
+            /* ignore */
+          }
+        });
+      } catch {
+        /* non-critical */
+      }
 
       const attemptSubmit = () => {
         if (!initialsInput) return false;
@@ -99,51 +109,33 @@ export function handleGameOver(game) {
           /* ignore */
         }
         try {
+          const leaderboardScreen = _leaderboardScreen;
           const postGameScreen = /** @type {HTMLElement|null} */ (
-            document.getElementById("postGameScreen")
+            document.getElementById("gameOverScreen")
           );
           if (postGameScreen) {
-            postGameScreen.classList.remove("hidden");
+            postGameScreen.classList.add("hidden");
             try {
-              postGameScreen.hidden = false;
-            } catch (_) {
+              postGameScreen.hidden = true;
+            } catch {
               /* ignore */
             }
+          }
+          if (leaderboardScreen) {
+            leaderboardScreen.classList.remove("hidden");
             try {
-              const okBtn = /** @type {HTMLButtonElement|null} */ (
-                document.getElementById("okBtn")
-              );
-              if (okBtn) UIManager.focusWithRetry(okBtn);
+              leaderboardScreen.hidden = false;
             } catch {
-              /* non-critical focus */
+              /* ignore */
             }
-            try {
-              const msg = /** @type {HTMLElement|null} */ (
-                document.getElementById("postGameMessage")
-              );
-              if (msg) {
-                AIAnalysisManager.render(
-                  msg,
-                  {
-                    score: game.score || 0,
-                    accuracy: game.accuracy || 0,
-                    shotsFired: game.shotsFired || 0,
-                    asteroidsKilled: game.asteroidsKilled || 0,
-                    hardenedAsteroidsKilled: game.hardenedAsteroidsKilled || 0,
-                    bonusAsteroidsKilled: game.bonusAsteroidsKilled || 0,
-                    starsCollected: game.starsCollected || 0,
-                    bonusStarsCollected: game.bonusStarsCollected || 0,
-                    timerSeconds: game.timerSeconds || 60,
-                    timerRemaining: game.timerRemaining || 0,
-                  },
-                  /** @type {any} */ (game)._lastRunSummary || null
-                );
-              }
-            } catch {
-              /* ignore AI analysis render errors */
-            }
-          } else {
-            if (_gameOverScreen) _gameOverScreen.classList.remove("hidden");
+          }
+          try {
+            const restartBtn = /** @type {HTMLButtonElement|null} */ (
+              document.getElementById("restartBtn")
+            );
+            if (restartBtn) UIManager.focusWithRetry(restartBtn);
+          } catch {
+            /* ignore */
           }
         } catch {
           /* ignore */

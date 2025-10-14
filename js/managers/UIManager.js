@@ -1312,15 +1312,15 @@ try {
     // Debug: listen for post-game OK event to reveal Game Over modal when appropriate.
     window.addEventListener("postGame:ok", () => {
       try {
-        const gameOverScreen = UIManager._byId("gameOverScreen");
+        const leaderboardScreen = UIManager._byId("leaderboardScreen");
         const initialsScreen = UIManager._byId("initialsScreen");
-        const postGameScreen = UIManager._byId("postGameScreen");
+        const postGameScreen = UIManager._byId("gameOverScreen");
         const initialsVisible = !!(initialsScreen && !initialsScreen.classList.contains("hidden"));
         const postGameVisible = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
-        if (!initialsVisible && !postGameVisible && gameOverScreen) {
-          gameOverScreen.classList.remove("hidden");
+        if (!initialsVisible && !postGameVisible && leaderboardScreen) {
+          leaderboardScreen.classList.remove("hidden");
           try {
-            gameOverScreen.hidden = false;
+            leaderboardScreen.hidden = false;
           } catch (_) {
             /* ignore */
           }

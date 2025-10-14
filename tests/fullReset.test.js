@@ -11,7 +11,7 @@ describe("DarkHorizon.fullReset", () => {
       <div class="game-container">
         <canvas id="gameCanvas"></canvas>
         <section id="gameInfo"></section>
-        <div id="gameOverScreen" class="hidden"></div>
+        <div id="leaderboardScreen" class="hidden"></div>
         <div id="pauseScreen" class="hidden"></div>
         <button id="startBtn"></button>
         <button id="restartBtn"></button>

@@ -7,7 +7,7 @@ function setupDom() {
   return new JSDOM(
     `<!doctype html><html><body>
     <canvas id="gameCanvas"></canvas>
-    <div id="gameOverScreen" class="game-over-screen hidden">
+    <div id="leaderboardScreen" class="game-over-screen hidden">
       <div class="game-over-content">
         <div id="leaderboard" class="leaderboard"><ol id="leaderboardList"></ol></div>
         <button id="restartBtn" type="button">Play Again</button>
@@ -78,7 +78,7 @@ describe("Restart button cooldown after submitting initials", () => {
       document.getElementById("initialsInput")
     );
     const submitBtn = document.getElementById("submitScoreBtn");
-    const gameOverScreen = document.getElementById("gameOverScreen");
+    const leaderboardScreen = document.getElementById("leaderboardScreen");
 
     // Force initials screen visible (qualification logic handled by handleGameOver)
     initialsScreen.classList.remove("hidden");
@@ -90,7 +90,7 @@ describe("Restart button cooldown after submitting initials", () => {
       leaderboardListEl: document.getElementById("leaderboardList"),
       restartBtn: restartBtn,
       startBtn: { focus: () => {} },
-      gameOverScreen: gameOverScreen,
+      leaderboardScreen: leaderboardScreen,
       finalScoreEl: document.getElementById("finalScore"),
       /** Mimic restart handler (respect cooldown dataset) */
       handleRestartClick() {

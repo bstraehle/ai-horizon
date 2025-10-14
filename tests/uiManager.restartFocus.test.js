@@ -6,7 +6,7 @@ import { LeaderboardManager } from "../js/managers/LeaderboardManager.js";
 function setupDOM() {
   const dom = new JSDOM(
     `<!doctype html><html><body>
-    <div id="gameOverScreen" class="game-over-overlay">
+    <div id="leaderboardScreen" class="game-over-overlay">
       <div class="initials-entry hidden">
         <label id="initialsLabel" class="hidden" for="initialsInput">Initials</label>
         <input id="initialsInput" class="hidden" maxlength="3" />
@@ -36,7 +36,7 @@ describe("UIManager.restartBtn focus persistence", () => {
   it("reclaims focus on restart button blur when submit/initials hidden", () => {
     const score = 0; // ensures initials UI stays hidden
     UIManager.showGameOver(
-      document.getElementById("gameOverScreen"),
+      document.getElementById("leaderboardScreen"),
       document.getElementById("restartBtn"),
       document.getElementById("finalScore"),
       score

@@ -79,8 +79,8 @@
  * @property {ViewSize} view
  * @property {DOMRect} [canvasRect]
  * @property {HTMLElement} gameInfo
+ * @property {HTMLElement} leaderboardScreen
  * @property {HTMLElement} gameOverScreen
- * @property {HTMLElement} postGameScreen
  * @property {HTMLButtonElement} startBtn
  * @property {HTMLButtonElement} restartBtn
  * @property {HTMLButtonElement|null} [okBtn]
