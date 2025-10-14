@@ -103,9 +103,11 @@ class AIHorizon {
     this._lastOrientation = null;
     this.gameInfo = /** @type {HTMLElement} */ (document.getElementById("gameInfo"));
     this.gameOverScreen = /** @type {HTMLElement} */ (document.getElementById("gameOverScreen"));
+    this.postGameScreen = /** @type {HTMLElement} */ (document.getElementById("postGameScreen"));
     this.pauseScreen = /** @type {HTMLElement} */ (document.getElementById("pauseScreen"));
     this.startBtn = /** @type {HTMLButtonElement} */ (document.getElementById("startBtn"));
     this.restartBtn = /** @type {HTMLButtonElement} */ (document.getElementById("restartBtn"));
+    this.okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
     this.highScoreEl = /** @type {HTMLElement} */ (document.getElementById("highScore"));
     this.highScoreBox = /** @type {HTMLElement|null} */ (document.getElementById("highScoreBox"));
     this.currentScoreEl = /** @type {HTMLElement} */ (document.getElementById("currentScore"));
@@ -513,7 +515,13 @@ class AIHorizon {
    * @param {Event} e
    */
   handleGameOverFocusGuard(e) {
-    UIManager.handleGameOverFocusGuard(e, this.gameOverScreen, this.restartBtn);
+    UIManager.handleGameOverFocusGuard(
+      e,
+      this.gameOverScreen,
+      this.restartBtn,
+      this.postGameScreen,
+      this.okBtn
+    );
   }
 
   /**
@@ -553,7 +561,9 @@ class AIHorizon {
       this.gameInfo,
       this.startBtn,
       this.gameOverScreen,
-      this.restartBtn
+      this.restartBtn,
+      this.postGameScreen,
+      this.okBtn
     );
   }
 
@@ -570,7 +580,11 @@ class AIHorizon {
    * @param {KeyboardEvent} e - The keyboard event.
    */
   handleKeyDown(e) {
-    if (document.activeElement === this.startBtn || document.activeElement === this.restartBtn)
+    if (
+      document.activeElement === this.startBtn ||
+      document.activeElement === this.restartBtn ||
+      document.activeElement === this.okBtn
+    )
       return;
     this.input.setKey(e.code, true);
     if (CONFIG.INPUT.FIRE_CODES.includes(e.code)) {
@@ -678,6 +692,12 @@ class AIHorizon {
     } catch (_) {
       /* intentionally ignored: focus may fail if button not yet in DOM or not focusable */
     }
+  }
+
+  /** Dismiss the post-game overlay and return focus to restart. */
+  handlePostGameOkClick() {
+    GameUI.hidePostGame(this);
+    GameUI.focusRestart(this);
   }
 
   /**

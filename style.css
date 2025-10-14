@@ -299,6 +299,20 @@ body {
 .initials-entry .action-button {
   margin-bottom: 0;
 }
+.post-game-message {
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-5);
+  text-align: center;
+}
+.post-game-message p {
+  margin-bottom: var(--space-4);
+}
+.post-game-message ul {
+  list-style: disc;
+  margin: 0 auto;
+  padding-left: var(--space-5);
+  text-align: left;
+}
 .initials-entry .initials-input {
   background: rgba(255, 255, 255, 0.01);
   border: 1px solid var(--color-border);

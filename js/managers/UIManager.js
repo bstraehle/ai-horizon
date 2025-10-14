@@ -69,8 +69,16 @@ export class UIManager {
     };
   }
 
-  /** @param {boolean} visible @param {HTMLElement|null} gameOverScreen @param {InitialsElements} elements */
-  static _toggleInitialsUI(visible, gameOverScreen, elements) {
+  /**
+   * Toggle initials UI visibility and sync related overlays.
+   * @param {boolean} visible
+   * @param {HTMLElement|null} gameOverScreen
+   * @param {InitialsElements} elements
+   * @param {HTMLElement|null} postGameScreen
+   * @param {{updatePostGame?:boolean}} [options]
+   */
+  static _toggleInitialsUI(visible, gameOverScreen, elements, postGameScreen, options = {}) {
+    const { updatePostGame = true } = options || {};
     const { initialsScreen, initialsEntry, initialsInput, submitBtn, initialsLabel } = elements;
     const method = visible ? "remove" : "add";
 
@@ -87,6 +95,16 @@ export class UIManager {
         else gameOverScreen.classList.remove("hidden");
       });
     }
+
+    UIManager._try(() => {
+      if (!postGameScreen) return;
+      if (visible) {
+        postGameScreen.classList.add("hidden");
+        return;
+      }
+      if (!updatePostGame) return;
+      postGameScreen.classList.remove("hidden");
+    });
 
     UIManager._try(() => {
       if (initialsInput) initialsInput.classList[method]("hidden");
@@ -189,17 +207,25 @@ export class UIManager {
     });
   }
 
-  /** @param {number} score @param {boolean|undefined} allowInitials @param {HTMLElement|null} gameOverScreen @param {InitialsElements} elements */
-  static _applyInitialsQualification(score, allowInitials, gameOverScreen, elements) {
-    const toggle = /** @param {boolean} v */ (v) =>
-      UIManager._toggleInitialsUI(v, gameOverScreen, elements);
+  /** @param {number} score @param {boolean|undefined} allowInitials @param {HTMLElement|null} gameOverScreen @param {InitialsElements} elements @param {HTMLElement|null} postGameScreen */
+  static _applyInitialsQualification(
+    score,
+    allowInitials,
+    gameOverScreen,
+    elements,
+    postGameScreen
+  ) {
+    const toggle = /** @param {boolean} v @param {{updatePostGame?:boolean}|undefined} [opts] */ (
+      v,
+      opts
+    ) => UIManager._toggleInitialsUI(v, gameOverScreen, elements, postGameScreen, opts);
     if (typeof allowInitials === "boolean") {
-      toggle(allowInitials);
+      toggle(allowInitials, { updatePostGame: true });
       return;
     }
     const baseline = typeof score === "number" && score > 0;
     if (!baseline) {
-      toggle(false);
+      toggle(false, { updatePostGame: true });
       return;
     }
 
@@ -208,21 +234,21 @@ export class UIManager {
       typeof LeaderboardManager.getCached === "function" && LeaderboardManager.getCached();
     if (Array.isArray(cachedEntries)) {
       const qualifies = LeaderboardManager.qualifiesForInitials(score, cachedEntries.slice(), max);
-      toggle(qualifies);
+      toggle(qualifies, { updatePostGame: true });
       return;
     }
 
     if (LeaderboardManager._pendingLoadPromise) {
-      toggle(false);
+      toggle(false, { updatePostGame: false });
       LeaderboardManager._pendingLoadPromise
         .then((entries) => {
           UIManager._try(() => {
             if (!Array.isArray(entries)) {
-              toggle(true);
+              toggle(true, { updatePostGame: true });
               return;
             }
             const qualifies = LeaderboardManager.qualifiesForInitials(score, entries, max);
-            toggle(qualifies);
+            toggle(qualifies, { updatePostGame: true });
           });
         })
         .catch(() => {});
@@ -232,26 +258,26 @@ export class UIManager {
     const maybe = LeaderboardManager.load({ remote: LeaderboardManager.IS_REMOTE });
     if (Array.isArray(maybe)) {
       const qualifies = LeaderboardManager.qualifiesForInitials(score, maybe, max);
-      toggle(qualifies);
+      toggle(qualifies, { updatePostGame: true });
       return;
     }
     if (maybe && typeof maybe.then === "function") {
-      toggle(false);
+      toggle(false, { updatePostGame: false });
       maybe
         .then((entries) => {
           UIManager._try(() => {
             if (!Array.isArray(entries)) {
-              toggle(true);
+              toggle(true, { updatePostGame: true });
               return;
             }
             const qualifies = LeaderboardManager.qualifiesForInitials(score, entries, max);
-            toggle(qualifies);
+            toggle(qualifies, { updatePostGame: true });
           });
         })
         .catch(() => {});
       return;
     }
-    toggle(true);
+    toggle(true, { updatePostGame: true });
   }
   /**
    * @param {HTMLElement|null} el
@@ -425,14 +451,15 @@ export class UIManager {
     if (pauseScreen) pauseScreen.classList.add("hidden");
   }
 
-  /** @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} restartBtn @param {HTMLElement|null} currentScoreEl @param {number} score @param {boolean} [preserveScroll=false] @param {boolean|undefined} [allowInitials] */
+  /** @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} restartBtn @param {HTMLElement|null} currentScoreEl @param {number} score @param {boolean} [preserveScroll=false] @param {boolean|undefined} [allowInitials] @param {HTMLElement|null} [postGameScreen=null] */
   static showGameOver(
     gameOverScreen,
     restartBtn,
     currentScoreEl,
     score,
     preserveScroll = false,
-    allowInitials = undefined
+    allowInitials = undefined,
+    postGameScreen = null
   ) {
     try {
       UIManager.clearFinaleTimer(null);
@@ -460,20 +487,34 @@ export class UIManager {
       if (currentScoreEl) currentScoreEl.textContent = String(score);
     }
     if (gameOverScreen) gameOverScreen.classList.remove("hidden");
+    UIManager._try(() => {
+      if (postGameScreen) postGameScreen.classList.add("hidden");
+    });
     UIManager._resetLeaderboardScroll();
 
     const initialsElements = UIManager._getInitialsElements();
-    UIManager._applyInitialsQualification(score, allowInitials, gameOverScreen, initialsElements);
+    UIManager._applyInitialsQualification(
+      score,
+      allowInitials,
+      gameOverScreen,
+      initialsElements,
+      postGameScreen
+    );
 
     const initialsInput = /** @type {HTMLElement|null} */ (
       document.getElementById("initialsInput")
     );
     const submitBtn = /** @type {HTMLElement|null} */ (document.getElementById("submitScoreBtn"));
+    const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
+    const postGameVisible = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
     const visibleInitials =
       initialsInput && !initialsInput.classList.contains("hidden") ? initialsInput : null;
     let preferred = visibleInitials || restartBtn;
     if (typeof score === "number" && score === 0) {
       preferred = restartBtn;
+    }
+    if (postGameVisible && okBtn) {
+      preferred = okBtn;
     }
 
     if (preserveScroll) {
@@ -526,7 +567,12 @@ export class UIManager {
         const onFocusIn = () => {
           try {
             const active = document.activeElement;
-            if (active === preferred || active === restartBtn || active === submitBtn) {
+            if (
+              active === preferred ||
+              active === restartBtn ||
+              active === submitBtn ||
+              active === okBtn
+            ) {
               try {
                 if (preferred) preferred.classList.remove("js-force-focus");
               } catch (_) {
@@ -559,11 +605,28 @@ export class UIManager {
     }
   }
 
-  /** @param {HTMLElement|null} gameOverScreen */
-  static hideGameOver(gameOverScreen) {
+  /** @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} [postGameScreen=null] */
+  static hideGameOver(gameOverScreen, postGameScreen = null) {
     if (gameOverScreen) gameOverScreen.classList.add("hidden");
+    if (postGameScreen) {
+      try {
+        postGameScreen.classList.add("hidden");
+      } catch (_) {
+        /* ignore */
+      }
+    }
     try {
       UIManager.teardownInitialsSubmitFocusGuard();
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  /** @param {HTMLElement|null} postGameScreen */
+  static hidePostGame(postGameScreen) {
+    if (!postGameScreen) return;
+    try {
+      postGameScreen.classList.add("hidden");
     } catch (_) {
       /* ignore */
     }
@@ -790,8 +853,33 @@ export class UIManager {
     }
   }
 
-  /** Ensure correct overlay element has focus based on visibility. @param {HTMLElement|null} gameInfo @param {HTMLElement|null} startBtn @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} restartBtn */
-  static ensureOverlayFocus(gameInfo, startBtn, gameOverScreen, restartBtn) {
+  /** Ensure correct overlay element has focus based on visibility.
+   * @param {HTMLElement|null} gameInfo
+   * @param {HTMLElement|null} startBtn
+   * @param {HTMLElement|null} gameOverScreen
+   * @param {HTMLElement|null} restartBtn
+   * @param {HTMLElement|null} [postGameScreen]
+   * @param {HTMLButtonElement|null} [postGameOkBtn]
+   */
+  static ensureOverlayFocus(
+    gameInfo,
+    startBtn,
+    gameOverScreen,
+    restartBtn,
+    postGameScreen = null,
+    postGameOkBtn = null
+  ) {
+    const postGameVisible = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
+    if (postGameVisible) {
+      const okTarget =
+        postGameOkBtn ||
+        /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn")) ||
+        restartBtn;
+      if (UIManager._preserveFocus) UIManager.focusPreserveScroll(okTarget);
+      else UIManager.focusWithRetry(okTarget);
+      return;
+    }
+
     if (gameOverScreen && !gameOverScreen.classList.contains("hidden")) {
       const initialsScreen = /** @type {HTMLElement|null} */ (
         document.getElementById("initialsScreen")
@@ -819,9 +907,25 @@ export class UIManager {
    * @param {HTMLElement|null} startBtn
    * @param {HTMLElement|null} gameOverScreen
    * @param {HTMLElement|null} restartBtn
+   * @param {HTMLElement|null} [postGameScreen]
+   * @param {HTMLButtonElement|null} [postGameOkBtn]
    */
-  static handleWindowFocus(gameInfo, startBtn, gameOverScreen, restartBtn) {
-    UIManager.ensureOverlayFocus(gameInfo, startBtn, gameOverScreen, restartBtn);
+  static handleWindowFocus(
+    gameInfo,
+    startBtn,
+    gameOverScreen,
+    restartBtn,
+    postGameScreen = null,
+    postGameOkBtn = null
+  ) {
+    UIManager.ensureOverlayFocus(
+      gameInfo,
+      startBtn,
+      gameOverScreen,
+      restartBtn,
+      postGameScreen,
+      postGameOkBtn
+    );
   }
 
   /** Handle visibility change (visible -> refocus overlays).
@@ -829,10 +933,26 @@ export class UIManager {
    * @param {HTMLElement|null} startBtn
    * @param {HTMLElement|null} gameOverScreen
    * @param {HTMLElement|null} restartBtn
+   * @param {HTMLElement|null} [postGameScreen]
+   * @param {HTMLButtonElement|null} [postGameOkBtn]
    */
-  static handleVisibilityChange(gameInfo, startBtn, gameOverScreen, restartBtn) {
+  static handleVisibilityChange(
+    gameInfo,
+    startBtn,
+    gameOverScreen,
+    restartBtn,
+    postGameScreen = null,
+    postGameOkBtn = null
+  ) {
     if (!document.hidden) {
-      UIManager.ensureOverlayFocus(gameInfo, startBtn, gameOverScreen, restartBtn);
+      UIManager.ensureOverlayFocus(
+        gameInfo,
+        startBtn,
+        gameOverScreen,
+        restartBtn,
+        postGameScreen,
+        postGameOkBtn
+      );
     }
   }
 
@@ -842,15 +962,43 @@ export class UIManager {
    * @param {HTMLElement|null} startBtn
    * @param {HTMLElement|null} gameOverScreen
    * @param {HTMLElement|null} restartBtn
+   * @param {HTMLElement|null} [postGameScreen]
+   * @param {HTMLButtonElement|null} [postGameOkBtn]
    */
-  static handleDocumentFocusIn(e, gameInfo, startBtn, gameOverScreen, restartBtn) {
+  static handleDocumentFocusIn(
+    e,
+    gameInfo,
+    startBtn,
+    gameOverScreen,
+    restartBtn,
+    postGameScreen = null,
+    postGameOkBtn = null
+  ) {
+    const overlayPostGameVisible = !!(
+      postGameScreen && !postGameScreen.classList.contains("hidden")
+    );
     const overlayGameOverVisible = !!(
       gameOverScreen && !gameOverScreen.classList.contains("hidden")
     );
     const overlayStartVisible = !!(gameInfo && !gameInfo.classList.contains("hidden"));
-    if (!overlayGameOverVisible && !overlayStartVisible) return;
+    if (!overlayGameOverVisible && !overlayStartVisible && !overlayPostGameVisible) return;
 
     const t = UIManager.isElement(e && e.target) ? /** @type {Element} */ (e.target) : null;
+    if (overlayPostGameVisible) {
+      const okTarget =
+        postGameOkBtn ||
+        /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn")) ||
+        restartBtn;
+      if (!okTarget) return;
+      const targetIsOk =
+        t === okTarget || (t && typeof t.closest === "function" && t.closest("#okBtn"));
+      if (!targetIsOk) {
+        if (UIManager._preserveFocus) UIManager.focusPreserveScroll(okTarget);
+        else UIManager.focusWithRetry(okTarget);
+      }
+      return;
+    }
+
     if (overlayGameOverVisible) {
       const isRestart =
         t === restartBtn || (t && typeof t.closest === "function" && t.closest("#restartBtn"));
@@ -866,8 +1014,9 @@ export class UIManager {
         (t === submitEl || (t && typeof t.closest === "function" && t.closest("#submitScoreBtn")));
 
       if (!isRestart && !isInitials && !isSubmit) {
-        if (UIManager._preserveFocus) UIManager.focusPreserveScroll(restartBtn);
-        else UIManager.focusWithRetry(restartBtn);
+        const fallback = restartBtn;
+        if (UIManager._preserveFocus) UIManager.focusPreserveScroll(fallback);
+        else UIManager.focusWithRetry(fallback);
       }
       return;
     }
@@ -919,10 +1068,45 @@ export class UIManager {
    * @param {Event} e
    * @param {HTMLElement|null} gameOverScreen
    * @param {HTMLElement|null} restartBtn
+   * @param {HTMLElement|null} [postGameScreen]
+   * @param {HTMLButtonElement|null} [postGameOkBtn]
    */
-  static handleGameOverFocusGuard(e, gameOverScreen, restartBtn) {
+  static handleGameOverFocusGuard(
+    e,
+    gameOverScreen,
+    restartBtn,
+    postGameScreen = null,
+    postGameOkBtn = null
+  ) {
     if (!gameOverScreen || gameOverScreen.classList.contains("hidden")) return;
     const t = UIManager.isElement(e && e.target) ? /** @type {Element} */ (e.target) : null;
+    const postGameVisible = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
+    if (postGameVisible) {
+      const okTarget =
+        postGameOkBtn ||
+        /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn")) ||
+        restartBtn;
+      if (!okTarget) return;
+      const targetIsOk =
+        t === okTarget || (t && typeof t.closest === "function" && t.closest("#okBtn"));
+      if (targetIsOk) {
+        if (e && e.type === "blur") {
+          if (UIManager._preserveFocus) UIManager.focusPreserveScroll(okTarget);
+          else UIManager.focusWithRetry(okTarget);
+        }
+        return;
+      }
+
+      if (UIManager._preserveFocus) UIManager.focusPreserveScroll(okTarget);
+      else UIManager.focusWithRetry(okTarget);
+      try {
+        if (e && e.cancelable) e.preventDefault();
+        if (e && typeof e.stopPropagation === "function") e.stopPropagation();
+      } catch (_) {
+        /* ignore */
+      }
+      return;
+    }
     const targetIsLink = t && typeof t.closest === "function" && t.closest("a");
     if (targetIsLink) return;
     const leaderboard = document.getElementById("leaderboardList");

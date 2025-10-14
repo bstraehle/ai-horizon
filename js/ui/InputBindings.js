@@ -26,6 +26,7 @@ export const InputBindings = {
     game.handleTouchEnd = game.handleTouchEnd.bind(game);
     game.handleStartClick = game.handleStartClick.bind(game);
     game.handleRestartClick = game.handleRestartClick.bind(game);
+    game.handlePostGameOkClick = game.handlePostGameOkClick.bind(game);
     game.handleStartKeyDown = game.handleStartKeyDown.bind(game);
     game.handleRestartKeyDown = game.handleRestartKeyDown.bind(game);
     game.resizeCanvas = game.resizeCanvas.bind(game);
@@ -52,6 +53,8 @@ export const InputBindings = {
       /** @type {HTMLElement} */ (game.gameOverScreen || document.createElement("div")),
       /** @type {HTMLButtonElement} */ (game.startBtn || document.createElement("button")),
       /** @type {HTMLButtonElement} */ (game.restartBtn || document.createElement("button")),
+      /** @type {HTMLButtonElement|null} */ (game.okBtn || null),
+      /** @type {HTMLElement|null} */ (game.postGameScreen || null),
       {
         handleKeyDown: game.handleKeyDown,
         handleKeyUp: game.handleKeyUp,
@@ -65,6 +68,7 @@ export const InputBindings = {
         handleTouchEnd: game.handleTouchEnd,
         handleStartClick: game.handleStartClick,
         handleRestartClick: game.handleRestartClick,
+        handlePostGameOkClick: game.handlePostGameOkClick,
         handleStartKeyDown: game.handleStartKeyDown,
         handleRestartKeyDown: game.handleRestartKeyDown,
         handleStartScreenFocusGuard: game.handleStartScreenFocusGuard,
@@ -74,16 +78,20 @@ export const InputBindings = {
             /** @type {HTMLElement|null} */ (game.gameInfo || null),
             /** @type {HTMLButtonElement|null} */ (game.startBtn || null),
             /** @type {HTMLElement|null} */ (game.gameOverScreen || null),
-            /** @type {HTMLButtonElement|null} */ (game.restartBtn || null)
+            /** @type {HTMLButtonElement|null} */ (game.restartBtn || null),
+            /** @type {HTMLElement|null} */ (game.postGameScreen || null),
+            /** @type {HTMLButtonElement|null} */ (game.okBtn || null)
           ),
         handleVisibilityChange: game.handleVisibilityChange,
-        handleDocumentFocusIn: (e) =>
+        handleDocumentFocusIn: (/** @type {FocusEvent} */ e) =>
           UIManager.handleDocumentFocusIn(
             e,
             /** @type {HTMLElement|null} */ (game.gameInfo || null),
             /** @type {HTMLButtonElement|null} */ (game.startBtn || null),
             /** @type {HTMLElement|null} */ (game.gameOverScreen || null),
-            /** @type {HTMLButtonElement|null} */ (game.restartBtn || null)
+            /** @type {HTMLButtonElement|null} */ (game.restartBtn || null),
+            /** @type {HTMLElement|null} */ (game.postGameScreen || null),
+            /** @type {HTMLButtonElement|null} */ (game.okBtn || null)
           ),
         handleScroll: game.handleScroll,
         handlePauseKeyDown: game.handlePauseKeyDown,

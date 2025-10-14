@@ -80,8 +80,10 @@
  * @property {DOMRect} [canvasRect]
  * @property {HTMLElement} gameInfo
  * @property {HTMLElement} gameOverScreen
+ * @property {HTMLElement} postGameScreen
  * @property {HTMLButtonElement} startBtn
  * @property {HTMLButtonElement} restartBtn
+ * @property {HTMLButtonElement|null} [okBtn]
  * @property {HTMLElement} currentScoreEl
  * @property {HTMLElement} highScoreEl
  * @property {HTMLElement} finalScoreEl
@@ -200,6 +202,7 @@
  * @property {(e:TouchEvent)=>void} handleTouchEnd
  * @property {()=>void} handleStartClick
  * @property {()=>void} handleRestartClick
+ * @property {()=>void} handlePostGameOkClick
  * @property {(e:KeyboardEvent)=>void} handleStartKeyDown
  * @property {(e:KeyboardEvent)=>void} handleRestartKeyDown
  * @property {(e:Event)=>void} handleStartScreenFocusGuard

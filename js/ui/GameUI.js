@@ -68,7 +68,8 @@ export const GameUI = {
       game.currentScoreEl || null,
       game.score || 0,
       submittedScore,
-      undefined
+      undefined,
+      game.postGameScreen || null
     );
   },
   /**
@@ -76,7 +77,14 @@ export const GameUI = {
    * @param {AIHorizon} game
    */
   hideGameOver(game) {
-    UIManager.hideGameOver(game.gameOverScreen || null);
+    UIManager.hideGameOver(game.gameOverScreen || null, game.postGameScreen || null);
+  },
+  /**
+   * Hide the post-game overlay without touching the main modal.
+   * @param {AIHorizon} game
+   */
+  hidePostGame(game) {
+    UIManager.hidePostGame(game.postGameScreen || null);
   },
   /**
    * Update the visible score.
