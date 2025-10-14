@@ -14,7 +14,7 @@ export class AIAnalysisAdapter {
     await new Promise((r) => setTimeout(r, 60));
     /** @type {any} */
     const payload = input || {};
-    console.log("AI analysis payload:", payload);
+    console.log("AI analysis payload:", JSON.stringify(payload.runSummary, null, 2));
     /** @type {any} */
     //const runSummary = payload && payload.runSummary ? payload.runSummary : null;
     /** @type {any} */
