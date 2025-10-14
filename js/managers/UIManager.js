@@ -1098,9 +1098,11 @@ export class UIManager {
     postGameScreen = null,
     postGameOkBtn = null
   ) {
-    if (!gameOverScreen || gameOverScreen.classList.contains("hidden")) return;
+    const gameOverVisible = !!(gameOverScreen && !gameOverScreen.classList.contains("hidden"));
+    const postGameVisibleCheck = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
+    if (!gameOverVisible && !postGameVisibleCheck) return;
     const t = UIManager.isElement(e && e.target) ? /** @type {Element} */ (e.target) : null;
-    const postGameVisible = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
+    const postGameVisible = postGameVisibleCheck;
     if (postGameVisible) {
       const okTarget =
         postGameOkBtn ||
