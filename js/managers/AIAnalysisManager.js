@@ -24,7 +24,6 @@ export class AIAnalysisManager {
     const adapter = new AIAnalysisAdapter();
     const p = (async () => {
       try {
-        // If remote is disabled or environment is test/SSR, still return mock output.
         const result = await adapter.analyze(stats);
         AIAnalysisManager._cache = result;
         return { ...result };
