@@ -13,11 +13,11 @@ export class AIAnalysisAdapter {
     // Simulate slight network latency to align with future REST behavior
     await new Promise((r) => setTimeout(r, 60));
     /** @type {any} */
-    const payload = input || {};
+    //const payload = input || {};
     /** @type {any} */
-    const runSummary = payload && payload.runSummary ? payload.runSummary : null;
+    //const runSummary = payload && payload.runSummary ? payload.runSummary : null;
     /** @type {any} */
-    let stats = payload && payload.stats ? payload.stats : payload;
+    //let stats = payload && payload.stats ? payload.stats : payload;
 
     // NOTE: In a real REST integration, we'd send `runSummary` as the request body and
     // possibly include derived scalar features from `stats`.
