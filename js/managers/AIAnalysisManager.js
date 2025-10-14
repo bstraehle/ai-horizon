@@ -31,8 +31,8 @@ export class AIAnalysisManager {
         const fallback = {
           title: "✨ AI analysis is not available",
           bullets: [
-            "Collect more stars and destroy more asteroids",
-            "Increase your accuracy",
+            "Play 60 seconds and increase your accuracy with shorter bursts",
+            "Collect more bonus stars and destroy all bonus asteroids",
             "Maximize double points in the last 10 seconds",
           ],
         };
@@ -100,8 +100,8 @@ export class AIAnalysisManager {
           doRender({
             title: "✨ AI analysis is not available",
             bullets: [
-              "Collect more bonus stars",
-              "Destroy more bonus asteroids",
+              "Play 60 seconds and increase your accuracy with shorter bursts",
+              "Collect more bonus stars and destroy all bonus asteroids",
               "Maximize double points in the last 10 seconds",
             ],
           });

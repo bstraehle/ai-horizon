@@ -23,8 +23,8 @@ export class AIAnalysisAdapter {
     // NOTE: In a real REST integration, we'd send `runSummary` as the request body and
     // possibly include derived scalar features from `stats`.
     const bullets = [];
-    bullets.push("Collect more stars and destroy more asteroids");
-    bullets.push("Increase your accuracy");
+    bullets.push("Play 60 seconds and increase your accuracy with shorter bursts");
+    bullets.push("Collect more bonus stars and destroy all bonus asteroids");
     bullets.push("Maximize double points in the last 10 seconds");
     return {
       title: "✨ AI analysis is coming soon",
