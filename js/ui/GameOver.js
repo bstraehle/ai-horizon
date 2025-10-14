@@ -2,7 +2,6 @@
 import { LeaderboardManager } from "../managers/LeaderboardManager.js";
 import { UIManager } from "../managers/UIManager.js";
 import { GameUI } from "./GameUI.js";
-import { AIAnalysisManager } from "../managers/AIAnalysisManager.js";
 
 /**
  * Orchestrates Game Over UI workflow: optional initials capture, leaderboard refresh,
