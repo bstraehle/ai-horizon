@@ -91,16 +91,21 @@ export function handleGameOver(game) {
           /* ignore */
         }
         try {
-          // Instead of directly revealing the main Game Over modal here,
-          // dispatch a centralized event so UIManager can decide when to
-          // show the modal (it will wait until any initials/post-game
-          // overlays have completed their lifecycle).
-          if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+          const postGameScreen = /** @type {HTMLElement|null} */ (
+            document.getElementById("postGameScreen")
+          );
+          if (postGameScreen) {
+            postGameScreen.classList.remove("hidden");
             try {
-              window.dispatchEvent(new CustomEvent("postGame:ok", { bubbles: true }));
-            } catch (_) {
-              /* ignore dispatch failures */
+              const okBtn = /** @type {HTMLButtonElement|null} */ (
+                document.getElementById("okBtn")
+              );
+              if (okBtn) UIManager.focusWithRetry(okBtn);
+            } catch {
+              /* non-critical focus */
             }
+          } else {
+            if (_gameOverScreen) _gameOverScreen.classList.remove("hidden");
           }
         } catch {
           /* ignore */
@@ -154,8 +159,11 @@ export function handleGameOver(game) {
         } catch {
           /* non-critical restart gating */
         }
-        GameUI.recenterLeaderboard();
-        GameUI.focusRestart(game);
+        try {
+          GameUI.recenterLeaderboard();
+        } catch {
+          /* optional */
+        }
       };
 
       if (submitBtn && initialsInput) {
