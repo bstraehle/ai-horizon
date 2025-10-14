@@ -1,13 +1,13 @@
 /**
- * RemoteAdapter – minimal fetch wrapper for JSON endpoints with timeout + graceful failure.
+ * RemoteStorageAdapter – minimal fetch wrapper for JSON endpoints with timeout + graceful failure.
  *
  * Goals:
  * - Encapsulate network concerns (timeouts, JSON parsing, null‑on‑failure contract).
  * - Remain environment tolerant (returns null when fetch unavailable – e.g., tests / SSR).
  */
-export class RemoteAdapter {
+export class RemoteStorageAdapter {
   /**
-   * Create a RemoteAdapter.
+   * Create a RemoteStorageAdapter.
    * @param {{ fetchFn?: typeof fetch, baseUrl?: string, timeoutMs?: number }} [opts]
    *  - fetchFn: Provide a custom fetch (e.g., mock in tests).
    *  - baseUrl: Optional prefix automatically prepended to relative paths.

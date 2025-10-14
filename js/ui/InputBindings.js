@@ -27,6 +27,7 @@ export const InputBindings = {
     game.handleStartClick = game.handleStartClick.bind(game);
     game.handleRestartClick = game.handleRestartClick.bind(game);
     game.handlePostGameOkClick = game.handlePostGameOkClick.bind(game);
+    game.handlePostGameOkKeyDown = game.handlePostGameOkKeyDown.bind(game);
     game.handleStartKeyDown = game.handleStartKeyDown.bind(game);
     game.handleRestartKeyDown = game.handleRestartKeyDown.bind(game);
     game.resizeCanvas = game.resizeCanvas.bind(game);
@@ -69,6 +70,7 @@ export const InputBindings = {
         handleStartClick: game.handleStartClick,
         handleRestartClick: game.handleRestartClick,
         handlePostGameOkClick: game.handlePostGameOkClick,
+        handlePostGameOkKeyDown: game.handlePostGameOkKeyDown,
         handleStartKeyDown: game.handleStartKeyDown,
         handleRestartKeyDown: game.handleRestartKeyDown,
         handleStartScreenFocusGuard: game.handleStartScreenFocusGuard,

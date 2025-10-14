@@ -145,7 +145,7 @@ js/
   entities/           Player, Asteroid, Bullet, Star, Explosion, Particle, Nebula, EngineTrail, Background
   managers/           Render, Spawn, Collision, UI, View, Leaderboard, Background, Sprite
   systems/            UpdateSystems (per-frame functions), EventHandlers (register listeners)
-  adapters/           StorageAdapter, RemoteAdapter (leaderboard persistence abstraction)
+  adapters/           LocalStorageAdapter, RemoteStorageAdapter (leaderboard persistence abstraction)
   server/lambda/      Example AWS Lambda handler for remote leaderboard
 utils/                ObjectPool, RNG, RateLimiter, etc.
 tests/                Vitest specs (unit, edge, stress)

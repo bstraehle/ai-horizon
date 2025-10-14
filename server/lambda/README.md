@@ -7,9 +7,9 @@ This directory contains the AWS Lambda handler and sample API Gateway proxy even
 
 | File                        | Purpose                                                                                                         |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `ai-horizon-leaderboard.js` | Lambda handler implementing GET (fetch item) & PUT (optimistic update) for the leaderboard record.              |
-| `test-get.json`             | Example API Gateway event for a GET request (`?id=1`).                                                          |
-| `test-put.json`             | Example API Gateway event for a PUT request with a JSON body containing a scores payload.                       |
+| `leaderboard.js`            | Lambda handler implementing GET (fetch item) & PUT (optimistic update) for the leaderboard record.              |
+| `test-leaderboard-get.json` | Example API Gateway event for a GET request (`?id=1`).                                                          |
+| `test-leaderboard-put.json` | Example API Gateway event for a PUT request with a JSON body containing a scores payload.                       |
 | `aws-sdk.d.ts`              | Ambient module declarations to silence bundler / type tooling complaints when not using full AWS types locally. |
 
 ## Handler Contract

@@ -2,6 +2,7 @@
 import { LeaderboardManager } from "../managers/LeaderboardManager.js";
 import { UIManager } from "../managers/UIManager.js";
 import { GameUI } from "./GameUI.js";
+import { AIAnalysisManager } from "../managers/AIAnalysisManager.js";
 
 /**
  * Orchestrates Game Over UI workflow: optional initials capture, leaderboard refresh,
@@ -86,7 +87,14 @@ export function handleGameOver(game) {
         }
         hideInitialsUI();
         try {
-          if (initialsScreen) initialsScreen.classList.add("hidden");
+          if (initialsScreen) {
+            initialsScreen.classList.add("hidden");
+            try {
+              initialsScreen.hidden = true;
+            } catch (_) {
+              /* ignore */
+            }
+          }
         } catch {
           /* ignore */
         }
@@ -97,12 +105,42 @@ export function handleGameOver(game) {
           if (postGameScreen) {
             postGameScreen.classList.remove("hidden");
             try {
+              postGameScreen.hidden = false;
+            } catch (_) {
+              /* ignore */
+            }
+            try {
               const okBtn = /** @type {HTMLButtonElement|null} */ (
                 document.getElementById("okBtn")
               );
               if (okBtn) UIManager.focusWithRetry(okBtn);
             } catch {
               /* non-critical focus */
+            }
+            try {
+              const msg = /** @type {HTMLElement|null} */ (
+                document.getElementById("postGameMessage")
+              );
+              if (msg) {
+                AIAnalysisManager.render(
+                  msg,
+                  {
+                    score: game.score || 0,
+                    accuracy: game.accuracy || 0,
+                    shotsFired: game.shotsFired || 0,
+                    asteroidsKilled: game.asteroidsKilled || 0,
+                    hardenedAsteroidsKilled: game.hardenedAsteroidsKilled || 0,
+                    bonusAsteroidsKilled: game.bonusAsteroidsKilled || 0,
+                    starsCollected: game.starsCollected || 0,
+                    bonusStarsCollected: game.bonusStarsCollected || 0,
+                    timerSeconds: game.timerSeconds || 60,
+                    timerRemaining: game.timerRemaining || 0,
+                  },
+                  /** @type {any} */ (game)._lastRunSummary || null
+                );
+              }
+            } catch {
+              /* ignore AI analysis render errors */
             }
           } else {
             if (_gameOverScreen) _gameOverScreen.classList.remove("hidden");

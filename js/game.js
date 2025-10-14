@@ -172,6 +172,8 @@ class AIHorizon {
     this._engineTrailModulo = 1;
     this._engineTrailStep = 0;
     this._mouseDown = false;
+    /** @type {any|null} */
+    this._lastRunSummary = null;
 
     this.asteroidSpeed = this._isMobile
       ? CONFIG.SPEEDS.ASTEROID_MOBILE
@@ -487,6 +489,22 @@ class AIHorizon {
    * @returns {boolean} True if pause should toggle.
    */
   shouldTogglePause(e) {
+    try {
+      const initialsScreen = /** @type {HTMLElement|null} */ (
+        document.getElementById("initialsScreen")
+      );
+      const gameOverVisible = !!(
+        this.gameOverScreen && !this.gameOverScreen.classList.contains("hidden")
+      );
+      const startVisible = !!(this.gameInfo && !this.gameInfo.classList.contains("hidden"));
+      const postGameVisible = !!(
+        this.postGameScreen && !this.postGameScreen.classList.contains("hidden")
+      );
+      const initialsVisible = !!(initialsScreen && !initialsScreen.classList.contains("hidden"));
+      if (gameOverVisible || postGameVisible || initialsVisible || startVisible) return false;
+    } catch (_) {
+      /* ignore */
+    }
     if (!this.state.isRunning() && !this.state.isPaused()) return false;
     if (e.repeat) return false;
     const codeOrKey = e.code || e.key;
@@ -701,6 +719,14 @@ class AIHorizon {
     GameUI.focusRestart(this);
   }
 
+  /** Keyboard accessibility for post-game OK button: block Space, allow Enter via native click. */
+  handlePostGameOkKeyDown(e) {
+    if (e.code === "Space" || e.key === " ") {
+      e.preventDefault();
+      return;
+    }
+  }
+
   /**
    * Keyboard accessibility for start button.
    * @param {KeyboardEvent} e - The keyboard event.
@@ -710,10 +736,9 @@ class AIHorizon {
       e.preventDefault();
       return;
     }
-    if (AIHorizon.PAUSE_CONFIRM_CODES.has(e.code)) {
+    if (e.code === "Escape" || e.key === "Escape" || e.key === "Esc") {
       e.preventDefault();
-      this.startGame();
-      this.startBtn.focus();
+      return;
     }
   }
 
@@ -726,13 +751,9 @@ class AIHorizon {
       e.preventDefault();
       return;
     }
-    if (AIHorizon.PAUSE_CONFIRM_CODES.has(e.code)) {
+    if (e.code === "Escape" || e.key === "Escape" || e.key === "Esc") {
       e.preventDefault();
-      if (this.restartBtn && this.restartBtn.dataset && this.restartBtn.dataset.cooldown === "1")
-        return;
-      GameUI.hideGameOver(this);
-      this.startGame();
-      this.startBtn.focus();
+      return;
     }
   }
 
@@ -927,12 +948,12 @@ class AIHorizon {
     this.state.end();
     this.updateHighScore();
     GameUI.hidePause(this);
-    handleGameOver(this);
     try {
-      this._logRunSummary(accuracySummary);
+      this._lastRunSummary = this._logRunSummary(accuracySummary);
     } catch (_e) {
-      /* non-critical telemetry log */
+      this._lastRunSummary = null;
     }
+    handleGameOver(this);
     if (this.loop) {
       this.loop.stop();
       this._loopRunning = false;
@@ -940,12 +961,13 @@ class AIHorizon {
   }
 
   /**
-   * Emit an aggregated run summary to the console for downstream AI/analytics ingestion.
+   * Build an aggregated run summary for downstream AI/analytics.
+   * Instead of logging, this returns the JSON-friendly object so callers can send it.
    * @param {{ applied:boolean, baseScore:number, accuracy:number, bonus:number, newScore:number }|null} accuracySummary
+   * @returns {any}
    * @private
    */
   _logRunSummary(accuracySummary) {
-    if (typeof console === "undefined" || typeof console.log !== "function") return;
     let shotsFiredAccuracy = 0;
     const scoreSummary = (() => {
       if (!accuracySummary) return null;
@@ -1091,27 +1113,7 @@ class AIHorizon {
         }
       })(),
     };
-    let summaryJson = null;
-    try {
-      summaryJson = JSON.stringify(summary, null, 2);
-    } catch (_e) {
-      summaryJson = null;
-    }
-    if (typeof console.groupCollapsed === "function" && typeof console.groupEnd === "function") {
-      console.groupCollapsed("[AI Horizon] Run summary");
-      if (summaryJson) {
-        console.log(summaryJson);
-      } else {
-        console.log(summary);
-      }
-      console.groupEnd();
-      return;
-    }
-    if (summaryJson) {
-      console.log(`[AI Horizon] Run summary\n${summaryJson}`);
-    } else {
-      console.log("[AI Horizon] Run summary", summary);
-    }
+    return summary;
   }
 
   /**

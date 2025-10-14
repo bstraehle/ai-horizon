@@ -1,6 +1,6 @@
 import { normalize } from "./LeaderboardFormatter.js";
-import { StorageAdapter } from "../../adapters/StorageAdapter.js";
-import { RemoteAdapter } from "../../adapters/RemoteAdapter.js";
+import { LocalStorageAdapter } from "../../adapters/LocalStorageAdapter.js";
+import { RemoteStorageAdapter } from "../../adapters/RemoteStorageAdapter.js";
 
 /**
  * @typedef {Object} LeaderboardEntry
@@ -24,15 +24,15 @@ export class LeaderboardRepository {
    * @param {string} [opts.key="aiHorizonLeaderboard"] Local storage key.
    * @param {string} [opts.endpoint] Remote endpoint URL (omit/empty for local-only mode).
    * @param {number} [opts.maxEntries=10] Defensive cap on entries processed.
-   * @param {StorageAdapter} [opts.storageAdapter] Injected storage adapter (test seam).
-   * @param {RemoteAdapter} [opts.remoteAdapter] Injected remote adapter (test seam).
+   * @param {LocalStorageAdapter} [opts.storageAdapter] Injected storage adapter (test seam).
+   * @param {RemoteStorageAdapter} [opts.remoteAdapter] Injected remote adapter (test seam).
    */
   constructor(opts = {}) {
     this.key = opts.key || "aiHorizonLeaderboard";
     this.endpoint = opts.endpoint || "";
     this.maxEntries = typeof opts.maxEntries === "number" ? opts.maxEntries : 10;
-    this._storageAdapter = opts.storageAdapter || new StorageAdapter();
-    this._remoteAdapter = opts.remoteAdapter || new RemoteAdapter({});
+    this._storageAdapter = opts.storageAdapter || new LocalStorageAdapter();
+    this._remoteAdapter = opts.remoteAdapter || new RemoteStorageAdapter({});
     /** @type {number|undefined} */
     this._version = undefined;
   }

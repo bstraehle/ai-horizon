@@ -83,10 +83,26 @@ export class UIManager {
     const method = visible ? "remove" : "add";
 
     UIManager._try(() => {
-      if (initialsScreen) initialsScreen.classList[method]("hidden");
+      if (initialsScreen) {
+        initialsScreen.classList[method]("hidden");
+        try {
+          if (method === "remove") initialsScreen.hidden = false;
+          else initialsScreen.hidden = true;
+        } catch (_) {
+          /* ignore */
+        }
+      }
     });
     UIManager._try(() => {
-      if (initialsEntry) initialsEntry.classList[method]("hidden");
+      if (initialsEntry) {
+        initialsEntry.classList[method]("hidden");
+        try {
+          if (method === "remove") initialsEntry.hidden = false;
+          else initialsEntry.hidden = true;
+        } catch (_) {
+          /* ignore */
+        }
+      }
     });
 
     // NOTE: Do not toggle `gameOverScreen` here. The visibility of the main
@@ -98,20 +114,54 @@ export class UIManager {
       if (!postGameScreen) return;
       if (visible) {
         postGameScreen.classList.add("hidden");
+        try {
+          postGameScreen.hidden = true;
+        } catch (_) {
+          /* ignore */
+        }
         return;
       }
       if (!updatePostGame) return;
       postGameScreen.classList.remove("hidden");
+      try {
+        postGameScreen.hidden = false;
+      } catch (_) {
+        /* ignore */
+      }
     });
 
     UIManager._try(() => {
-      if (initialsInput) initialsInput.classList[method]("hidden");
+      if (initialsInput) {
+        initialsInput.classList[method]("hidden");
+        try {
+          if (method === "remove") initialsInput.hidden = false;
+          else initialsInput.hidden = true;
+        } catch (_) {
+          /* ignore */
+        }
+      }
     });
     UIManager._try(() => {
-      if (submitBtn) submitBtn.classList[method]("hidden");
+      if (submitBtn) {
+        submitBtn.classList[method]("hidden");
+        try {
+          if (method === "remove") submitBtn.hidden = false;
+          else submitBtn.hidden = true;
+        } catch (_) {
+          /* ignore */
+        }
+      }
     });
     UIManager._try(() => {
-      if (initialsLabel) initialsLabel.classList[method]("hidden");
+      if (initialsLabel) {
+        initialsLabel.classList[method]("hidden");
+        try {
+          if (method === "remove") initialsLabel.hidden = false;
+          else initialsLabel.hidden = true;
+        } catch (_) {
+          /* ignore */
+        }
+      }
     });
     UIManager._try(() => {
       UIManager.syncInitialsSubmitFocusGuard();
@@ -441,12 +491,26 @@ export class UIManager {
 
   /** @param {HTMLElement|null} pauseScreen */
   static showPause(pauseScreen) {
-    if (pauseScreen) pauseScreen.classList.remove("hidden");
+    if (pauseScreen) {
+      pauseScreen.classList.remove("hidden");
+      try {
+        pauseScreen.hidden = false;
+      } catch (_) {
+        /* ignore */
+      }
+    }
   }
 
   /** @param {HTMLElement|null} pauseScreen */
   static hidePause(pauseScreen) {
-    if (pauseScreen) pauseScreen.classList.add("hidden");
+    if (pauseScreen) {
+      pauseScreen.classList.add("hidden");
+      try {
+        pauseScreen.hidden = true;
+      } catch (_) {
+        /* ignore */
+      }
+    }
   }
 
   /** @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} restartBtn @param {HTMLElement|null} currentScoreEl @param {number} score @param {boolean} [preserveScroll=false] @param {boolean|undefined} [allowInitials] @param {HTMLElement|null} [postGameScreen=null] */
@@ -489,7 +553,14 @@ export class UIManager {
       const hasInitialsElement = !!initialsElements.initialsScreen;
       const hasPostGameElement = !!postGameScreen;
       if (!hasInitialsElement && !hasPostGameElement) {
-        if (gameOverScreen) gameOverScreen.classList.remove("hidden");
+        if (gameOverScreen) {
+          gameOverScreen.classList.remove("hidden");
+          try {
+            gameOverScreen.hidden = false;
+          } catch (_) {
+            /* ignore */
+          }
+        }
       }
     } catch (_) {
       // If anything goes wrong, be conservative and keep the modal hidden
@@ -503,10 +574,6 @@ export class UIManager {
       postGameScreen
     );
 
-    // After initials qualification has run, reveal the main Game Over modal
-    // only if neither the initials overlay nor the post-game overlay exists
-    // in the DOM. If either overlay exists, they will control when the main
-    // modal is revealed.
     try {
       const initialsVisible = !!(
         initialsElements.initialsScreen &&
@@ -514,10 +581,16 @@ export class UIManager {
       );
       const postGameVisible = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
       if (!initialsVisible && !postGameVisible) {
-        if (gameOverScreen) gameOverScreen.classList.remove("hidden");
+        if (gameOverScreen) {
+          gameOverScreen.classList.remove("hidden");
+          try {
+            gameOverScreen.hidden = false;
+          } catch (_) {
+            /* ignore */
+          }
+        }
       }
     } catch (_) {
-      // If visibility checks fail for any reason, fall back to revealing the modal
       if (gameOverScreen) gameOverScreen.classList.remove("hidden");
     }
 
@@ -627,10 +700,18 @@ export class UIManager {
 
   /** @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} [postGameScreen=null] */
   static hideGameOver(gameOverScreen, postGameScreen = null) {
-    if (gameOverScreen) gameOverScreen.classList.add("hidden");
+    if (gameOverScreen) {
+      gameOverScreen.classList.add("hidden");
+      try {
+        gameOverScreen.hidden = true;
+      } catch (_) {
+        /* ignore */
+      }
+    }
     if (postGameScreen) {
       try {
         postGameScreen.classList.add("hidden");
+        postGameScreen.hidden = true;
       } catch (_) {
         /* ignore */
       }
@@ -647,6 +728,11 @@ export class UIManager {
     if (!postGameScreen) return;
     try {
       postGameScreen.classList.add("hidden");
+      try {
+        postGameScreen.hidden = true;
+      } catch (_) {
+        /* ignore */
+      }
     } catch (_) {
       /* ignore */
     }
@@ -654,7 +740,14 @@ export class UIManager {
 
   /** @param {HTMLElement|null} gameInfo */
   static hideGameInfo(gameInfo) {
-    if (gameInfo) gameInfo.classList.add("hidden");
+    if (gameInfo) {
+      gameInfo.classList.add("hidden");
+      try {
+        gameInfo.hidden = true;
+      } catch (_) {
+        /* ignore */
+      }
+    }
   }
 
   /** @param {HTMLElement|null} el */
@@ -1226,6 +1319,11 @@ try {
         const postGameVisible = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
         if (!initialsVisible && !postGameVisible && gameOverScreen) {
           gameOverScreen.classList.remove("hidden");
+          try {
+            gameOverScreen.hidden = false;
+          } catch (_) {
+            /* ignore */
+          }
         }
       } catch (_) {
         /* ignore */

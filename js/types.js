@@ -203,6 +203,7 @@
  * @property {()=>void} handleStartClick
  * @property {()=>void} handleRestartClick
  * @property {()=>void} handlePostGameOkClick
+ * @property {(e:KeyboardEvent)=>void} handlePostGameOkKeyDown
  * @property {(e:KeyboardEvent)=>void} handleStartKeyDown
  * @property {(e:KeyboardEvent)=>void} handleRestartKeyDown
  * @property {(e:Event)=>void} handleStartScreenFocusGuard

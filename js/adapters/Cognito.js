@@ -59,7 +59,7 @@ class CognitoAPIClient {
 
   /**
    * Public: build a fetch implementation that signs requests with SigV4.
-   * Supports GET and PUT JSON used by our RemoteAdapter.
+   * Supports GET and PUT JSON used by our RemoteStorageAdapter.
    * @returns {(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>}
    */
   buildSignedFetch() {

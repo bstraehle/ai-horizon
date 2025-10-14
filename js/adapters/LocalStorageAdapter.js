@@ -1,13 +1,13 @@
 /**
- * StorageAdapter – defensive JSON wrapper around Web Storage (localStorage style).
+ * LocalStorageAdapter – defensive JSON wrapper around Web Storage (localStorage style).
  *
  * Safety features:
  * - Silently degrades (returns fallbacks) when storage API unavailable or throws (quota / privacy mode).
  * - Shields callers from JSON.parse exceptions; returns provided fallback instead.
  */
-export class StorageAdapter {
+export class LocalStorageAdapter {
   /**
-   * Create a StorageAdapter.
+   * Create a LocalStorageAdapter.
    * @param {{storage?: Storage|null}} [opts] Optional dependency injection hook (pass mock storage in tests).
    */
   constructor(opts = {}) {

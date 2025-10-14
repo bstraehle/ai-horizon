@@ -1,4 +1,5 @@
 import { UIManager } from "../managers/UIManager.js";
+import { AIAnalysisManager } from "../managers/AIAnalysisManager.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
 /**
@@ -71,6 +72,74 @@ export const GameUI = {
       undefined,
       game.postGameScreen || null
     );
+
+    try {
+      const postGame =
+        game.postGameScreen ||
+        /** @type {HTMLElement|null} */ (document.getElementById("postGameScreen"));
+      const msg = /** @type {HTMLElement|null} */ (document.getElementById("postGameMessage"));
+      const visible = !!(postGame && !postGame.classList.contains("hidden"));
+      if (visible && msg) {
+        AIAnalysisManager.render(
+          msg,
+          {
+            score: game.score || 0,
+            accuracy: game.accuracy || 0,
+            shotsFired: game.shotsFired || 0,
+            asteroidsKilled: game.asteroidsKilled || 0,
+            hardenedAsteroidsKilled: game.hardenedAsteroidsKilled || 0,
+            bonusAsteroidsKilled: game.bonusAsteroidsKilled || 0,
+            starsCollected: game.starsCollected || 0,
+            bonusStarsCollected: game.bonusStarsCollected || 0,
+            timerSeconds: game.timerSeconds || 60,
+            timerRemaining: game.timerRemaining || 0,
+          },
+          game._lastRunSummary || null
+        );
+      } else if (postGame && msg) {
+        const obs = new MutationObserver(() => {
+          try {
+            const nowVisible = !postGame.classList.contains("hidden");
+            if (nowVisible) {
+              AIAnalysisManager.render(
+                msg,
+                {
+                  score: game.score || 0,
+                  accuracy: game.accuracy || 0,
+                  shotsFired: game.shotsFired || 0,
+                  asteroidsKilled: game.asteroidsKilled || 0,
+                  hardenedAsteroidsKilled: game.hardenedAsteroidsKilled || 0,
+                  bonusAsteroidsKilled: game.bonusAsteroidsKilled || 0,
+                  starsCollected: game.starsCollected || 0,
+                  bonusStarsCollected: game.bonusStarsCollected || 0,
+                  timerSeconds: game.timerSeconds || 60,
+                  timerRemaining: game.timerRemaining || 0,
+                },
+                game._lastRunSummary || null
+              );
+              try {
+                obs.disconnect();
+              } catch {
+                /* ignoring observer disconnect failures */
+              }
+            }
+          } catch {
+            try {
+              obs.disconnect();
+            } catch {
+              /* ignore observer disconnect */
+            }
+          }
+        });
+        try {
+          obs.observe(postGame, { attributes: true, attributeFilter: ["class"] });
+        } catch {
+          /* ignore observer observe errors */
+        }
+      }
+    } catch {
+      /* non-critical post-game UI analysis render */
+    }
   },
   /**
    * Hide the game over overlay.

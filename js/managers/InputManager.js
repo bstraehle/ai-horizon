@@ -41,6 +41,9 @@ export class InputManager {
     if (postGameOkBtn && handlers.handlePostGameOkClick) {
       postGameOkBtn.addEventListener("click", handlers.handlePostGameOkClick);
     }
+    if (postGameOkBtn && handlers.handlePostGameOkKeyDown) {
+      postGameOkBtn.addEventListener("keydown", handlers.handlePostGameOkKeyDown);
+    }
     startBtn.addEventListener("keydown", handlers.handleStartKeyDown);
     restartBtn.addEventListener("keydown", handlers.handleRestartKeyDown);
     startBtn.addEventListener("blur", handlers.handleStartScreenFocusGuard, true);

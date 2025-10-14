@@ -4,7 +4,7 @@
  */
 import { qualifiesForInitials, formatRow, formatRows } from "./leaderboard/LeaderboardFormatter.js";
 import { LeaderboardRepository } from "./leaderboard/LeaderboardRepository.js";
-import { RemoteAdapter } from "../adapters/RemoteAdapter.js";
+import { RemoteStorageAdapter } from "../adapters/RemoteStorageAdapter.js";
 import { CognitoAPIClient } from "../adapters/Cognito.js";
 export class LeaderboardManager {
   static IS_REMOTE = true;
@@ -22,7 +22,7 @@ export class LeaderboardManager {
   /** @type {number} Last remote sync timestamp */
   static _lastRemoteSync = 0;
 
-  /** Internal repository factory (injects signed RemoteAdapter outside tests). */
+  /** Internal repository factory (injects signed RemoteStorageAdapter outside tests). */
   static _createRepository() {
     const g = /** @type {any} */ (typeof globalThis !== "undefined" ? globalThis : {});
     const proc = g.process;
@@ -31,7 +31,7 @@ export class LeaderboardManager {
     // Build endpoint from Cognito client defaults (even in tests),
     // but only attach a signed fetch in non-test environments.
     let endpoint = "";
-    /** @type {RemoteAdapter|undefined} */
+    /** @type {RemoteStorageAdapter|undefined} */
     let remoteAdapter = undefined;
 
     try {
@@ -39,10 +39,9 @@ export class LeaderboardManager {
       // Base endpoint (no query) + id param
       endpoint = `${api.getApiEndpoint()}?id=${encodeURIComponent(LeaderboardManager.REMOTE_ID)}`;
       if (!isTestEnv && LeaderboardManager.IS_REMOTE) {
-        remoteAdapter = new RemoteAdapter({ fetchFn: api.buildSignedFetch() });
+        remoteAdapter = new RemoteStorageAdapter({ fetchFn: api.buildSignedFetch() });
       }
     } catch (_) {
-      // If Cognito initialization fails entirely, leave endpoint empty to imply local-only mode
       endpoint = "";
       remoteAdapter = undefined;
     }
@@ -51,7 +50,6 @@ export class LeaderboardManager {
       key: LeaderboardManager.KEY_LEADERBOARD,
       endpoint,
       maxEntries: LeaderboardManager.MAX_ENTRIES,
-      // Only pass remoteAdapter when we actually created a signed one; default handles tests
       ...(remoteAdapter ? { remoteAdapter } : {}),
     });
   }
