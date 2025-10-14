@@ -32,8 +32,8 @@ export class AIAnalysisManager {
         const fallback = {
           title: "✨ AI analysis is not available",
           bullets: [
-            "Collect more bonus stars",
-            "Destroy more bonus asteroids",
+            "Collect more stars and destroy more asteroids",
+            "Increase your accuracy",
             "Maximize double points in the last 10 seconds",
           ],
         };
@@ -59,31 +59,25 @@ export class AIAnalysisManager {
 
     const doRender = (payload) => {
       try {
-        // Clear existing nodes
         while (container.firstChild) container.removeChild(container.firstChild);
       } catch {
         /* non-critical cleanup of container children */
       }
       try {
         const p = document.createElement("p");
-        p.textContent = payload?.title || "✨ AI analysis";
+        p.textContent = payload?.title || "✨ AI analysis is not available";
         container.appendChild(p);
       } catch {
         /* non-critical creation of title paragraph */
       }
       try {
         const ul = document.createElement("ul");
+        //alert(1);
         const items = Array.isArray(payload?.bullets) ? payload.bullets : [];
-        if (!items.length) {
+        for (const text of items) {
           const li = document.createElement("li");
-          li.textContent = "Collect more bonus stars";
+          li.textContent = String(text);
           ul.appendChild(li);
-        } else {
-          for (const text of items) {
-            const li = document.createElement("li");
-            li.textContent = String(text);
-            ul.appendChild(li);
-          }
         }
         container.appendChild(ul);
       } catch {
@@ -91,15 +85,9 @@ export class AIAnalysisManager {
       }
     };
 
-    if (AIAnalysisManager._cache) {
-      doRender(AIAnalysisManager._cache);
-      return;
-    }
-
-    // Optimistic immediate placeholder
     try {
       const p = document.createElement("p");
-      p.textContent = "✨ Analyzing your run...";
+      p.textContent = "✨ AI analysis is in progress";
       container.appendChild(p);
     } catch {
       /* non-critical immediate placeholder render */
@@ -110,7 +98,14 @@ export class AIAnalysisManager {
       maybe
         .then((res) => doRender(res))
         .catch(() => {
-          doRender({ title: "✨ AI analysis", bullets: ["Collect more bonus stars"] });
+          doRender({
+            title: "✨ AI analysis is not available",
+            bullets: [
+              "Collect more bonus stars",
+              "Destroy more bonus asteroids",
+              "Maximize double points in the last 10 seconds",
+            ],
+          });
         });
     }
   }
