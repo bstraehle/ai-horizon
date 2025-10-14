@@ -71,6 +71,24 @@
     </div>
 
     <div
+      id="postGameScreen"
+      class="game-over-screen hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="postGameTitle"
+      aria-describedby="postGameMessage"
+      hidden
+    >
+      <div class="game-over-content">
+        <h2 id="postGameTitle">GAME OVER</h2>
+        <div class="initials-entry post-game-entry">
+          <div id="postGameMessage" class="post-game-message"></div>
+          <button id="okBtn" class="action-button" type="button" aria-label="Ok">Ok</button>
+        </div>
+      </div>
+    </div>
+
+    <div
       id="initialsScreen"
       class="game-over-screen hidden"
       role="dialog"
@@ -98,24 +116,6 @@
           <button id="submitScoreBtn" class="action-button" type="button" aria-label="Submit Score">
             Submit
           </button>
-        </div>
-      </div>
-    </div>
-
-    <div
-      id="postGameScreen"
-      class="game-over-screen hidden"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="postGameTitle"
-      aria-describedby="postGameMessage"
-      hidden
-    >
-      <div class="game-over-content">
-        <h2 id="postGameTitle">GAME OVER</h2>
-        <div class="initials-entry post-game-entry">
-          <div id="postGameMessage" class="post-game-message"></div>
-          <button id="okBtn" class="action-button" type="button" aria-label="Ok">Ok</button>
         </div>
       </div>
     </div>
