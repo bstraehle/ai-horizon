@@ -91,7 +91,17 @@ export function handleGameOver(game) {
           /* ignore */
         }
         try {
-          if (gameOverScreen) gameOverScreen.classList.remove("hidden");
+          // Instead of directly revealing the main Game Over modal here,
+          // dispatch a centralized event so UIManager can decide when to
+          // show the modal (it will wait until any initials/post-game
+          // overlays have completed their lifecycle).
+          if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+            try {
+              window.dispatchEvent(new CustomEvent("postGame:ok", { bubbles: true }));
+            } catch (_) {
+              /* ignore dispatch failures */
+            }
+          }
         } catch {
           /* ignore */
         }

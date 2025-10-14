@@ -313,8 +313,6 @@ class AIHorizon {
         /* ignore */
       }
     };
-
-    // Detect connectivity via a third-party endpoint; start async without blocking constructor.
     LeaderboardManager.detectRemote({ timeoutMs: 1200 })
       .then((isRemote) => {
         LeaderboardManager.IS_REMOTE = !!isRemote;
@@ -435,16 +433,11 @@ class AIHorizon {
       fontSize: o.fontSize || 18,
       fontWeight: o.fontWeight || "700",
       glow: !!o.glow,
-      glowColor: o.glowColor || o.color || "#fff",
-      glowBlur: o.glowBlur || 8,
-      stroke: o.stroke || undefined,
+      glowColor: o.glowColor || "#fff",
+      glowBlur: typeof o.glowBlur === "number" ? o.glowBlur : 8,
+      stroke: o.stroke || null,
     });
   }
-
-  /** no-op placeholder to hint presence; handlers are registered in systems/EventHandlers */
-  /** @type {(() => void) | null} */
-  _unsubscribeEvents = null;
-
   /**
    * Detect if the user is on a mobile device.
    * Multi-strategy heuristic using User-Agent Client Hints, pointer media queries,
@@ -697,6 +690,14 @@ class AIHorizon {
   /** Dismiss the post-game overlay and return focus to restart. */
   handlePostGameOkClick() {
     GameUI.hidePostGame(this);
+    // Dispatch a custom event so centralized UI code can respond to the Ok action.
+    try {
+      if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+        window.dispatchEvent(new CustomEvent("postGame:ok", { bubbles: true }));
+      }
+    } catch (_) {
+      /* ignore */
+    }
     GameUI.focusRestart(this);
   }
 
@@ -1121,6 +1122,29 @@ class AIHorizon {
   handleGuardClick(e) {
     if (!this._uiTouchGuardActive) return;
     try {
+      // If the click originates inside the post-game or initials overlays
+      // (for example the Ok button or the initials submit), allow it to
+      // proceed and simply clear the guard — don't swallow user intent.
+      const t = e && /** @type {any} */ (e.target);
+      try {
+        if (
+          t &&
+          typeof t.closest === "function" &&
+          (t.closest("#postGameScreen") ||
+            t.closest("#initialsScreen") ||
+            t.closest("#okBtn") ||
+            t.closest("#submitScoreBtn"))
+        ) {
+          this._uiTouchGuardActive = false;
+          if (this._uiTouchGuardTimeout) {
+            clearTimeout(this._uiTouchGuardTimeout);
+            this._uiTouchGuardTimeout = null;
+          }
+          return;
+        }
+      } catch (_inner) {
+        /* ignore */
+      }
       e.preventDefault();
       e.stopImmediatePropagation();
     } catch (_e) {

@@ -89,12 +89,10 @@ export class UIManager {
       if (initialsEntry) initialsEntry.classList[method]("hidden");
     });
 
-    if (initialsScreen && gameOverScreen) {
-      UIManager._try(() => {
-        if (visible) gameOverScreen.classList.add("hidden");
-        else gameOverScreen.classList.remove("hidden");
-      });
-    }
+    // NOTE: Do not toggle `gameOverScreen` here. The visibility of the main
+    // game over modal should be managed by the overall show/hide workflow so
+    // it appears only after initials/post-game overlays have completed their
+    // own lifecycle. This avoids flashing the main modal underneath overlays.
 
     UIManager._try(() => {
       if (!postGameScreen) return;
@@ -486,13 +484,17 @@ export class UIManager {
     } catch {
       if (currentScoreEl) currentScoreEl.textContent = String(score);
     }
-    if (gameOverScreen) gameOverScreen.classList.remove("hidden");
-    UIManager._try(() => {
-      if (postGameScreen) postGameScreen.classList.add("hidden");
-    });
+    let initialsElements = UIManager._getInitialsElements();
+    try {
+      const hasInitialsElement = !!initialsElements.initialsScreen;
+      const hasPostGameElement = !!postGameScreen;
+      if (!hasInitialsElement && !hasPostGameElement) {
+        if (gameOverScreen) gameOverScreen.classList.remove("hidden");
+      }
+    } catch (_) {
+      // If anything goes wrong, be conservative and keep the modal hidden
+    }
     UIManager._resetLeaderboardScroll();
-
-    const initialsElements = UIManager._getInitialsElements();
     UIManager._applyInitialsQualification(
       score,
       allowInitials,
@@ -500,6 +502,24 @@ export class UIManager {
       initialsElements,
       postGameScreen
     );
+
+    // After initials qualification has run, reveal the main Game Over modal
+    // only if neither the initials overlay nor the post-game overlay exists
+    // in the DOM. If either overlay exists, they will control when the main
+    // modal is revealed.
+    try {
+      const initialsVisible = !!(
+        initialsElements.initialsScreen &&
+        !initialsElements.initialsScreen.classList.contains("hidden")
+      );
+      const postGameVisible = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
+      if (!initialsVisible && !postGameVisible) {
+        if (gameOverScreen) gameOverScreen.classList.remove("hidden");
+      }
+    } catch (_) {
+      // If visibility checks fail for any reason, fall back to revealing the modal
+      if (gameOverScreen) gameOverScreen.classList.remove("hidden");
+    }
 
     const initialsInput = /** @type {HTMLElement|null} */ (
       document.getElementById("initialsInput")
@@ -1190,6 +1210,21 @@ try {
       try {
         const list = /** @type {HTMLElement|null} */ (document.getElementById("leaderboardList"));
         if (list) LeaderboardManager.render(list);
+      } catch (_) {
+        /* ignore */
+      }
+    });
+    // Debug: listen for post-game OK event to reveal Game Over modal when appropriate.
+    window.addEventListener("postGame:ok", () => {
+      try {
+        const gameOverScreen = UIManager._byId("gameOverScreen");
+        const initialsScreen = UIManager._byId("initialsScreen");
+        const postGameScreen = UIManager._byId("postGameScreen");
+        const initialsVisible = !!(initialsScreen && !initialsScreen.classList.contains("hidden"));
+        const postGameVisible = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
+        if (!initialsVisible && !postGameVisible && gameOverScreen) {
+          gameOverScreen.classList.remove("hidden");
+        }
       } catch (_) {
         /* ignore */
       }
