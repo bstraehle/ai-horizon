@@ -30,12 +30,13 @@ export class AIAnalysisAdapter {
     ) {
       bullets.push("Play full 60 seconds");
     }
+    bullets.push("Maximize double points in last 10 seconds");
     if (
       payload.runSummary &&
       payload.runSummary.stats &&
-      payload.runSummary.stats.starsCollectedAccuracy < 1
+      payload.runSummary.stats.bonusAsteroidsKilledAccuracy < 1
     ) {
-      bullets.push("Collect more stars");
+      bullets.push("Destroy all 5 bonus asteroids");
     }
     if (
       payload.runSummary &&
@@ -47,9 +48,9 @@ export class AIAnalysisAdapter {
     if (
       payload.runSummary &&
       payload.runSummary.stats &&
-      payload.runSummary.stats.asteroidsKilledAccuracy < 1
+      payload.runSummary.stats.shotsFiredAccuracy < 1
     ) {
-      bullets.push("Destroy more asteroids");
+      bullets.push("Increase shot accuracy with short bursts for accuracy bonus");
     }
     if (
       payload.runSummary &&
@@ -61,18 +62,17 @@ export class AIAnalysisAdapter {
     if (
       payload.runSummary &&
       payload.runSummary.stats &&
-      payload.runSummary.stats.bonusAsteroidsKilledAccuracy < 1
+      payload.runSummary.stats.starsCollectedAccuracy < 1
     ) {
-      bullets.push("Destroy all 5 bonus asteroids");
+      bullets.push("Collect more stars");
     }
     if (
       payload.runSummary &&
       payload.runSummary.stats &&
-      payload.runSummary.stats.shotsFiredAccuracy < 1
+      payload.runSummary.stats.asteroidsKilledAccuracy < 1
     ) {
-      bullets.push("Increase shot accuracy with short bursts");
+      bullets.push("Destroy more asteroids");
     }
-    bullets.push("Maximize double points in last 10 seconds");
     return {
       title: "✨ AI analysis is not available",
       bullets,
