@@ -23,7 +23,7 @@ export function handleGameOver(game) {
       const initialsScreen = /** @type {HTMLElement|null} */ (
         document.getElementById("initialsScreen")
       );
-      const gameOverScreen = /** @type {HTMLElement|null} */ (
+      const _gameOverScreen = /** @type {HTMLElement|null} */ (
         document.getElementById("gameOverScreen")
       );
       const initialsEntry = document.querySelector(".initials-entry");
