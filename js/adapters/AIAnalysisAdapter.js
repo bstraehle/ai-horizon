@@ -26,7 +26,7 @@ export class AIAnalysisAdapter {
     bullets.push("Play full 60 seconds");
     bullets.push("Collect more bonus stars");
     bullets.push("Destroy all bonus asteroids");
-    bullets.push("Increase accuracy with shorter bursts");
+    bullets.push("Increase accuracy with short bursts");
     bullets.push("Maximize double points in last 10 seconds");
     return {
       title: "✨ AI analysis is coming soon",
