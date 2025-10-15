@@ -57,7 +57,7 @@ export class AIAnalysisAdapter {
       payload.runSummary.stats.shotsFiredAccuracy < 1
     ) {
       bullets.push(
-        "Increase shot accuracy with short bursts for accuracy bonus, accuracy: " +
+        "Increase shot accuracy for end of run bonus, accuracy: " +
           (payload.runSummary.stats.shotsFiredAccuracy * 100).toFixed(0) +
           "%"
       );
