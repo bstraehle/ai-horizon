@@ -200,6 +200,8 @@ body {
   padding-bottom: max(var(--page-vertical), env(safe-area-inset-bottom));
   position: fixed;
   z-index: 2000;
+  overscroll-behavior: none;
+  touch-action: none;
 }
 @supports (height: 100svh) {
   .game-over-screen {
