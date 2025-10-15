@@ -75,7 +75,7 @@ export class AIAnalysisManager {
         const ol = document.createElement("ol");
         //alert(1);
         const items = Array.isArray(payload?.bullets) ? payload.bullets : [];
-        for (const text of items.slice(0, 5)) {
+        for (const text of items.slice(0, 8)) {
           const li = document.createElement("li");
           li.textContent = String(text);
           ol.appendChild(li);
