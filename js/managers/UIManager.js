@@ -72,12 +72,12 @@ export class UIManager {
   /**
    * Toggle initials UI visibility and sync related overlays.
    * @param {boolean} visible
-   * @param {HTMLElement|null} gameOverScreen
+   * @param {HTMLElement|null} leaderboardScreen
    * @param {InitialsElements} elements
-   * @param {HTMLElement|null} postGameScreen
+   * @param {HTMLElement|null} gameOverScreen
    * @param {{updatePostGame?:boolean}} [options]
    */
-  static _toggleInitialsUI(visible, gameOverScreen, elements, postGameScreen, options = {}) {
+  static _toggleInitialsUI(visible, leaderboardScreen, elements, gameOverScreen, options = {}) {
     const { updatePostGame = true } = options || {};
     const { initialsScreen, initialsEntry, initialsInput, submitBtn, initialsLabel } = elements;
     const method = visible ? "remove" : "add";
@@ -115,20 +115,13 @@ export class UIManager {
       }
     });
 
-    // NOTE: Do not toggle `gameOverScreen` here. The visibility of the main
-    // game over modal should be managed by the overall show/hide workflow so
-    // it appears only after initials/post-game overlays have completed their
-    // own lifecycle. This avoids flashing the main modal underneath overlays.
-
     UIManager._try(() => {
-      if (!postGameScreen) return;
+      if (!gameOverScreen) return;
       if (visible) {
-        // When initials are enabled, show postGameScreen so it appears first.
-        // The postGame:ok handler will hide it and reveal initialsScreen.
         if (updatePostGame) {
-          postGameScreen.classList.remove("hidden");
+          gameOverScreen.classList.remove("hidden");
           try {
-            postGameScreen.hidden = false;
+            gameOverScreen.hidden = false;
           } catch (_) {
             /* ignore */
           }
@@ -136,9 +129,9 @@ export class UIManager {
         return;
       }
       if (!updatePostGame) return;
-      postGameScreen.classList.remove("hidden");
+      gameOverScreen.classList.remove("hidden");
       try {
-        postGameScreen.hidden = false;
+        gameOverScreen.hidden = false;
       } catch (_) {
         /* ignore */
       }
@@ -269,18 +262,18 @@ export class UIManager {
     });
   }
 
-  /** @param {number} score @param {boolean|undefined} allowInitials @param {HTMLElement|null} gameOverScreen @param {InitialsElements} elements @param {HTMLElement|null} postGameScreen */
+  /** @param {number} score @param {boolean|undefined} allowInitials @param {HTMLElement|null} leaderboardScreen @param {InitialsElements} elements @param {HTMLElement|null} gameOverScreen */
   static _applyInitialsQualification(
     score,
     allowInitials,
-    gameOverScreen,
+    leaderboardScreen,
     elements,
-    postGameScreen
+    gameOverScreen
   ) {
     const toggle = /** @param {boolean} v @param {{updatePostGame?:boolean}|undefined} [opts] */ (
       v,
       opts
-    ) => UIManager._toggleInitialsUI(v, gameOverScreen, elements, postGameScreen, opts);
+    ) => UIManager._toggleInitialsUI(v, leaderboardScreen, elements, gameOverScreen, opts);
     if (typeof allowInitials === "boolean") {
       toggle(allowInitials, { updatePostGame: true });
       return;
@@ -527,15 +520,15 @@ export class UIManager {
     }
   }
 
-  /** @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} restartBtn @param {HTMLElement|null} currentScoreEl @param {number} score @param {boolean} [preserveScroll=false] @param {boolean|undefined} [allowInitials] @param {HTMLElement|null} [postGameScreen=null] */
+  /** @param {HTMLElement|null} leaderboardScreen @param {HTMLElement|null} restartBtn @param {HTMLElement|null} currentScoreEl @param {number} score @param {boolean} [preserveScroll=false] @param {boolean|undefined} [allowInitials] @param {HTMLElement|null} [gameOverScreen=null] */
   static showGameOver(
-    gameOverScreen,
+    leaderboardScreen,
     restartBtn,
     currentScoreEl,
     score,
     preserveScroll = false,
     allowInitials = undefined,
-    postGameScreen = null
+    gameOverScreen = null
   ) {
     try {
       UIManager.clearFinaleTimer(null);
@@ -565,12 +558,12 @@ export class UIManager {
     let initialsElements = UIManager._getInitialsElements();
     try {
       const hasInitialsElement = !!initialsElements.initialsScreen;
-      const hasPostGameElement = !!postGameScreen;
+      const hasPostGameElement = !!gameOverScreen;
       if (!hasInitialsElement && !hasPostGameElement) {
-        if (gameOverScreen) {
-          gameOverScreen.classList.remove("hidden");
+        if (leaderboardScreen) {
+          leaderboardScreen.classList.remove("hidden");
           try {
-            gameOverScreen.hidden = false;
+            leaderboardScreen.hidden = false;
           } catch (_) {
             /* ignore */
           }
@@ -583,9 +576,9 @@ export class UIManager {
     UIManager._applyInitialsQualification(
       score,
       allowInitials,
-      gameOverScreen,
+      leaderboardScreen,
       initialsElements,
-      postGameScreen
+      gameOverScreen
     );
 
     try {
@@ -593,19 +586,19 @@ export class UIManager {
         initialsElements.initialsScreen &&
         !initialsElements.initialsScreen.classList.contains("hidden")
       );
-      const postGameVisible = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
+      const postGameVisible = !!(gameOverScreen && !gameOverScreen.classList.contains("hidden"));
       if (!initialsVisible && !postGameVisible) {
-        if (gameOverScreen) {
-          gameOverScreen.classList.remove("hidden");
+        if (leaderboardScreen) {
+          leaderboardScreen.classList.remove("hidden");
           try {
-            gameOverScreen.hidden = false;
+            leaderboardScreen.hidden = false;
           } catch (_) {
             /* ignore */
           }
         }
       }
     } catch (_) {
-      if (gameOverScreen) gameOverScreen.classList.remove("hidden");
+      if (leaderboardScreen) leaderboardScreen.classList.remove("hidden");
     }
 
     const initialsInput = /** @type {HTMLElement|null} */ (
@@ -613,7 +606,7 @@ export class UIManager {
     );
     const submitBtn = /** @type {HTMLElement|null} */ (document.getElementById("submitScoreBtn"));
     const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
-    const postGameVisible = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
+    const postGameVisible = !!(gameOverScreen && !gameOverScreen.classList.contains("hidden"));
     const visibleInitials =
       initialsInput && !initialsInput.classList.contains("hidden") ? initialsInput : null;
     let preferred = visibleInitials || restartBtn;
