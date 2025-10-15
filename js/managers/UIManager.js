@@ -84,12 +84,22 @@ export class UIManager {
 
     UIManager._try(() => {
       if (initialsScreen) {
-        initialsScreen.classList[method]("hidden");
-        try {
-          if (method === "remove") initialsScreen.hidden = false;
-          else initialsScreen.hidden = true;
-        } catch (_) {
-          /* ignore */
+        if (visible) {
+          initialsScreen.classList.add("hidden");
+          try {
+            initialsScreen.hidden = true;
+            initialsScreen.setAttribute("data-initials-ready", "true");
+          } catch (_) {
+            /* ignore */
+          }
+        } else {
+          initialsScreen.classList.add("hidden");
+          try {
+            initialsScreen.hidden = true;
+            initialsScreen.removeAttribute("data-initials-ready");
+          } catch (_) {
+            /* ignore */
+          }
         }
       }
     });
@@ -113,11 +123,15 @@ export class UIManager {
     UIManager._try(() => {
       if (!postGameScreen) return;
       if (visible) {
-        postGameScreen.classList.add("hidden");
-        try {
-          postGameScreen.hidden = true;
-        } catch (_) {
-          /* ignore */
+        // When initials are enabled, show postGameScreen so it appears first.
+        // The postGame:ok handler will hide it and reveal initialsScreen.
+        if (updatePostGame) {
+          postGameScreen.classList.remove("hidden");
+          try {
+            postGameScreen.hidden = false;
+          } catch (_) {
+            /* ignore */
+          }
         }
         return;
       }
@@ -287,7 +301,7 @@ export class UIManager {
     }
 
     if (LeaderboardManager._pendingLoadPromise) {
-      toggle(false, { updatePostGame: false });
+      toggle(false, { updatePostGame: true });
       LeaderboardManager._pendingLoadPromise
         .then((entries) => {
           UIManager._try(() => {
@@ -310,7 +324,7 @@ export class UIManager {
       return;
     }
     if (maybe && typeof maybe.then === "function") {
-      toggle(false, { updatePostGame: false });
+      toggle(false, { updatePostGame: true });
       maybe
         .then((entries) => {
           UIManager._try(() => {
@@ -1315,9 +1329,36 @@ try {
         const leaderboardScreen = UIManager._byId("leaderboardScreen");
         const initialsScreen = UIManager._byId("initialsScreen");
         const postGameScreen = UIManager._byId("gameOverScreen");
-        const initialsVisible = !!(initialsScreen && !initialsScreen.classList.contains("hidden"));
-        const postGameVisible = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
-        if (!initialsVisible && !postGameVisible && leaderboardScreen) {
+
+        if (postGameScreen) {
+          postGameScreen.classList.add("hidden");
+          try {
+            postGameScreen.hidden = true;
+          } catch (_) {
+            /* ignore */
+          }
+        }
+
+        const initialsReady = !!(
+          initialsScreen && initialsScreen.hasAttribute("data-initials-ready")
+        );
+
+        if (initialsReady && initialsScreen) {
+          initialsScreen.classList.remove("hidden");
+          try {
+            initialsScreen.hidden = false;
+          } catch (_) {
+            /* ignore */
+          }
+          try {
+            const initialsInput = document.getElementById("initialsInput");
+            if (initialsInput) {
+              UIManager.focusWithRetry(initialsInput);
+            }
+          } catch (_) {
+            /* ignore */
+          }
+        } else if (leaderboardScreen) {
           leaderboardScreen.classList.remove("hidden");
           try {
             leaderboardScreen.hidden = false;

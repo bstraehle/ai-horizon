@@ -307,8 +307,8 @@ body {
 .post-game-message p {
   margin-bottom: var(--space-4);
 }
-.post-game-message ul {
-  list-style: disc;
+.post-game-message ul,
+.post-game-message ol {
   margin: 0 auto;
   padding-left: var(--space-5);
   text-align: left;

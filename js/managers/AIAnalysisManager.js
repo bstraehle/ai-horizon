@@ -72,15 +72,15 @@ export class AIAnalysisManager {
         /* non-critical creation of title paragraph */
       }
       try {
-        const ul = document.createElement("ul");
+        const ol = document.createElement("ol");
         //alert(1);
         const items = Array.isArray(payload?.bullets) ? payload.bullets : [];
-        for (const text of items) {
+        for (const text of items.slice(0, 5)) {
           const li = document.createElement("li");
           li.textContent = String(text);
-          ul.appendChild(li);
+          ol.appendChild(li);
         }
-        container.appendChild(ul);
+        container.appendChild(ol);
       } catch {
         /* non-critical creation of bullet list */
       }
