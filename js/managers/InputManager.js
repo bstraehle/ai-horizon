@@ -40,6 +40,18 @@ export class InputManager {
     restartBtn.addEventListener("click", handlers.handleRestartClick);
     if (okBtn && handlers.handlePostGameOkClick) {
       okBtn.addEventListener("click", handlers.handlePostGameOkClick);
+      try {
+        okBtn.addEventListener("pointerdown", (e) => {
+          try {
+            e.preventDefault();
+          } catch {
+            /* ignore */
+          }
+          handlers.handlePostGameOkClick();
+        });
+      } catch {
+        /* pointerdown optional */
+      }
     }
     if (okBtn && handlers.handlePostGameOkKeyDown) {
       okBtn.addEventListener("keydown", handlers.handlePostGameOkKeyDown);

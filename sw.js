@@ -2,7 +2,7 @@
  * Provides offline-first caching for core assets and a network-first strategy for API calls.
  * Increment CACHE_VERSION to force an update after deploys that change cached assets.
  */
-const CACHE_VERSION = "v1.0.273";
+const CACHE_VERSION = "v1.0.275";
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 

@@ -744,6 +744,67 @@ export class UIManager {
     }
   }
 
+  /**
+   * Advance the post-game flow from gameOverScreen to initialsScreen or leaderboardScreen.
+   * Simplified flow: gameOverScreen -> initialsScreen (if qualifies) or leaderboardScreen (if doesn't qualify)
+   * @param {{postGameScreen:HTMLElement|null, initialsScreen:HTMLElement|null, leaderboardScreen:HTMLElement|null, initialsInput:HTMLElement|null, restartBtn:HTMLElement|null}} params
+   * @returns {"initials"|"leaderboard"} The screen that was shown
+   */
+  static advancePostGameFlow(params) {
+    const { postGameScreen, initialsScreen, leaderboardScreen, initialsInput, restartBtn } = params;
+
+    UIManager._try(() => {
+      if (postGameScreen) {
+        postGameScreen.classList.add("hidden");
+        try {
+          postGameScreen.hidden = true;
+        } catch (_) {
+          /* ignore */
+        }
+      }
+    });
+
+    const initialsReady = !!(initialsScreen && initialsScreen.hasAttribute("data-initials-ready"));
+
+    if (initialsReady && initialsScreen) {
+      UIManager._try(() => {
+        initialsScreen.classList.remove("hidden");
+        try {
+          initialsScreen.hidden = false;
+        } catch (_) {
+          /* ignore */
+        }
+      });
+
+      UIManager._try(() => {
+        if (initialsInput) {
+          UIManager.focusWithRetry(initialsInput);
+        }
+      });
+
+      return "initials";
+    } else {
+      UIManager._try(() => {
+        if (leaderboardScreen) {
+          leaderboardScreen.classList.remove("hidden");
+          try {
+            leaderboardScreen.hidden = false;
+          } catch (_) {
+            /* ignore */
+          }
+        }
+      });
+
+      UIManager._try(() => {
+        if (restartBtn) {
+          UIManager.focusWithRetry(restartBtn);
+        }
+      });
+
+      return "leaderboard";
+    }
+  }
+
   /** @param {HTMLElement|null} gameInfo */
   static hideGameInfo(gameInfo) {
     if (gameInfo) {
@@ -1315,49 +1376,25 @@ try {
         /* ignore */
       }
     });
-    // Debug: listen for post-game OK event to reveal Game Over modal when appropriate.
-    window.addEventListener("postGame:ok", () => {
+
+    window.addEventListener("postGame:ok", (evt) => {
       try {
+        const detail = /** @type {any} */ (evt).detail;
+        if (detail && detail.skipUiAdvance) return;
+
         const leaderboardScreen = UIManager._byId("leaderboardScreen");
         const initialsScreen = UIManager._byId("initialsScreen");
         const postGameScreen = UIManager._byId("gameOverScreen");
+        const initialsInput = UIManager._byId("initialsInput");
+        const restartBtn = UIManager._byId("restartBtn");
 
-        if (postGameScreen) {
-          postGameScreen.classList.add("hidden");
-          try {
-            postGameScreen.hidden = true;
-          } catch (_) {
-            /* ignore */
-          }
-        }
-
-        const initialsReady = !!(
-          initialsScreen && initialsScreen.hasAttribute("data-initials-ready")
-        );
-
-        if (initialsReady && initialsScreen) {
-          initialsScreen.classList.remove("hidden");
-          try {
-            initialsScreen.hidden = false;
-          } catch (_) {
-            /* ignore */
-          }
-          try {
-            const initialsInput = document.getElementById("initialsInput");
-            if (initialsInput) {
-              UIManager.focusWithRetry(initialsInput);
-            }
-          } catch (_) {
-            /* ignore */
-          }
-        } else if (leaderboardScreen) {
-          leaderboardScreen.classList.remove("hidden");
-          try {
-            leaderboardScreen.hidden = false;
-          } catch (_) {
-            /* ignore */
-          }
-        }
+        UIManager.advancePostGameFlow({
+          postGameScreen,
+          initialsScreen,
+          leaderboardScreen,
+          initialsInput,
+          restartBtn,
+        });
       } catch (_) {
         /* ignore */
       }

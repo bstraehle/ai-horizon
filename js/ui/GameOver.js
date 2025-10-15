@@ -95,6 +95,7 @@ export function handleGameOver(game) {
           /* leaderboard render optional */
         }
         hideInitialsUI();
+
         try {
           if (initialsScreen) {
             initialsScreen.classList.add("hidden");
@@ -107,19 +108,9 @@ export function handleGameOver(game) {
         } catch {
           /* ignore */
         }
+
         try {
           const leaderboardScreen = _leaderboardScreen;
-          const postGameScreen = /** @type {HTMLElement|null} */ (
-            document.getElementById("gameOverScreen")
-          );
-          if (postGameScreen) {
-            postGameScreen.classList.add("hidden");
-            try {
-              postGameScreen.hidden = true;
-            } catch {
-              /* ignore */
-            }
-          }
           if (leaderboardScreen) {
             leaderboardScreen.classList.remove("hidden");
             try {
@@ -128,17 +119,19 @@ export function handleGameOver(game) {
               /* ignore */
             }
           }
-          try {
-            const restartBtn = /** @type {HTMLButtonElement|null} */ (
-              document.getElementById("restartBtn")
-            );
-            if (restartBtn) UIManager.focusWithRetry(restartBtn);
-          } catch {
-            /* ignore */
-          }
         } catch {
           /* ignore */
         }
+
+        try {
+          const restartBtn = /** @type {HTMLButtonElement|null} */ (
+            document.getElementById("restartBtn")
+          );
+          if (restartBtn) UIManager.focusWithRetry(restartBtn);
+        } catch {
+          /* ignore */
+        }
+
         try {
           const restartBtn = /** @type {HTMLButtonElement|null} */ (
             document.getElementById("restartBtn")
@@ -188,6 +181,7 @@ export function handleGameOver(game) {
         } catch {
           /* non-critical restart gating */
         }
+
         try {
           GameUI.recenterLeaderboard();
         } catch {
