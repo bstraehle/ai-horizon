@@ -709,15 +709,40 @@ class AIHorizon {
 
   /** Dismiss the post-game overlay and return focus to restart. */
   handlePostGameOkClick() {
-    GameUI.hidePostGame(this);
-    // Dispatch a custom event so centralized UI code can respond to the Ok action.
+    /** @type {HTMLElement|null} */
+    let initialsScreen = null;
+    /** @type {HTMLElement|null} */
+    let initialsInput = null;
+    try {
+      initialsScreen = /** @type {HTMLElement|null} */ (document.getElementById("initialsScreen"));
+      initialsInput = /** @type {HTMLElement|null} */ (document.getElementById("initialsInput"));
+    } catch (_) {
+      initialsScreen = null;
+      initialsInput = null;
+    }
+
+    const outcome = UIManager.advancePostGameFlow({
+      postGameScreen: this.gameOverScreen || null,
+      initialsScreen,
+      leaderboardScreen: this.leaderboardScreen || null,
+      initialsInput,
+      restartBtn: this.restartBtn || null,
+    });
+
     try {
       if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
-        window.dispatchEvent(new CustomEvent("postGame:ok", { bubbles: true }));
+        window.dispatchEvent(
+          new CustomEvent("postGame:ok", {
+            bubbles: true,
+            detail: { skipUiAdvance: true, outcome },
+          })
+        );
       }
     } catch (_) {
       /* ignore */
     }
+
+    if (outcome === "initials") return;
     GameUI.focusRestart(this);
   }
 

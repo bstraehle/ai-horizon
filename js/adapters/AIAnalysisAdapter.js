@@ -28,9 +28,7 @@ export class AIAnalysisAdapter {
       payload.runSummary.timer &&
       payload.runSummary.timer.remainingSeconds > 0
     ) {
-      bullets.push(
-        "Play full 60 seconds, remaining: " + payload.runSummary.timer.remainingSeconds + "s"
-      );
+      bullets.push("Play full 60 seconds, played: " + payload.runSummary.timer.runtimeSeconds);
     }
     bullets.push("Maximize double points in last 10 seconds");
     if (
@@ -39,8 +37,7 @@ export class AIAnalysisAdapter {
       payload.runSummary.stats.bonusAsteroidsKilled < 5
     ) {
       bullets.push(
-        "Destroy all 5 bonus asteroids, remaining: " +
-          (5 - payload.runSummary.stats.bonusAsteroidsKilled)
+        "Destroy all 5 bonus asteroids, destroyed: " + payload.runSummary.stats.bonusAsteroidsKilled
       );
     }
     if (
