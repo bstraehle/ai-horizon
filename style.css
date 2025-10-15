@@ -203,6 +203,17 @@ body {
   overscroll-behavior: none;
   touch-action: none;
 }
+@media (max-width: 480px) {
+  .game-over-screen {
+    z-index: 3000;
+  }
+  #initialsScreen {
+    z-index: 2000;
+  }
+  #gameOverScreen {
+    z-index: 3000;
+  }
+}
 @supports (height: 100svh) {
   .game-over-screen {
     min-height: 100svh;

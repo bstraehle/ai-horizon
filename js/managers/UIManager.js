@@ -84,22 +84,21 @@ export class UIManager {
 
     UIManager._try(() => {
       if (initialsScreen) {
-        if (visible) {
+        try {
           initialsScreen.classList.add("hidden");
-          try {
-            initialsScreen.hidden = true;
-            initialsScreen.setAttribute("data-initials-ready", "true");
-          } catch (_) {
-            /* ignore */
-          }
-        } else {
-          initialsScreen.classList.add("hidden");
-          try {
-            initialsScreen.hidden = true;
-            initialsScreen.removeAttribute("data-initials-ready");
-          } catch (_) {
-            /* ignore */
-          }
+        } catch (_) {
+          /* ignore */
+        }
+        try {
+          initialsScreen.hidden = true;
+        } catch (_) {
+          /* ignore */
+        }
+        try {
+          if (visible) initialsScreen.setAttribute("data-initials-ready", "true");
+          else initialsScreen.removeAttribute("data-initials-ready");
+        } catch (_) {
+          /* ignore */
         }
       }
     });
