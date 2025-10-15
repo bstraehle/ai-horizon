@@ -28,16 +28,20 @@ export class AIAnalysisAdapter {
       payload.runSummary.timer &&
       payload.runSummary.timer.remainingSeconds > 0
     ) {
-      bullets.push("Play full 60 seconds, played: " + payload.runSummary.timer.runtimeSeconds);
+      bullets.push(
+        "Play full 60 seconds, played: " + payload.runSummary.timer.runtimeSeconds + " ⏱️"
+      );
     }
-    bullets.push("Maximize double points in last 10 seconds");
+    bullets.push("Maximize double points in last 10 seconds" + " ⚡");
     if (
       payload.runSummary &&
       payload.runSummary.stats &&
       payload.runSummary.stats.bonusAsteroidsKilled < 5
     ) {
       bullets.push(
-        "Destroy all 5 bonus asteroids, destroyed: " + payload.runSummary.stats.bonusAsteroidsKilled
+        "Destroy all 5 bonus asteroids, destroyed: " +
+          payload.runSummary.stats.bonusAsteroidsKilled +
+          " 💥"
       );
     }
     if (
@@ -48,7 +52,8 @@ export class AIAnalysisAdapter {
       bullets.push(
         "Collect more bonus stars, accuracy: " +
           (payload.runSummary.stats.bonusStarsCollectedAccuracy * 100).toFixed(0) +
-          "%"
+          "%" +
+          " 🌟"
       );
     }
     if (
@@ -59,7 +64,8 @@ export class AIAnalysisAdapter {
       bullets.push(
         "Increase shot accuracy for end of run bonus, accuracy: " +
           (payload.runSummary.stats.shotsFiredAccuracy * 100).toFixed(0) +
-          "%"
+          "%" +
+          " 🎯"
       );
     }
     if (
@@ -70,7 +76,8 @@ export class AIAnalysisAdapter {
       bullets.push(
         "Destroy more hardened asteroids, accuracy: " +
           (payload.runSummary.stats.hardenedAsteroidsKilledAccuracy * 100).toFixed(0) +
-          "%"
+          "%" +
+          " 🪨"
       );
     }
     if (
@@ -81,7 +88,8 @@ export class AIAnalysisAdapter {
       bullets.push(
         "Collect more stars, accuracy: " +
           (payload.runSummary.stats.starsCollectedAccuracy * 100).toFixed(0) +
-          "%"
+          "%" +
+          " ⭐"
       );
     }
     if (
@@ -92,11 +100,12 @@ export class AIAnalysisAdapter {
       bullets.push(
         "Destroy more asteroids, accuracy: " +
           (payload.runSummary.stats.asteroidsKilledAccuracy * 100).toFixed(0) +
-          "%"
+          "%" +
+          " 🪨"
       );
     }
     return {
-      title: "✨ AI analysis coming soon! ✨",
+      title: "How to improve your score",
       bullets,
     };
   }
