@@ -58,48 +58,33 @@ export const handler = async (event) => {
  * @param {string} body - The game summary / prompt to analyze
  */
 async function analysis(body) {
-  try {
-    const modelId = "anthropic.claude-3-5-haiku-20241022-v1:0";
+  const modelId = "anthropic.claude-3-5-haiku-20241022-v1:0";
 
-    var prompt =
-      'You are a senior analyst for "AI HORIZON", a fast, arcade-style space shooter, in which a player needs to collect stars, blast asteroids, and beat the clock. Based on the provided scoring rules, general tips (in order of importance), and game summary, provide your analysis (in order of importance) to help the player improve. Respond in the provided answer format. <scoring rules - start> - Unlimited shots - Regular asteroids: +10 - Hardened asteroids (10 hits): +100 - 5 bonus asteroids (10 hits): +250 - Regular stars: +25 - Bonus stars: +50 - Every 1000 points: +250 - Last 10 seconds: all asteroid and star points are doubled - End of run accuracy bonus (0-100%): +(score × asteroids destroyed / shots fired) <scoring rules - end> <general tips - start> 1. Play full 60 seconds 2. Maximize double points in last 10 seconds 3. Destroy all 5 bonus asteroids 4. Collect more bonus stars 5. Increase shot accuracy with short bursts for accuracy bonus 6. Destroy more hardened asteroids 7. Collect more stars 8. Destroy more asteroids <general tips - end> <game summary - start> %%prompt%% <game summary - end> <answer format - start> { "feedback": "<friendly feedback to game play in less than 10 words in language based on locale>", "specific-tip-1": "⏱️ <1. General tip in less than 10 words in language based on locale, give specific example from game summary>", "specific-tip-2": "🎮 <2. General tip in less than 10 words in language based on locale, give specific example from game summary>", "specific-tip-3": "🪨 <3. General tip in less than 10 words in language based on locale, give specific example from game summary>", "specific-tip-4": "⭐ <4. General tip in less than 10 words in language based on locale, give specific example from game summary>", "specific-tip-5": "🎯 <5. General tip in less than 10 words in language based on locale, give specific example from game summary>", "specific-tip-6": "🪨 <6. General tip in less than 10 words in language based on locale, give specific example from game summary>", "specific-tip-7": "⭐ <7. General tip in less than 10 words in language based on locale, give specific example from game summary>", "specific-tip-8": "🪨 <8. General tip in less than 10 words in language based on locale, give specific example from game summary>" } <answer format - end> Your answer:';
+  var prompt =
+    'You are a senior analyst for "AI HORIZON", a fast, arcade-style space shooter, in which a player needs to collect stars, blast asteroids, and beat the clock. Based on the provided scoring rules, general tips (in order of importance), and game summary, provide your analysis (in order of importance) to help the player improve. Respond in the provided answer format. <scoring rules - start> - Unlimited shots - Regular asteroids: +10 - Hardened asteroids (10 hits): +100 - 5 bonus asteroids (10 hits): +250 - Regular stars: +25 - Bonus stars: +50 - Every 1000 points: +250 - Last 10 seconds: all asteroid and star points are doubled - End of run accuracy bonus (0-100%): +(score × asteroids destroyed / shots fired) <scoring rules - end> <general tips - start> 1. Play full 60 seconds 2. Maximize double points in last 10 seconds 3. Destroy all 5 bonus asteroids 4. Collect more bonus stars 5. Increase shot accuracy with short bursts for accuracy bonus 6. Destroy more hardened asteroids 7. Collect more stars 8. Destroy more asteroids <general tips - end> <game summary - start> %%prompt%% <game summary - end> <answer format - start> { "feedback": "<friendly feedback to game play in less than 10 words in language based on locale>", "specific-tip-1": "⏱️ <1. General tip in less than 10 words in language based on locale, give specific example from game summary>", "specific-tip-2": "🎮 <2. General tip in less than 10 words in language based on locale, give specific example from game summary>", "specific-tip-3": "🪨 <3. General tip in less than 10 words in language based on locale, give specific example from game summary>", "specific-tip-4": "⭐ <4. General tip in less than 10 words in language based on locale, give specific example from game summary>", "specific-tip-5": "🎯 <5. General tip in less than 10 words in language based on locale, give specific example from game summary>", "specific-tip-6": "🪨 <6. General tip in less than 10 words in language based on locale, give specific example from game summary>", "specific-tip-7": "⭐ <7. General tip in less than 10 words in language based on locale, give specific example from game summary>", "specific-tip-8": "🪨 <8. General tip in less than 10 words in language based on locale, give specific example from game summary>" } <answer format - end> Your answer:';
 
-    prompt = prompt.replace("%%prompt%%", body);
+  prompt = prompt.replace("%%prompt%%", body);
 
-    const requestBody = {
-      anthropic_version: "bedrock-2023-05-31",
-      max_tokens: 1000,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    };
+  const requestBody = {
+    anthropic_version: "bedrock-2023-05-31",
+    max_tokens: 1000,
+    messages: [
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+  };
 
-    const command = new InvokeModelCommand({
-      modelId: modelId,
-      contentType: "application/json",
-      accept: "application/json",
-      body: JSON.stringify(requestBody),
-    });
+  const command = new InvokeModelCommand({
+    modelId: modelId,
+    contentType: "application/json",
+    accept: "application/json",
+    body: JSON.stringify(requestBody),
+  });
 
-    const response = await bedrockClient.send(command);
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+  const response = await bedrockClient.send(command);
+  const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        message: responseBody.content[0].text,
-      }),
-    };
-  } catch (error) {
-    console.error("Error calling Bedrock:", error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        error: "Failed to call Bedrock API",
-      }),
-    };
-  }
+  return responseBody.content[0].text;
 }
