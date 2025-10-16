@@ -7,13 +7,12 @@ const bedrockClient = new BedrockRuntimeClient({
 
 /**
  * Lambda handler
- * @param {{httpMethod:string,queryStringParameters?:Record<string,string>,body?:string}} event
+ * @param {{httpMethod:string,body?:string}} event
  */
 export const handler = async (event) => {
   try {
-    const { httpMethod, queryStringParameters, body } = event;
+    const { httpMethod, body } = event;
     let response;
-    let updateData;
 
     switch (httpMethod) {
       case "POST":
@@ -55,7 +54,8 @@ export const handler = async (event) => {
 };
 
 /**
- * @param {number} id
+ * Analyze a game summary using Bedrock and return a structured response.
+ * @param {string} body - The game summary / prompt to analyze
  */
 async function analysis(body) {
   try {
