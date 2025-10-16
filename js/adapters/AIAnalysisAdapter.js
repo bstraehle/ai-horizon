@@ -31,7 +31,7 @@ export class AIAnalysisAdapter {
           var transformedResponse = this._transformRemoteResponse(response);
           return transformedResponse;
         }
-      } catch (err) {
+      } catch {
         // AI analysis failed
       }
     }
@@ -50,7 +50,7 @@ export class AIAnalysisAdapter {
     if (typeof response === "string") {
       try {
         parsedResponse = JSON.parse(response);
-      } catch (e) {
+      } catch {
         parsedResponse = response;
       }
     }
