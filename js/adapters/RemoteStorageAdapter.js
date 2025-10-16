@@ -74,4 +74,31 @@ export class RemoteStorageAdapter {
       if (to) clearTimeout(to);
     }
   }
+
+  /**
+   * POST JSON and return parsed JSON or null.
+   * @template T
+   * @param {string} urlOrPath
+   * @param {any} body
+   * @returns {Promise<T|null>}
+   */
+  async postJSON(urlOrPath, body) {
+    if (!this._fetch) return null;
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const to = controller ? setTimeout(() => controller.abort(), this._timeoutMs) : null;
+    try {
+      const res = await this._fetch(this._url(urlOrPath), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller?.signal,
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    } finally {
+      if (to) clearTimeout(to);
+    }
+  }
 }

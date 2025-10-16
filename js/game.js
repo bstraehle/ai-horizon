@@ -698,6 +698,18 @@ class AIHorizon {
   handleRestartClick() {
     if (this.restartBtn && this.restartBtn.dataset && this.restartBtn.dataset.cooldown === "1")
       return;
+
+    try {
+      const postGameMessage = /** @type {HTMLElement|null} */ (
+        document.getElementById("postGameMessage")
+      );
+      if (postGameMessage) {
+        postGameMessage.textContent = "";
+      }
+    } catch (_) {
+      /* ignore */
+    }
+
     GameUI.hideGameOver(this);
     this.startGame();
     try {

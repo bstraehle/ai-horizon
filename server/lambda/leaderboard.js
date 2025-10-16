@@ -86,16 +86,22 @@ export const handler = async (event) => {
       headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
+        "Access-Control-Allow-Methods": "GET, PUT",
         "Access-Control-Allow-Headers": "Content-Type",
       },
       body: JSON.stringify(response),
     };
   } catch (error) {
-    console.error("Error:", error);
+    //console.error("Error:", error);
     const message = error instanceof Error ? error.message : String(error);
     return {
       statusCode: 500,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, PUT",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
       body: JSON.stringify({
         message: "Internal server error",
         error: message,
