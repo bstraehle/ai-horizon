@@ -24,13 +24,14 @@
 
         <p class="instructions">
           AI analysis at the end of each run helps you improve your score — based on 25+ data points
-          (not available offline).
+          (offline analysis is deterministic).
         </p>
 
         <h3>How to play</h3>
         <p class="instructions">
-          Your goal is to score as many points as possible in one minute. Move your ship to collect
-          stars and shoot asteroids. Some asteroids are hardened and take many hits.
+          Your goal is to score as many points as possible in one minute without getting hit by an
+          asteroid. Move your ship to collect stars and shoot asteroids. Some asteroids are hardened
+          and take many hits.
         </p>
 
         <h3>Controls</h3>
@@ -61,13 +62,12 @@
         <h3>About</h3>
         <ul class="instructions">
           <li>
-            100% AI-generated using VS Code & GitHub Copilot Agent Mode (Claude Sonnet 4.5, Gemini
-            2.5 Pro, and GPT-5).
+            100% AI-generated using VS Code & GitHub Copilot agent mode (Claude Sonnet 4.5, Gemini
+            2.5 Pro, and GPT-5 Codex). AI-assisted by Amazon Q.
           </li>
           <li>
-            An AWS serverless architecture comprised of Cognito, CloudFront & S3 (frontend) and API
-            Gateway, Lambda, DynamoDB & Bedrock - Claude Haiku 4.5 (backend). AI-assisted by Amazon
-            Q.
+            An AWS serverless architecture comprised of CloudFront & S3 (frontend) and Cognito, API
+            Gateway, Lambda, DynamoDB & Bedrock — Claude Haiku 4.5 (backend).
           </li>
           <li>
             A Progressive Web App (PWA) that works offline and can be installed on your device.
