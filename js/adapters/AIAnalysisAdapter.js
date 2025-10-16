@@ -82,10 +82,10 @@ export class AIAnalysisAdapter {
     if (
       payload.runSummary &&
       payload.runSummary.timer &&
-      payload.runSummary.timer.remainingSeconds > 0
+      payload.runSummary.timer.toPlaySeconds > 0
     ) {
       bullets.push(
-        "⏱️ Play full 60 seconds, played: " + payload.runSummary.timer.runtimeSeconds + "."
+        "⏱️ Play full 60 seconds, played: " + payload.runSummary.timer.killedByAsteroidSeconds + "."
       );
     }
     bullets.push("🎮 Maximize double points in last 10 seconds.");

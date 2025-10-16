@@ -1033,7 +1033,7 @@ class AIHorizon {
         baseScore,
         bonus,
         finalScore: finalScoreNormalized,
-        highScore: highScoreValue,
+        leaderBoardHighScore: highScoreValue,
         scoreDifference,
         ...rest,
       };
@@ -1092,8 +1092,8 @@ class AIHorizon {
       })(),
       timer: {
         totalSeconds: totalSecondsInt,
-        runtimeSeconds: runtimeSecondsInt,
-        remainingSeconds: remainingSecondsInt,
+        killedByAsteroidSeconds: runtimeSecondsInt,
+        toPlaySeconds: remainingSecondsInt,
       },
       score: scoreSummary,
       stats: {
