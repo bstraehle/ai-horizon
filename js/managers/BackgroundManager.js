@@ -18,6 +18,7 @@ import { StarField } from "../entities/StarField.js";
  * @property {number} [starfieldScale] Optional scale multiplier
  * @property {RNGLike} [rng] Optional deterministic RNG
  * @property {"red"|"blue"} [nebulaPalette] Optional palette override
+ * @property {boolean} [preservePalette] If true, don't flip palette (for performance adjustments)
  */
 /**
  * @typedef {Object} BackgroundResizeContext
@@ -61,12 +62,20 @@ export class BackgroundManager {
       starfieldScale,
       rng,
       nebulaPalette,
+      preservePalette,
     } = ctxObj;
     const mobileHint = isMobile || !!isLowPower;
     const scale = typeof starfieldScale === "number" ? starfieldScale : 1;
     const state = {};
     if (running) {
-      const palette = BackgroundManager._getAndFlipNebulaPalette(nebulaPalette);
+      let palette;
+      if (typeof nebulaPalette === "string") {
+        palette = nebulaPalette;
+      } else if (preservePalette === true) {
+        palette = BackgroundManager._nebulaCurrentPalette || "red";
+      } else {
+        palette = BackgroundManager._getAndFlipNebulaPalette();
+      }
       BackgroundManager._nebulaCurrentPalette = palette;
       state.nebulaConfigs = Nebula.init(width, height, mobileHint, rng, palette);
     } else {

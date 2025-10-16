@@ -66,7 +66,7 @@ export function applyPerformanceProfile(game, level, meta = {}) {
       /* ignore */
     }
     try {
-      initBackgroundLifecycle(game);
+      initBackgroundLifecycle(game, { preservePalette: true });
     } catch {
       /* ignore */
     }

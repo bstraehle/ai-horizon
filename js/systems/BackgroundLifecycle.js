@@ -8,8 +8,10 @@ import { RNG } from "../utils/RNG.js";
 /**
  * Initialize background (nebula configs + starfield) using current game context & performance flags.
  * @param {AIHorizon} game
+ * @param {{ preservePalette?: boolean }} [options] Optional settings
+ *   preservePalette: If true, keeps current nebula palette instead of flipping (for performance adjustments)
  */
-export function initBackgroundLifecycle(game) {
+export function initBackgroundLifecycle(game, options = {}) {
   try {
     const isGameOver =
       game && game.state && typeof game.state.isGameOver === "function" && game.state.isGameOver();
@@ -22,6 +24,9 @@ export function initBackgroundLifecycle(game) {
   const ctx = getGameContext(game);
   ctx.starfieldScale = game._starfieldScale;
   ctx.isLowPower = game._isLowPowerMode;
+  if (options.preservePalette === true) {
+    ctx.preservePalette = true;
+  }
   try {
     const url = new URL(window.location.href);
     if (!url.searchParams.has(CONFIG.RNG.SEED_PARAM)) {
