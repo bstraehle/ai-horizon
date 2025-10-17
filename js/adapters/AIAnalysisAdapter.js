@@ -130,7 +130,7 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.shotsFiredAccuracy < 1) {
         bullets.push(
-          "🎯 Increase your shots fired accuracy for end of run bonus (0-100%). Your accuracy is " +
+          "🎯 Increase shots fired accuracy for end of run bonus (0-100%). Your accuracy is " +
             (payload.runSummary.stats.shotsFiredAccuracy * 100).toFixed(0) +
             "% (" +
             payload.runSummary.stats.shotsFiredOnTarget +
