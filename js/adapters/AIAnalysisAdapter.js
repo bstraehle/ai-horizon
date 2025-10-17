@@ -98,9 +98,9 @@ export class AIAnalysisAdapter {
         bullets.push(
           "🌑 Destroy all 5 bonus asteroids. You destroyed " +
             payload.runSummary.stats.bonusAsteroidsKilled +
-            " out of " +
+            " of " +
             payload.runSummary.stats.bonusAsteroidsSpawned +
-            " spawned."
+            "."
         );
       } else {
         bullets.push("🌑 Great job, you destroyed all 5 bonus asteroids.");
@@ -113,17 +113,17 @@ export class AIAnalysisAdapter {
             (payload.runSummary.stats.bonusStarsCollectedAccuracy * 100).toFixed(0) +
             "% (" +
             payload.runSummary.stats.bonusStarsCollected +
-            " out of " +
+            " of " +
             payload.runSummary.stats.bonusStarsSpawned +
-            " spawned)."
+            ")."
         );
       } else {
         bullets.push(
           "🌟 Great job, you collected all bonus stars (" +
             payload.runSummary.stats.bonusStarsCollected +
-            " out of " +
+            " of " +
             payload.runSummary.stats.bonusStarsSpawned +
-            " spawned)."
+            ")."
         );
       }
     }
@@ -134,17 +134,17 @@ export class AIAnalysisAdapter {
             (payload.runSummary.stats.shotsFiredAccuracy * 100).toFixed(0) +
             "% (" +
             payload.runSummary.stats.shotsFiredOnTarget +
-            " out of " +
+            " of " +
             payload.runSummary.stats.shotsFired +
-            " shots fired)."
+            ")."
         );
       } else {
         bullets.push(
           "🎯 Great job, your shots fired accuracy for end of run bonus is 100% (" +
             payload.runSummary.stats.shotsFiredOnTarget +
-            " out of " +
+            " of " +
             payload.runSummary.stats.shotsFired +
-            " shots fired)."
+            ")."
         );
       }
     }
@@ -155,17 +155,17 @@ export class AIAnalysisAdapter {
             (payload.runSummary.stats.hardenedAsteroidsKilledAccuracy * 100).toFixed(0) +
             "% (" +
             payload.runSummary.stats.hardenedAsteroidsKilled +
-            " out of " +
+            " of " +
             payload.runSummary.stats.hardenedAsteroidsSpawned +
-            " spawned)."
+            ")."
         );
       } else {
         bullets.push(
           "🛡️ Great job, you destroyed all hardened asteroids (." +
             payload.runSummary.stats.hardenedAsteroidsKilled +
-            " out of " +
+            " of " +
             payload.runSummary.stats.hardenedAsteroidsSpawned +
-            " spawned)."
+            ")."
         );
       }
     }
@@ -176,17 +176,17 @@ export class AIAnalysisAdapter {
             (payload.runSummary.stats.starsCollectedAccuracy * 100).toFixed(0) +
             "% (" +
             payload.runSummary.stats.starsCollected +
-            " out of " +
+            " of " +
             payload.runSummary.stats.starsSpawned +
-            " spawned)."
+            ")."
         );
       } else {
         bullets.push(
           "⭐ Great job, you collected all regular stars (" +
             payload.runSummary.stats.starsCollected +
-            " out of " +
+            " of " +
             payload.runSummary.stats.starsSpawned +
-            " spawned)."
+            ")."
         );
       }
     }
@@ -197,17 +197,17 @@ export class AIAnalysisAdapter {
             (payload.runSummary.stats.asteroidsKilledAccuracy * 100).toFixed(0) +
             "% (" +
             payload.runSummary.stats.asteroidsKilled +
-            " out of " +
+            " of " +
             payload.runSummary.stats.asteroidsSpawned +
-            " spawned)."
+            ")."
         );
       } else {
         bullets.push(
           "🪨 Great job, you destroyed all regular asteroids (" +
             payload.runSummary.stats.asteroidsKilled +
-            " out of " +
+            " of " +
             payload.runSummary.stats.asteroidsSpawned +
-            " spawned)."
+            ")."
         );
       }
     }
