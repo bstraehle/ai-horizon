@@ -82,15 +82,17 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.timer) {
       if (payload.runSummary.timer.killedByAsteroidSeconds > 0) {
         bullets.push(
-          "⏱️ Play the full 60 seconds, you played " +
+          "⏱️ Play the full 60 seconds and don't get killed by an asteroid. You played " +
             payload.runSummary.timer.killedByAsteroidSeconds +
             " seconds."
         );
       } else {
-        bullets.push("⏱️ Great job, you played the full 60 seconds.");
+        bullets.push(
+          "⏱️ Great job, you played the full 60 seconds and did not get killed by an asteroid."
+        );
       }
     }
-    bullets.push("🎮 Maximize double points in the last 10 seconds.");
+    bullets.push("🎮 Finish strong during the double-point finale (last 10 seconds).");
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.bonusAsteroidsKilled < 5) {
         bullets.push(
@@ -116,12 +118,12 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.shotsFiredAccuracy < 1) {
         bullets.push(
-          "🎯 Increase your shot accuracy for end of run bonus, your accuracy is " +
+          "🎯 Increase your shot accuracy for end of run accuracy bonus (0-100%). Your accuracy is " +
             (payload.runSummary.stats.shotsFiredAccuracy * 100).toFixed(0) +
             "%."
         );
       } else {
-        bullets.push("🎯 Great job, your shot accuracy for end of run bonus is 100%.");
+        bullets.push("🎯 Great job, your shot accuracy for end of run accuracy bonus is 100%.");
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
@@ -138,23 +140,23 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.starsCollectedAccuracy < 1) {
         bullets.push(
-          "⭐ Collect more stars — aim for clusters, your accuracy is " +
+          "⭐ Collect more regular stars — aim for clusters, your accuracy is " +
             (payload.runSummary.stats.starsCollectedAccuracy * 100).toFixed(0) +
             "%."
         );
       } else {
-        bullets.push("⭐ Great job, you collected all stars.");
+        bullets.push("⭐ Great job, you collected all regular stars.");
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.asteroidsKilledAccuracy < 1) {
         bullets.push(
-          "🪨 Destroy more asteroids — aim for clusters, your accuracy is " +
+          "🪨 Destroy more regular asteroids — aim for clusters, your accuracy is " +
             (payload.runSummary.stats.asteroidsKilledAccuracy * 100).toFixed(0) +
             "%."
         );
       } else {
-        bullets.push("🪨 Great job, you destroyed all asteroids.");
+        bullets.push("🪨 Great job, you destroyed all regular asteroids.");
       }
     }
     return {
