@@ -94,7 +94,8 @@ export const GameUI = {
             timerSeconds: game.timerSeconds || 60,
             timerRemaining: game.timerRemaining || 0,
           },
-          game._lastRunSummary || null
+          game._lastRunSummary || null,
+          AIAnalysisManager.IS_REMOTE
         );
       } else if (postGame && msg) {
         const obs = new MutationObserver(() => {
@@ -115,7 +116,8 @@ export const GameUI = {
                   timerSeconds: game.timerSeconds || 60,
                   timerRemaining: game.timerRemaining || 0,
                 },
-                game._lastRunSummary || null
+                game._lastRunSummary || null,
+                AIAnalysisManager.IS_REMOTE
               );
               try {
                 obs.disconnect();

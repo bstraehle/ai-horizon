@@ -74,8 +74,10 @@ export class AIAnalysisManager {
    * - Otherwise triggers analyze(stats) and updates when ready
    * @param {HTMLElement|null} container Typically the #postGameMessage element
    * @param {object} stats
+   * @param {object|null} runSummary
+   * @param {boolean} isRemote Whether remote mode is enabled
    */
-  static render(container, stats, runSummary = null) {
+  static render(container, stats, runSummary = null, isRemote = true) {
     if (!container) return;
 
     const doRender = (payload) => {
@@ -105,12 +107,14 @@ export class AIAnalysisManager {
       }
     };
 
-    try {
-      const p = document.createElement("p");
-      p.textContent = "✨ Analysis in progress ✨";
-      container.appendChild(p);
-    } catch {
-      /* non-critical immediate placeholder render */
+    if (isRemote) {
+      try {
+        const p = document.createElement("p");
+        p.textContent = "✨ Analysis in progress ✨";
+        container.appendChild(p);
+      } catch {
+        /* non-critical immediate placeholder render */
+      }
     }
 
     const maybe = AIAnalysisManager.analyze({ stats, runSummary });

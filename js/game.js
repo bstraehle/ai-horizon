@@ -39,6 +39,7 @@ import { UIManager } from "./managers/UIManager.js";
 import { GameUI } from "./ui/GameUI.js";
 import { handleGameOver } from "./ui/GameOver.js";
 import { LeaderboardManager } from "./managers/LeaderboardManager.js";
+import { AIAnalysisManager } from "./managers/AIAnalysisManager.js";
 import { ViewManager } from "./managers/ViewManager.js";
 import { ScoringManager } from "./managers/ScoringManager.js";
 
@@ -320,7 +321,7 @@ class AIHorizon {
     LeaderboardManager.detectRemote({ timeoutMs: 1200 })
       .then((isRemote) => {
         LeaderboardManager.IS_REMOTE = !!isRemote;
-        // Reflect connection status in the high score UI border
+        AIAnalysisManager.IS_REMOTE = !!isRemote;
         try {
           const boxes = [
             this.highScoreBox || document.getElementById("highScoreBox"),
@@ -341,10 +342,9 @@ class AIHorizon {
       })
       .then((entries) => handleEntries(entries))
       .catch(async () => {
-        // Fall back to local-only load
         try {
           LeaderboardManager.IS_REMOTE = false;
-          // Mark high score as offline
+          AIAnalysisManager.IS_REMOTE = false;
           try {
             const boxes = [
               this.highScoreBox || document.getElementById("highScoreBox"),
