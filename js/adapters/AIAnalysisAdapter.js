@@ -140,7 +140,7 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.starsCollectedAccuracy < 1) {
         bullets.push(
-          "⭐ Collect more regular stars — aim for clusters, your accuracy is " +
+          "⭐ Collect more regular stars, your accuracy is " +
             (payload.runSummary.stats.starsCollectedAccuracy * 100).toFixed(0) +
             "%."
         );
@@ -151,7 +151,7 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.asteroidsKilledAccuracy < 1) {
         bullets.push(
-          "🪨 Destroy more regular asteroids — aim for clusters, your accuracy is " +
+          "🪨 Destroy more regular asteroids, your accuracy is " +
             (payload.runSummary.stats.asteroidsKilledAccuracy * 100).toFixed(0) +
             "%."
         );
