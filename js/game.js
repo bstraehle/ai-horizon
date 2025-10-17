@@ -1025,16 +1025,37 @@ class AIHorizon {
       shotsFiredAccuracy = roundedAccuracy;
       const finalScoreNormalized = typeof newScore === "number" ? newScore : (newScore ?? null);
       const highScoreValue = Number.isFinite(this.highScore) ? this.highScore : null;
-      const scoreDifference =
+
+      let lowScoreValue = null;
+      try {
+        const cachedEntries = LeaderboardManager.getCached();
+        if (Array.isArray(cachedEntries) && cachedEntries.length > 0) {
+          const lastEntry = cachedEntries[cachedEntries.length - 1];
+          if (lastEntry && typeof lastEntry.score === "number") {
+            lowScoreValue = lastEntry.score;
+          }
+        }
+      } catch (_e) {
+        /* ignore */
+      }
+
+      const differencePlayerFinalScoreToLeaderBoardHighScore =
         typeof highScoreValue === "number" && typeof finalScoreNormalized === "number"
           ? highScoreValue - finalScoreNormalized
           : null;
+      const differencePlayerFinalScoreToLeaderBoardLowScore =
+        typeof lowScoreValue === "number" && typeof finalScoreNormalized === "number"
+          ? lowScoreValue - finalScoreNormalized
+          : null;
+
       return {
-        baseScore,
-        bonus,
-        finalScore: finalScoreNormalized,
+        playerBaseScore: baseScore,
+        playerBonus: bonus,
+        playerFinalScore: finalScoreNormalized,
         leaderBoardHighScore: highScoreValue,
-        scoreDifference,
+        leaderBoardLowScore: lowScoreValue,
+        differencePlayerFinalScoreToLeaderBoardHighScore,
+        differencePlayerFinalScoreToLeaderBoardLowScore,
         ...rest,
       };
     })();
