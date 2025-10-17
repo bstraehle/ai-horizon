@@ -262,6 +262,7 @@ export class LeaderboardManager {
 
   /**
    * Append score + persist (validates score/id).
+   * If the same initials already exist, only keep the higher score.
    * @param {number} score
    * @param {string} userId
    * @param {{remote?:boolean, accuracy?:number}=} options
@@ -280,7 +281,17 @@ export class LeaderboardManager {
     if (typeof accuracy === "number" && !isNaN(accuracy)) {
       newEntry.accuracy = accuracy;
     }
-    entries.push(newEntry);
+
+    const existingIndex = entries.findIndex((e) => e.id === id);
+
+    if (existingIndex !== -1) {
+      if (newEntry.score > entries[existingIndex].score) {
+        entries[existingIndex] = newEntry;
+      }
+    } else {
+      entries.push(newEntry);
+    }
+
     entries.sort(compareEntries);
     return LeaderboardManager.save(entries.slice(0, LeaderboardManager.MAX_ENTRIES), { remote });
   }
