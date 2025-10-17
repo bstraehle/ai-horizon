@@ -45,6 +45,8 @@ function setupDom() {
   const raf = dom.window.requestAnimationFrame || ((cb) => setTimeout(cb, 0));
   global.requestAnimationFrame = raf;
   dom.window.requestAnimationFrame = raf;
+  dom.window.scrollTo = () => {};
+  global.window.scrollTo = () => {};
   return dom;
 }
 
