@@ -19,7 +19,7 @@ export class LeaderboardManager {
   static IS_REMOTE = true;
   // Remote partition identifier (query param ?id=...)
   static REMOTE_ID = 1;
-  static MAX_ENTRIES = 25;
+  static MAX_ENTRIES = 10;
   static KEY_LEADERBOARD = "aiHorizonLeaderboard";
   static REMOTE_REFRESH_COOLDOWN_MS = 0;
   /** @type {LeaderboardEntry[]|null} */

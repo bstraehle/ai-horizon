@@ -105,12 +105,9 @@ describe("LeaderboardManager duplicate initials handling", () => {
   it("should update date when replacing score", async () => {
     // Mock Date for consistent testing
     const firstDate = "2025-01-01";
-    const secondDate = "2025-01-02";
 
     // Submit first score
-    await LeaderboardManager.submit(100, "DDD", { remote: false });
-
-    // Manually set the date for testing
+    await LeaderboardManager.submit(100, "DDD", { remote: false }); // Manually set the date for testing
     let entries = await LeaderboardManager.load({ remote: false });
     entries[0].date = firstDate;
     await LeaderboardManager.save(entries, { remote: false });

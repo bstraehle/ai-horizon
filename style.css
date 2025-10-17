@@ -340,9 +340,10 @@ body {
   text-transform: uppercase;
   width: 8ch;
 }
-.initials-entry .initials-input:invalid {
+.initials-entry .initials-input:focus {
   border-color: var(--color-border);
-  box-shadow: none;
+  outline: 3px solid var(--color-btn-focus-outline);
+  outline-offset: -3px;
 }
 .initials-entry .initials-label {
   display: block;
