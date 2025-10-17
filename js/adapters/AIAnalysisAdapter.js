@@ -82,7 +82,7 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.timer) {
       if (payload.runSummary.timer.killedByAsteroidSeconds > 0) {
         bullets.push(
-          "⏱️ Play the full 60 seconds without getting killed by an asteroid. You played " +
+          "⏱️ Play the full 60 seconds without getting killed by an asteroid. Played: " +
             payload.runSummary.timer.killedByAsteroidSeconds +
             " seconds."
         );
@@ -96,7 +96,7 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.bonusAsteroidsKilled < 5) {
         bullets.push(
-          "🌑 Destroy all 5 bonus asteroids. You destroyed " +
+          "🌑 Destroy all 5 bonus asteroids. Destroyed: " +
             payload.runSummary.stats.bonusAsteroidsKilled +
             " of " +
             payload.runSummary.stats.bonusAsteroidsSpawned +
@@ -109,7 +109,7 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.bonusStarsCollected < 5) {
         bullets.push(
-          "🌟 Collect more bonus stars. Your accuracy is " +
+          "🌟 Collect more bonus stars. Accuracy: " +
             (payload.runSummary.stats.bonusStarsCollectedAccuracy * 100).toFixed(0) +
             "% (" +
             payload.runSummary.stats.bonusStarsCollected +
@@ -130,7 +130,7 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.shotsFiredAccuracy < 1) {
         bullets.push(
-          "🎯 Increase shots fired accuracy for end of run bonus (0-100%). Your accuracy is " +
+          "🎯 Increase shots fired accuracy for end of run bonus (0-100%). Accuracy: " +
             (payload.runSummary.stats.shotsFiredAccuracy * 100).toFixed(0) +
             "% (" +
             payload.runSummary.stats.shotsFiredOnTarget +
@@ -151,7 +151,7 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.hardenedAsteroidsKilledAccuracy < 1) {
         bullets.push(
-          "🛡️ Destroy more hardened asteroids. Your accuracy is " +
+          "🛡️ Destroy more hardened asteroids. Accuracy: " +
             (payload.runSummary.stats.hardenedAsteroidsKilledAccuracy * 100).toFixed(0) +
             "% (" +
             payload.runSummary.stats.hardenedAsteroidsKilled +
@@ -161,7 +161,7 @@ export class AIAnalysisAdapter {
         );
       } else {
         bullets.push(
-          "🛡️ Great job, you destroyed all hardened asteroids (." +
+          "🛡️ Great job, you destroyed all hardened asteroids (" +
             payload.runSummary.stats.hardenedAsteroidsKilled +
             " of " +
             payload.runSummary.stats.hardenedAsteroidsSpawned +
@@ -172,7 +172,7 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.starsCollectedAccuracy < 1) {
         bullets.push(
-          "⭐ Collect more regular stars. Your accuracy is " +
+          "⭐ Collect more regular stars. Accuracy: " +
             (payload.runSummary.stats.starsCollectedAccuracy * 100).toFixed(0) +
             "% (" +
             payload.runSummary.stats.starsCollected +
@@ -193,7 +193,7 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.asteroidsKilledAccuracy < 1) {
         bullets.push(
-          "🪨 Destroy more regular asteroids. Your accuracy is " +
+          "🪨 Destroy more regular asteroids. Accuracy: " +
             (payload.runSummary.stats.asteroidsKilledAccuracy * 100).toFixed(0) +
             "% (" +
             payload.runSummary.stats.asteroidsKilled +
