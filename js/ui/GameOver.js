@@ -55,7 +55,10 @@ export function handleGameOver(game) {
           return false;
         }
         try {
-          LeaderboardManager.submit(game.score, raw, { remote: LeaderboardManager.IS_REMOTE });
+          LeaderboardManager.submit(game.score, raw, {
+            remote: LeaderboardManager.IS_REMOTE,
+            accuracy: game.accuracy,
+          });
           submittedScore = true;
           initialsInput.value = "";
         } catch {

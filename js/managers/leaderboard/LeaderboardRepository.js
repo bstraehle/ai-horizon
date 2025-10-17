@@ -6,6 +6,8 @@ import { RemoteStorageAdapter } from "../../adapters/RemoteStorageAdapter.js";
  * @typedef {Object} LeaderboardEntry
  * @property {string} id
  * @property {number} score
+ * @property {number} [accuracy]
+ * @property {string} [date]
  *
  * @typedef {Object} SaveRemoteResult
  * @property {boolean} ok        True on successful authoritative save.

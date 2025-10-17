@@ -4,6 +4,8 @@ import { LeaderboardManager } from "../LeaderboardManager";
  * @typedef {Object} LeaderboardEntry
  * @property {string} id   Upper‑case initials (1–3 chars) or placeholder.
  * @property {number} score Non‑negative integer score.
+ * @property {number} [accuracy] Accuracy as decimal (0.0-1.0).
+ * @property {string} [date] ISO date string (YYYY-MM-DD) when score was achieved.
  *
  * @typedef {Object} FormattedRow
  * @property {number} rank   1‑based rank.
@@ -11,12 +13,15 @@ import { LeaderboardManager } from "../LeaderboardManager";
  * @property {string} medal  Medal emoji for top 3 or empty string.
  * @property {string} icon   Secondary icon (👏) for non‑medal ranks within range.
  * @property {string} text   Composite presentation string.
+ * @property {string} accuracyFormatted Formatted accuracy (XX%) or empty string.
+ * @property {string} dateFormatted Formatted date (YYYY-MM-DD) or empty string.
  */
 
 /**
  * Normalize potentially untrusted raw data into safe immutable entries.
  * - Always returns a new array (never mutates input).
  * - Coerces `id` to string (empty string fallback) and `score` to finite number (0 fallback).
+ * - Preserves `date` field if present and valid string, otherwise omits it.
  * - Preserves original ordering and length (caller decides filtering / sorting separately).
  *
  * @param {any} arr Incoming value (expected array of objects with `id` & `score`).
@@ -24,7 +29,17 @@ import { LeaderboardManager } from "../LeaderboardManager";
  */
 export function normalize(arr) {
   return Array.isArray(arr)
-    ? arr.map((e) => ({ id: String(e?.id || ""), score: Number(e?.score || 0) }))
+    ? arr.map((e) => {
+        /** @type {LeaderboardEntry} */
+        const entry = { id: String(e?.id || ""), score: Number(e?.score || 0) };
+        if (typeof e?.accuracy === "number") {
+          entry.accuracy = e.accuracy;
+        }
+        if (e?.date && typeof e.date === "string") {
+          entry.date = e.date;
+        }
+        return entry;
+      })
     : [];
 }
 
@@ -61,7 +76,9 @@ export function qualifiesForInitials(score, entries, max = LeaderboardManager.MA
  * - Ranks 1–3 receive medal emoji (🥇🥈🥉).
  * - Remaining ranks up to MAX_ENTRIES receive a clap icon (👏).
  * - Badge is the validated initials (1–3 A–Z) or "???" fallback.
- * - Text layout: `[medal ][icon ]<rank> — <BADGE> — <score>` (spaces only when parts present).
+ * - Accuracy is formatted as XX% (rounded to whole number) or empty string if missing.
+ * - Date is formatted as YYYY-MM-DD or empty string if missing.
+ * - Text layout: `[medal ][icon ]<rank> — <BADGE> — <score>[ — XX%][ — YYYY-MM-DD]` (spaces only when parts present).
  *
  * @param {LeaderboardEntry} entry Normalized entry.
  * @param {number} index Zero‑based index within already ordered list.
@@ -74,10 +91,20 @@ export function formatRow(entry, index) {
   const needsClap = !medal && rank >= 4 && rank <= LeaderboardManager.MAX_ENTRIES;
   const icon = needsClap ? "👏" : "";
   const badge = /^[A-Z]{1,3}$/.test(entry.id) ? entry.id : "???";
+
+  let accuracyFormatted = "";
+  if (typeof entry.accuracy === "number" && !isNaN(entry.accuracy)) {
+    const accuracyPercent = Math.round(entry.accuracy * 100);
+    accuracyFormatted = `${accuracyPercent}%`;
+  }
+
+  const dateFormatted = entry.date || "";
   const medalPrefix = medal ? medal + " " : "";
   const iconPrefix = icon ? icon + " " : "";
-  const text = `${medalPrefix}${iconPrefix}${rank} — ${badge} — ${entry.score}`;
-  return { rank, badge, medal, icon, text };
+  const accuracySuffix = accuracyFormatted ? " — " + accuracyFormatted : "";
+  const dateSuffix = dateFormatted ? " — " + dateFormatted : "";
+  const text = `${medalPrefix}${iconPrefix}${rank} — ${badge} — ${entry.score}${accuracySuffix}${dateSuffix}`;
+  return { rank, badge, medal, icon, text, accuracyFormatted, dateFormatted };
 }
 
 /**

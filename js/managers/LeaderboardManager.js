@@ -6,6 +6,15 @@ import { qualifiesForInitials, formatRow, formatRows } from "./leaderboard/Leade
 import { LeaderboardRepository } from "./leaderboard/LeaderboardRepository.js";
 import { RemoteStorageAdapter } from "../adapters/RemoteStorageAdapter.js";
 import { CognitoAPIClient } from "../adapters/Cognito.js";
+
+/**
+ * @typedef {Object} LeaderboardEntry
+ * @property {string} id
+ * @property {number} score
+ * @property {number} [accuracy]
+ * @property {string} [date]
+ */
+
 export class LeaderboardManager {
   static IS_REMOTE = true;
   // Remote partition identifier (query param ?id=...)
@@ -13,13 +22,13 @@ export class LeaderboardManager {
   static MAX_ENTRIES = 25;
   static KEY_LEADERBOARD = "aiHorizonLeaderboard";
   static REMOTE_REFRESH_COOLDOWN_MS = 0;
-  /** @type {{id:string,score:number}[]|null} */
+  /** @type {LeaderboardEntry[]|null} */
   static _cacheEntries = null;
-  /** @type {Promise<{id:string,score:number}[]>|null} */
+  /** @type {Promise<LeaderboardEntry[]>|null} */
   static _pendingLoadPromise = null;
-  /** @type {number|undefined} Optimistic concurrency version */
+  /** @type {number|undefined} */
   static _version = undefined;
-  /** @type {number} Last remote sync timestamp */
+  /** @type {number} */
   static _lastRemoteSync = 0;
 
   /** Internal repository factory (injects signed RemoteStorageAdapter outside tests). */
@@ -57,7 +66,7 @@ export class LeaderboardManager {
   /**
    * Delegate: test if score qualifies for initials (see helper rules).
    * @param {number} score
-   * @param {{id:string,score:number}[]|null|undefined} entries
+   * @param {LeaderboardEntry[]|null|undefined} entries
    * @param {number} [max=LeaderboardManager.MAX_ENTRIES]
    * @returns {boolean}
    */
@@ -67,9 +76,9 @@ export class LeaderboardManager {
 
   /**
    * Pure: derive formatted label info for a single entry.
-   * @param {{id:string,score:number}} entry
+   * @param {LeaderboardEntry} entry
    * @param {number} index
-   * @returns {{rank:number,badge:string,medal:string,icon:string,text:string}}
+   * @returns {{rank:number,badge:string,medal:string,icon:string,text:string,accuracyFormatted:string,dateFormatted:string}}
    */
   static formatRow(entry, index) {
     return formatRow(entry, index);
@@ -77,7 +86,7 @@ export class LeaderboardManager {
 
   /**
    * Pure: format many entries.
-   * @param {{id:string,score:number}[]} entries
+   * @param {LeaderboardEntry[]} entries
    * @returns {string[]}
    */
   static formatRows(entries) {
@@ -86,7 +95,7 @@ export class LeaderboardManager {
 
   /**
    * Shallow copy of cache (null if empty).
-   * @returns {{id:string,score:number}[]|null}
+   * @returns {LeaderboardEntry[]|null}
    */
   static getCached() {
     return Array.isArray(LeaderboardManager._cacheEntries)
@@ -117,7 +126,7 @@ export class LeaderboardManager {
   /**
    * Load entries (dedupes concurrent calls, optional remote). Never rejects; returns [] on failure.
    * @param {{remote?:boolean}=} options
-   * @returns {Promise<{id:string,score:number}[]>}
+   * @returns {Promise<LeaderboardEntry[]>}
    */
   static async load({ remote = this.IS_REMOTE } = {}) {
     if (LeaderboardManager._pendingLoadPromise) return LeaderboardManager._pendingLoadPromise;
@@ -145,7 +154,7 @@ export class LeaderboardManager {
 
   /**
    * Save entries (local or remote) with optimistic concurrency + conflict merge.
-   * @param {{id:string,score:number}[]} entries
+   * @param {LeaderboardEntry[]} entries
    * @param {{remote?:boolean}=} options
    * @returns {Promise<boolean>}
    */
@@ -192,7 +201,7 @@ export class LeaderboardManager {
 
     let attempt = 0;
     const MAX_ATTEMPTS = 3;
-    /** @type {{ok:boolean, conflict:boolean, entries:{id:string,score:number}[]}} */
+    /** @type {{ok:boolean, conflict:boolean, entries:LeaderboardEntry[]}} */
     let lastResult = { ok: false, conflict: false, entries: payload };
     while (attempt < MAX_ATTEMPTS) {
       lastResult = await repo.saveRemote(payload);
@@ -201,12 +210,22 @@ export class LeaderboardManager {
         LeaderboardManager._cacheEntries = lastResult.entries.slice();
         if (typeof repo._version === "number") LeaderboardManager._version = repo._version;
         const map = new Map();
-        for (const e of lastResult.entries) map.set(e.id, e.score);
+        for (const e of lastResult.entries) {
+          map.set(e.id, { score: e.score, accuracy: e.accuracy, date: e.date });
+        }
         for (const e of entries) {
           const prev = map.get(e.id);
-          if (prev === undefined || prev === null || e.score > prev) map.set(e.id, e.score);
+          if (prev === undefined || prev === null || e.score > prev.score) {
+            map.set(e.id, { score: e.score, accuracy: e.accuracy, date: e.date });
+          }
         }
-        const merged = Array.from(map, ([id, score]) => ({ id, score }))
+        const merged = Array.from(map, ([id, data]) => {
+          /** @type {LeaderboardEntry} */
+          const entry = { id, score: data.score };
+          if (typeof data.accuracy === "number") entry.accuracy = data.accuracy;
+          if (data.date) entry.date = data.date;
+          return entry;
+        })
           .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
           .slice(0, LeaderboardManager.MAX_ENTRIES);
         payload.splice(0, payload.length, ...merged);
@@ -245,16 +264,23 @@ export class LeaderboardManager {
    * Append score + persist (validates score/id).
    * @param {number} score
    * @param {string} userId
-   * @param {{remote?:boolean}=} options
+   * @param {{remote?:boolean, accuracy?:number}=} options
    * @returns {Promise<boolean>}
    */
-  static async submit(score, userId, { remote = false } = {}) {
+  static async submit(score, userId, { remote = false, accuracy } = {}) {
     if (typeof score !== "number" || !Number.isFinite(score) || score <= 0) return false;
-    /** @param {{id:string,score:number}} a @param {{id:string,score:number}} b */
+    /** @param {LeaderboardEntry} a @param {LeaderboardEntry} b */
     const compareEntries = (a, b) => b.score - a.score || a.id.localeCompare(b.id);
     const entries = await LeaderboardManager.load({ remote });
     const id = userId && /^[A-Z]{1,3}$/.test(userId) ? userId : "???";
-    entries.push({ id, score: Math.floor(score) });
+    const now = new Date();
+    const date = now.toISOString().split("T")[0];
+    /** @type {LeaderboardEntry} */
+    const newEntry = { id, score: Math.floor(score), date };
+    if (typeof accuracy === "number" && !isNaN(accuracy)) {
+      newEntry.accuracy = accuracy;
+    }
+    entries.push(newEntry);
     entries.sort(compareEntries);
     return LeaderboardManager.save(entries.slice(0, LeaderboardManager.MAX_ENTRIES), { remote });
   }
@@ -262,7 +288,7 @@ export class LeaderboardManager {
   /**
    * Render cached or provided entries into a list element; optional background refresh (cooldown‑gated).
    * @param {HTMLElement|null} listEl
-   * @param {{id:string,score:number}[]=} entries
+   * @param {LeaderboardEntry[]=} entries
    */
   static render(listEl, entries) {
     if (!listEl) return;
