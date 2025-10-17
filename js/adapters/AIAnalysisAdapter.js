@@ -94,23 +94,23 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.bonusAsteroidsKilled < 5) {
         bullets.push(
-          "🪨 Destroy all 5 bonus asteroids, you destroyed " +
+          "🌑 Destroy all 5 bonus asteroids, you destroyed " +
             payload.runSummary.stats.bonusAsteroidsKilled +
             "."
         );
       } else {
-        bullets.push("🪨 Great job, you destroyed all 5 bonus asteroids.");
+        bullets.push("🌑 Great job, you destroyed all 5 bonus asteroids.");
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.bonusStarsCollected < 5) {
         bullets.push(
-          "⭐ Collect more bonus stars, your accuracy is " +
+          "🌟 Collect more bonus stars, your accuracy is " +
             (payload.runSummary.stats.bonusStarsCollectedAccuracy * 100).toFixed(0) +
             "%."
         );
       } else {
-        bullets.push("⭐ Great job, you collected all bonus stars.");
+        bullets.push("🌟 Great job, you collected all bonus stars.");
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
@@ -127,12 +127,12 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.hardenedAsteroidsKilledAccuracy < 1) {
         bullets.push(
-          "🪨 Destroy more hardened asteroids, your accuracy is " +
+          "🛡️ Destroy more hardened asteroids, your accuracy is " +
             (payload.runSummary.stats.hardenedAsteroidsKilledAccuracy * 100).toFixed(0) +
             "%."
         );
       } else {
-        bullets.push("🪨 Great job, you destroyed all hardened asteroids.");
+        bullets.push("🛡️ Great job, you destroyed all hardened asteroids.");
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
