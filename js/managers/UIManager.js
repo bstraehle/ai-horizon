@@ -124,6 +124,14 @@ export class UIManager {
           } catch (_) {
             /* ignore */
           }
+          UIManager._try(() => {
+            const postGameMessage = /** @type {HTMLElement|null} */ (
+              document.getElementById("postGameMessage")
+            );
+            if (postGameMessage) {
+              postGameMessage.textContent = "";
+            }
+          });
         }
         return;
       }
@@ -134,6 +142,14 @@ export class UIManager {
       } catch (_) {
         /* ignore */
       }
+      UIManager._try(() => {
+        const postGameMessage = /** @type {HTMLElement|null} */ (
+          document.getElementById("postGameMessage")
+        );
+        if (postGameMessage) {
+          postGameMessage.textContent = "";
+        }
+      });
     });
 
     UIManager._try(() => {
