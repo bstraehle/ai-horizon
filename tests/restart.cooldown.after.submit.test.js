@@ -42,7 +42,7 @@ describe("Restart button cooldown after submitting initials", () => {
     global.HTMLElement = window.HTMLElement;
     global.Node = window.Node;
     global.getComputedStyle = window.getComputedStyle;
-    window.scrollTo = window.scrollTo || (() => {});
+    window.scrollTo = () => {};
     const raf = window.requestAnimationFrame || ((cb) => setTimeout(cb, 0));
     const caf = window.cancelAnimationFrame || ((id) => clearTimeout(id));
     window.requestAnimationFrame = raf;

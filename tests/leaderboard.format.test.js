@@ -20,10 +20,10 @@ describe("LeaderboardManager.formatRow / formatRows", () => {
     expect(r4.medal).toBe("");
     expect(r4.icon).toBe("👏");
     expect(r4.text).toContain("👏");
-    const r11 = LeaderboardManager.formatRow(rows[10], 10); // rank 11
-    expect(r11.medal).toBe("");
-    expect(r11.icon).toBe("👏");
-    expect(r11.text).toContain("👏");
+    const r10 = LeaderboardManager.formatRow(rows[9], 9);
+    expect(r10.medal).toBe("");
+    expect(r10.icon).toBe("👏");
+    expect(r10.text).toContain("👏");
   });
 
   it("falls back to ??? for invalid initials", () => {
