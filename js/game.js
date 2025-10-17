@@ -1146,6 +1146,11 @@ class AIHorizon {
         bonusAsteroidHitBullets:
           typeof this.bonusAsteroidHitBullets === "number" ? this.bonusAsteroidHitBullets : null,
         shotsFired: typeof this.shotsFired === "number" ? this.shotsFired : null,
+        shotsFiredOnTarget:
+          (typeof this.asteroidsKilled === "number" ? this.asteroidsKilled : 0) +
+          (typeof this.hardenedAsteroidHitBullets === "number"
+            ? this.hardenedAsteroidHitBullets
+            : 0),
         shotsFiredAccuracy: shotsFiredAccuracy,
       },
       device: (() => {

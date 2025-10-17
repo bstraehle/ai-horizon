@@ -82,13 +82,13 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.timer) {
       if (payload.runSummary.timer.killedByAsteroidSeconds > 0) {
         bullets.push(
-          "⏱️ Play the full 60 seconds and don't get killed by an asteroid. You played " +
+          "⏱️ Play the full 60 seconds without getting killed by an asteroid. You played " +
             payload.runSummary.timer.killedByAsteroidSeconds +
             " seconds."
         );
       } else {
         bullets.push(
-          "⏱️ Great job, you played the full 60 seconds and did not get killed by an asteroid."
+          "⏱️ Great job, you played the full 60 seconds without getting killed by an asteroid."
         );
       }
     }
@@ -96,9 +96,11 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.bonusAsteroidsKilled < 5) {
         bullets.push(
-          "🌑 Destroy all 5 bonus asteroids, you destroyed " +
+          "🌑 Destroy all 5 bonus asteroids. You destroyed " +
             payload.runSummary.stats.bonusAsteroidsKilled +
-            "."
+            " out of " +
+            payload.runSummary.stats.bonusAsteroidsSpawned +
+            " spawned."
         );
       } else {
         bullets.push("🌑 Great job, you destroyed all 5 bonus asteroids.");
@@ -107,56 +109,106 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.bonusStarsCollected < 5) {
         bullets.push(
-          "🌟 Collect more bonus stars, your accuracy is " +
+          "🌟 Collect more bonus stars. Your accuracy is " +
             (payload.runSummary.stats.bonusStarsCollectedAccuracy * 100).toFixed(0) +
-            "%."
+            "% (" +
+            payload.runSummary.stats.bonusStarsCollected +
+            " out of " +
+            payload.runSummary.stats.bonusStarsSpawned +
+            " spawned)."
         );
       } else {
-        bullets.push("🌟 Great job, you collected all bonus stars.");
+        bullets.push(
+          "🌟 Great job, you collected all bonus stars (" +
+            payload.runSummary.stats.bonusStarsCollected +
+            " out of " +
+            payload.runSummary.stats.bonusStarsSpawned +
+            " spawned)."
+        );
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.shotsFiredAccuracy < 1) {
         bullets.push(
-          "🎯 Increase your shot accuracy for end of run accuracy bonus (0-100%). Your accuracy is " +
+          "🎯 Increase your shots fired accuracy for end of run bonus (0-100%). Your accuracy is " +
             (payload.runSummary.stats.shotsFiredAccuracy * 100).toFixed(0) +
-            "%."
+            "% (" +
+            payload.runSummary.stats.shotsFiredOnTarget +
+            " out of " +
+            payload.runSummary.stats.shotsFired +
+            " shots fired)."
         );
       } else {
-        bullets.push("🎯 Great job, your shot accuracy for end of run accuracy bonus is 100%.");
+        bullets.push(
+          "🎯 Great job, your shots fired accuracy for end of run bonus is 100% (" +
+            payload.runSummary.stats.shotsFiredOnTarget +
+            " out of " +
+            payload.runSummary.stats.shotsFired +
+            " shots fired)."
+        );
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.hardenedAsteroidsKilledAccuracy < 1) {
         bullets.push(
-          "🛡️ Destroy more hardened asteroids, your accuracy is " +
+          "🛡️ Destroy more hardened asteroids. Your accuracy is " +
             (payload.runSummary.stats.hardenedAsteroidsKilledAccuracy * 100).toFixed(0) +
-            "%."
+            "% (" +
+            payload.runSummary.stats.hardenedAsteroidsKilled +
+            " out of " +
+            payload.runSummary.stats.hardenedAsteroidsSpawned +
+            " spawned)."
         );
       } else {
-        bullets.push("🛡️ Great job, you destroyed all hardened asteroids.");
+        bullets.push(
+          "🛡️ Great job, you destroyed all hardened asteroids (." +
+            payload.runSummary.stats.hardenedAsteroidsKilled +
+            " out of " +
+            payload.runSummary.stats.hardenedAsteroidsSpawned +
+            " spawned)."
+        );
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.starsCollectedAccuracy < 1) {
         bullets.push(
-          "⭐ Collect more regular stars, your accuracy is " +
+          "⭐ Collect more regular stars. Your accuracy is " +
             (payload.runSummary.stats.starsCollectedAccuracy * 100).toFixed(0) +
-            "%."
+            "% (" +
+            payload.runSummary.stats.starsCollected +
+            " out of " +
+            payload.runSummary.stats.starsSpawned +
+            " spawned)."
         );
       } else {
-        bullets.push("⭐ Great job, you collected all regular stars.");
+        bullets.push(
+          "⭐ Great job, you collected all regular stars (" +
+            payload.runSummary.stats.starsCollected +
+            " out of " +
+            payload.runSummary.stats.starsSpawned +
+            " spawned)."
+        );
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.asteroidsKilledAccuracy < 1) {
         bullets.push(
-          "🪨 Destroy more regular asteroids, your accuracy is " +
+          "🪨 Destroy more regular asteroids. Your accuracy is " +
             (payload.runSummary.stats.asteroidsKilledAccuracy * 100).toFixed(0) +
-            "%."
+            "% (" +
+            payload.runSummary.stats.asteroidsKilled +
+            " out of " +
+            payload.runSummary.stats.asteroidsSpawned +
+            " spawned)."
         );
       } else {
-        bullets.push("🪨 Great job, you destroyed all regular asteroids.");
+        bullets.push(
+          "🪨 Great job, you destroyed all regular asteroids (" +
+            payload.runSummary.stats.asteroidsKilled +
+            " out of " +
+            payload.runSummary.stats.asteroidsSpawned +
+            " spawned)."
+        );
       }
     }
     return {
