@@ -96,14 +96,14 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.bonusAsteroidsKilled < 5) {
         bullets.push(
-          "🌑 Destroy all 5 bonus asteroids. Destroyed: " +
+          "🌑 Destroy all 15 bonus asteroids. Destroyed: " +
             payload.runSummary.stats.bonusAsteroidsKilled +
             " of " +
             payload.runSummary.stats.bonusAsteroidsSpawned +
             "."
         );
       } else {
-        bullets.push("🌑 Great job, you destroyed all 5 bonus asteroids.");
+        bullets.push("🌑 Great job, you destroyed all 15 bonus asteroids.");
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
