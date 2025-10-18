@@ -82,28 +82,28 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.timer) {
       if (payload.runSummary.timer.killedByAsteroidSeconds > 0) {
         bullets.push(
-          "⏱️ Play full three minutes without getting killed by an asteroid. Played: " +
+          "⏱️ Play full 90 seconds without getting killed by an asteroid. Played: " +
             payload.runSummary.timer.killedByAsteroidSeconds +
             " seconds."
         );
       } else {
         bullets.push(
-          "⏱️ Great job, you played full three minutes without getting killed by an asteroid."
+          "⏱️ Great job, you played full 90 seconds without getting killed by an asteroid."
         );
       }
     }
-    bullets.push("🎮 Finish strong during double-point finale (last 30 seconds).");
+    bullets.push("🎮 Finish strong during double-point finale (last 15 seconds).");
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.bonusAsteroidsKilled < 5) {
         bullets.push(
-          "🌑 Destroy all 15 bonus asteroids. Destroyed: " +
+          "🌑 Destroy all 8 bonus asteroids. Destroyed: " +
             payload.runSummary.stats.bonusAsteroidsKilled +
             " of " +
             payload.runSummary.stats.bonusAsteroidsSpawned +
             "."
         );
       } else {
-        bullets.push("🌑 Great job, you destroyed all 15 bonus asteroids.");
+        bullets.push("🌑 Great job, you destroyed all 8 bonus asteroids.");
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
