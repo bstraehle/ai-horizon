@@ -380,7 +380,7 @@ body {
   margin-bottom: var(--space-5);
   overscroll-behavior: contain;
   text-align: center;
-  touch-action: pan-y;
+  touch-action: none;
 }
 .leaderboard h3 {
   color: var(--color-text);
@@ -402,7 +402,7 @@ body {
   padding-left: 0;
   scrollbar-gutter: stable both-edges;
   scrollbar-width: thin;
-  touch-action: pan-y;
+  touch-action: none;
 }
 #leaderboardList li {
   background: rgba(255, 255, 255, 0.02);
