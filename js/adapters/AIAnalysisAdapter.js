@@ -82,17 +82,17 @@ export class AIAnalysisAdapter {
     if (payload.runSummary && payload.runSummary.timer) {
       if (payload.runSummary.timer.killedByAsteroidSeconds > 0) {
         bullets.push(
-          "⏱️ Play full 60 seconds without getting killed by an asteroid. Played: " +
+          "⏱️ Play full three minutes without getting killed by an asteroid. Played: " +
             payload.runSummary.timer.killedByAsteroidSeconds +
             " seconds."
         );
       } else {
         bullets.push(
-          "⏱️ Great job, you played full 60 seconds without getting killed by an asteroid."
+          "⏱️ Great job, you played full three minutes without getting killed by an asteroid."
         );
       }
     }
-    bullets.push("🎮 Finish strong during double-point finale (last 10 seconds).");
+    bullets.push("🎮 Finish strong during double-point finale (last 30 seconds).");
     if (payload.runSummary && payload.runSummary.stats) {
       if (payload.runSummary.stats.bonusAsteroidsKilled < 5) {
         bullets.push(
