@@ -402,7 +402,7 @@ body {
   padding-left: 0;
   scrollbar-gutter: stable both-edges;
   scrollbar-width: thin;
-  touch-action: none;
+  touch-action: pan-y;
 }
 #leaderboardList li {
   background: rgba(255, 255, 255, 0.02);

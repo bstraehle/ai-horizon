@@ -46,7 +46,7 @@ describe("Bonus (red) asteroid timing gates", () => {
     expect(a.isBonus).toBe(true);
   });
 
-  it("caps bonus spawns at 5 total, every 10s thereafter", () => {
+  it("caps bonus spawns at 15 total, every 10s thereafter", () => {
     const game = makeGame();
     const start = 300;
     game.timeSec = start;
@@ -61,12 +61,12 @@ describe("Bonus (red) asteroid timing gates", () => {
       return !!hardened.isBonus;
     };
 
-    for (let k = 1; k <= 5; k++) {
+    for (let k = 1; k <= 15; k++) {
       game.timeSec = start + k * 10;
       expect(spawnBlock()).toBe(true);
     }
 
-    game.timeSec = start + 60;
+    game.timeSec = start + 160;
     expect(spawnBlock()).toBe(false);
   });
 });
