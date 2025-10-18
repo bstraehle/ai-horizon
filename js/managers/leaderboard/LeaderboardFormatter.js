@@ -78,7 +78,7 @@ export function qualifiesForInitials(score, entries, max = LeaderboardManager.MA
  * - Badge is the validated initials (1–3 A–Z) or "???" fallback.
  * - Accuracy is formatted as XX% (rounded to whole number) or empty string if missing.
  * - Date is formatted as YYYY-MM-DD or empty string if missing.
- * - Text layout: `[medal ][icon ]<rank> — <BADGE> — <score>[ — XX%][ — YYYY-MM-DD]` (spaces only when parts present).
+ * - Text layout: `[medal ][icon ]<rank> • <BADGE> • <score>[ • XX%][ • YYYY-MM-DD]` (spaces only when parts present).
  *
  * @param {LeaderboardEntry} entry Normalized entry.
  * @param {number} index Zero‑based index within already ordered list.
@@ -101,9 +101,9 @@ export function formatRow(entry, index) {
   const dateFormatted = entry.date || "";
   const medalPrefix = medal ? medal + " " : "";
   const iconPrefix = icon ? icon + " " : "";
-  const accuracySuffix = accuracyFormatted ? " — " + accuracyFormatted : "";
-  const dateSuffix = dateFormatted ? " — " + dateFormatted : "";
-  const text = `${medalPrefix}${iconPrefix}${rank} — ${badge} — ${entry.score}${accuracySuffix}${dateSuffix}`;
+  const accuracySuffix = accuracyFormatted ? " • " + accuracyFormatted : "";
+  const dateSuffix = dateFormatted ? " • " + dateFormatted : "";
+  const text = `${medalPrefix}${iconPrefix}${rank} • ${badge} • ${entry.score}${accuracySuffix}${dateSuffix}`;
   return { rank, badge, medal, icon, text, accuracyFormatted, dateFormatted };
 }
 

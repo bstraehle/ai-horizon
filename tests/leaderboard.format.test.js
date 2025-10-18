@@ -35,7 +35,7 @@ describe("LeaderboardManager.formatRow / formatRows", () => {
   it("includes rank numbering starting at 1", () => {
     const row = LeaderboardManager.formatRow({ id: "AAA", score: 1 }, 5); // index 5 => rank 6
     expect(row.rank).toBe(6);
-    expect(row.text).toContain("6 — AAA");
+    expect(row.text).toContain("6 • AAA");
   });
 
   it("formatRows caps at 100 entries", () => {
