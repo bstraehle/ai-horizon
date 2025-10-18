@@ -275,7 +275,7 @@ export class LeaderboardManager {
     const entries = await LeaderboardManager.load({ remote });
     const id = userId && /^[A-Z]{1,3}$/.test(userId) ? userId : "???";
     const now = new Date();
-    const date = now.toISOString().split("T")[0];
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     /** @type {LeaderboardEntry} */
     const newEntry = { id, score: Math.floor(score), date };
     if (typeof accuracy === "number" && !isNaN(accuracy)) {
