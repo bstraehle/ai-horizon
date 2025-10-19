@@ -13,6 +13,7 @@ import { CognitoAPIClient } from "../adapters/Cognito.js";
  * @property {number} score
  * @property {number} [accuracy]
  * @property {string} [date]
+ * @property {any} [game-summary]
  */
 
 export class LeaderboardManager {
@@ -211,12 +212,22 @@ export class LeaderboardManager {
         if (typeof repo._version === "number") LeaderboardManager._version = repo._version;
         const map = new Map();
         for (const e of lastResult.entries) {
-          map.set(e.id, { score: e.score, accuracy: e.accuracy, date: e.date });
+          map.set(e.id, {
+            score: e.score,
+            accuracy: e.accuracy,
+            date: e.date,
+            "game-summary": e["game-summary"],
+          });
         }
         for (const e of entries) {
           const prev = map.get(e.id);
           if (prev === undefined || prev === null || e.score > prev.score) {
-            map.set(e.id, { score: e.score, accuracy: e.accuracy, date: e.date });
+            map.set(e.id, {
+              score: e.score,
+              accuracy: e.accuracy,
+              date: e.date,
+              "game-summary": e["game-summary"],
+            });
           }
         }
         const merged = Array.from(map, ([id, data]) => {
@@ -224,6 +235,8 @@ export class LeaderboardManager {
           const entry = { id, score: data.score };
           if (typeof data.accuracy === "number") entry.accuracy = data.accuracy;
           if (data.date) entry.date = data.date;
+          if (data["game-summary"] !== undefined && data["game-summary"] !== null)
+            entry["game-summary"] = data["game-summary"];
           return entry;
         })
           .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
@@ -265,10 +278,10 @@ export class LeaderboardManager {
    * If the same initials already exist, only keep the higher score.
    * @param {number} score
    * @param {string} userId
-   * @param {{remote?:boolean, accuracy?:number}=} options
+   * @param {{remote?:boolean, accuracy?:number, gameSummary?:any}=} options
    * @returns {Promise<boolean>}
    */
-  static async submit(score, userId, { remote = false, accuracy } = {}) {
+  static async submit(score, userId, { remote = false, accuracy, gameSummary } = {}) {
     if (typeof score !== "number" || !Number.isFinite(score) || score <= 0) return false;
     /** @param {LeaderboardEntry} a @param {LeaderboardEntry} b */
     const compareEntries = (a, b) => b.score - a.score || a.id.localeCompare(b.id);
@@ -280,6 +293,9 @@ export class LeaderboardManager {
     const newEntry = { id, score: Math.floor(score), date };
     if (typeof accuracy === "number" && !isNaN(accuracy)) {
       newEntry.accuracy = accuracy;
+    }
+    if (gameSummary !== undefined && gameSummary !== null) {
+      newEntry["game-summary"] = gameSummary;
     }
 
     const existingIndex = entries.findIndex((e) => e.id === id);

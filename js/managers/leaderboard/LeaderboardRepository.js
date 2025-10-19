@@ -8,6 +8,7 @@ import { RemoteStorageAdapter } from "../../adapters/RemoteStorageAdapter.js";
  * @property {number} score
  * @property {number} [accuracy]
  * @property {string} [date]
+ * @property {any} [game-summary]
  *
  * @typedef {Object} SaveRemoteResult
  * @property {boolean} ok        True on successful authoritative save.

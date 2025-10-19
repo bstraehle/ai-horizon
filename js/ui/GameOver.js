@@ -58,6 +58,7 @@ export function handleGameOver(game) {
           LeaderboardManager.submit(game.score, raw, {
             remote: LeaderboardManager.IS_REMOTE,
             accuracy: game.accuracy,
+            gameSummary: game._lastRunSummary,
           });
           submittedScore = true;
           initialsInput.value = "";
