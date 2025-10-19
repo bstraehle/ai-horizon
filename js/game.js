@@ -1028,26 +1028,9 @@ class AIHorizon {
       const finalScoreNormalized = typeof newScore === "number" ? newScore : (newScore ?? null);
       const highScoreValue = Number.isFinite(this.highScore) ? this.highScore : null;
 
-      let lowScoreValue = null;
-      try {
-        const cachedEntries = LeaderboardManager.getCached();
-        if (Array.isArray(cachedEntries) && cachedEntries.length > 0) {
-          const lastEntry = cachedEntries[cachedEntries.length - 1];
-          if (lastEntry && typeof lastEntry.score === "number") {
-            lowScoreValue = lastEntry.score;
-          }
-        }
-      } catch (_e) {
-        /* ignore */
-      }
-
       const differencePlayerFinalScoreToLeaderBoardHighScore =
         typeof highScoreValue === "number" && typeof finalScoreNormalized === "number"
           ? highScoreValue - finalScoreNormalized
-          : null;
-      const differencePlayerFinalScoreToLeaderBoardLowScore =
-        typeof lowScoreValue === "number" && typeof finalScoreNormalized === "number"
-          ? lowScoreValue - finalScoreNormalized
           : null;
 
       return {
@@ -1055,9 +1038,7 @@ class AIHorizon {
         playerBonusEarned: bonus,
         playerFinalScore: finalScoreNormalized,
         leaderBoardHighScore: highScoreValue,
-        leaderBoardLowScore: lowScoreValue,
         differencePlayerFinalScoreToLeaderBoardHighScore,
-        differencePlayerFinalScoreToLeaderBoardLowScore,
         ...rest,
       };
     })();
@@ -1142,12 +1123,6 @@ class AIHorizon {
         bonusAsteroidsKilled:
           typeof this.bonusAsteroidsKilled === "number" ? this.bonusAsteroidsKilled : null,
         bonusAsteroidsKilledAccuracy: bonusAsteroidsKilledAccuracy,
-        hardenedAsteroidHitShots:
-          typeof this.hardenedAsteroidHitBullets === "number"
-            ? this.hardenedAsteroidHitBullets
-            : null,
-        bonusAsteroidHitShots:
-          typeof this.bonusAsteroidHitBullets === "number" ? this.bonusAsteroidHitBullets : null,
         shotsFiredTotal: typeof this.shotsFired === "number" ? this.shotsFired : null,
         shotsFiredHitTarget:
           (typeof this.asteroidsKilled === "number" ? this.asteroidsKilled : 0) +
