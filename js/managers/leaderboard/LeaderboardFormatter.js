@@ -11,7 +11,7 @@ import { LeaderboardManager } from "../LeaderboardManager";
  * @property {number} rank   1‑based rank.
  * @property {string} badge  Sanitized / validated `id` ("???" fallback).
  * @property {string} medal  Medal emoji for top 3 or empty string.
- * @property {string} icon   Secondary icon (👏) for non‑medal ranks within range.
+ * @property {string} icon   Number emoji (4️⃣) for ranks 4-10 or empty string.
  * @property {string} text   Composite presentation string.
  * @property {string} accuracyFormatted Formatted accuracy (XX%) or empty string.
  * @property {string} dateFormatted Formatted date (YYYY-MM-DD) or empty string.
@@ -74,11 +74,11 @@ export function qualifiesForInitials(score, entries, max = LeaderboardManager.MA
  * Produce semantic + textual formatting for a single entry.
  * Presentation:
  * - Ranks 1–3 receive medal emoji (🥇🥈🥉).
- * - Remaining ranks up to MAX_ENTRIES receive a clap icon (👏).
+ * - Ranks 4–10 receive number emoji (4️⃣5️⃣6️⃣7️⃣8️⃣9️⃣🔟).
  * - Badge is the validated initials (1–3 A–Z) or "???" fallback.
  * - Accuracy is formatted as XX% (rounded to whole number) or empty string if missing.
  * - Date is formatted as YYYY-MM-DD or empty string if missing.
- * - Text layout: `[medal ][icon ]<rank> • <BADGE> • <score>[ • XX%][ • YYYY-MM-DD]` (spaces only when parts present).
+ * - Text layout: `[medal ][icon ]<BADGE> • <score>[ • XX%][ • YYYY-MM-DD]` (spaces only when parts present).
  *
  * @param {LeaderboardEntry} entry Normalized entry.
  * @param {number} index Zero‑based index within already ordered list.
@@ -88,8 +88,9 @@ export function formatRow(entry, index) {
   const rank = index + 1;
   const medals = ["🥇", "🥈", "🥉"];
   const medal = index < 3 ? medals[index] : "";
-  const needsClap = !medal && rank >= 4 && rank <= LeaderboardManager.MAX_ENTRIES;
-  const icon = needsClap ? "👏" : "";
+  const numberEmojis = ["4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
+  const needsNumberEmoji = !medal && rank >= 4 && rank <= LeaderboardManager.MAX_ENTRIES;
+  const icon = needsNumberEmoji ? numberEmojis[rank - 4] : "";
   const badge = /^[A-Z]{1,3}$/.test(entry.id) ? entry.id : "???";
 
   let accuracyFormatted = "";
@@ -103,7 +104,7 @@ export function formatRow(entry, index) {
   const iconPrefix = icon ? icon + " " : "";
   const accuracySuffix = accuracyFormatted ? " • " + accuracyFormatted : "";
   const dateSuffix = dateFormatted ? " • " + dateFormatted : "";
-  const text = `${medalPrefix}${iconPrefix}${rank} • ${badge} • ${entry.score}${accuracySuffix}${dateSuffix}`;
+  const text = `${medalPrefix}${iconPrefix}${badge} • ${entry.score}${accuracySuffix}${dateSuffix}`;
   return { rank, badge, medal, icon, text, accuracyFormatted, dateFormatted };
 }
 

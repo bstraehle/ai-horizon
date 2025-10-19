@@ -14,16 +14,16 @@ describe("LeaderboardManager.formatRow / formatRows", () => {
     expect(formatted[2].medal).toBe("🥉");
   });
 
-  it("uses clapping hands for ranks 4-MAX_ENTRIES", () => {
+  it("uses number emojis for ranks 4-MAX_ENTRIES", () => {
     const rows = Array.from({ length: 12 }, (_, i) => ({ id: "AAA", score: 1000 - i * 10 }));
-    const r4 = LeaderboardManager.formatRow(rows[3], 3); // rank 4
+    const r4 = LeaderboardManager.formatRow(rows[3], 3);
     expect(r4.medal).toBe("");
-    expect(r4.icon).toBe("👏");
-    expect(r4.text).toContain("👏");
+    expect(r4.icon).toBe("4️⃣");
+    expect(r4.text).toContain("4️⃣");
     const r10 = LeaderboardManager.formatRow(rows[9], 9);
     expect(r10.medal).toBe("");
-    expect(r10.icon).toBe("👏");
-    expect(r10.text).toContain("👏");
+    expect(r10.icon).toBe("🔟");
+    expect(r10.text).toContain("🔟");
   });
 
   it("falls back to ??? for invalid initials", () => {
@@ -32,10 +32,11 @@ describe("LeaderboardManager.formatRow / formatRows", () => {
     expect(row.text).toContain("???");
   });
 
-  it("includes rank numbering starting at 1", () => {
+  it("excludes rank numbers from text (emojis convey rank)", () => {
     const row = LeaderboardManager.formatRow({ id: "AAA", score: 1 }, 5); // index 5 => rank 6
     expect(row.rank).toBe(6);
-    expect(row.text).toContain("6 • AAA");
+    expect(row.text).toContain("AAA");
+    expect(row.text).not.toContain("6 •");
   });
 
   it("formatRows caps at 100 entries", () => {
