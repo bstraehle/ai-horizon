@@ -1120,35 +1120,36 @@ class AIHorizon {
       },
       score: scoreSummary,
       stats: {
-        starsSpawned: typeof this.starsSpawned === "number" ? this.starsSpawned : null,
+        starsEncountered: typeof this.starsSpawned === "number" ? this.starsSpawned : null,
         starsCollected: typeof this.starsCollected === "number" ? this.starsCollected : null,
         starsCollectedAccuracy: starsCollectedAccuracy,
-        bonusStarsSpawned:
+        bonusStarsEncountered:
           typeof this.bonusStarsSpawned === "number" ? this.bonusStarsSpawned : null,
         bonusStarsCollected:
           typeof this.bonusStarsCollected === "number" ? this.bonusStarsCollected : null,
         bonusStarsCollectedAccuracy: bonusStarsCollectedAccuracy,
-        asteroidsSpawned: typeof this.asteroidsSpawned === "number" ? this.asteroidsSpawned : null,
+        asteroidsEncountered:
+          typeof this.asteroidsSpawned === "number" ? this.asteroidsSpawned : null,
         asteroidsKilled: typeof this.asteroidsKilled === "number" ? this.asteroidsKilled : null,
         asteroidsKilledAccuracy: asteroidsKilledAccuracy,
-        hardenedAsteroidsSpawned:
+        hardenedAsteroidsEncountered:
           typeof this.hardenedAsteroidsSpawned === "number" ? this.hardenedAsteroidsSpawned : null,
         hardenedAsteroidsKilled:
           typeof this.hardenedAsteroidsKilled === "number" ? this.hardenedAsteroidsKilled : null,
         hardenedAsteroidsKilledAccuracy: hardenedAsteroidsKilledAccuracy,
-        bonusAsteroidsSpawned:
+        bonusAsteroidsEncountered:
           typeof this.bonusAsteroidsSpawned === "number" ? this.bonusAsteroidsSpawned : null,
         bonusAsteroidsKilled:
           typeof this.bonusAsteroidsKilled === "number" ? this.bonusAsteroidsKilled : null,
         bonusAsteroidsKilledAccuracy: bonusAsteroidsKilledAccuracy,
-        hardenedAsteroidHitBullets:
+        hardenedAsteroidHitShots:
           typeof this.hardenedAsteroidHitBullets === "number"
             ? this.hardenedAsteroidHitBullets
             : null,
-        bonusAsteroidHitBullets:
+        bonusAsteroidHitShots:
           typeof this.bonusAsteroidHitBullets === "number" ? this.bonusAsteroidHitBullets : null,
-        shotsFired: typeof this.shotsFired === "number" ? this.shotsFired : null,
-        shotsFiredOnTarget:
+        shotsFiredTotal: typeof this.shotsFired === "number" ? this.shotsFired : null,
+        shotsFiredHitTarget:
           (typeof this.asteroidsKilled === "number" ? this.asteroidsKilled : 0) +
           (typeof this.hardenedAsteroidHitBullets === "number"
             ? this.hardenedAsteroidHitBullets
