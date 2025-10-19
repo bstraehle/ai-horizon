@@ -1113,7 +1113,7 @@ class AIHorizon {
       })(),
       timer: {
         totalSeconds: totalSecondsInt,
-        killedByAsteroidSeconds: runtimeSecondsInt,
+        survivedSeconds: runtimeSecondsInt,
         toPlaySeconds: remainingSecondsInt,
       },
       score: scoreSummary,

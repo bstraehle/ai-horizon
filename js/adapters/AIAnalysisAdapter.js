@@ -80,10 +80,10 @@ export class AIAnalysisAdapter {
   _deterministicAnalysis(payload) {
     const bullets = [];
     if (payload.runSummary && payload.runSummary.timer) {
-      if (payload.runSummary.timer.killedByAsteroidSeconds > 0) {
+      if (payload.runSummary.timer.survivedSeconds > 0) {
         bullets.push(
           "⏱️ Play full 90 seconds without getting killed by an asteroid. Played: " +
-            payload.runSummary.timer.killedByAsteroidSeconds +
+            payload.runSummary.timer.survivedSeconds +
             " seconds."
         );
       } else {
