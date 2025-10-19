@@ -22,7 +22,7 @@ describe("LeaderboardManager game-summary persistence", () => {
       },
       score: {
         playerBaseScore: 1000,
-        playerBonus: 200,
+        playerBonusEarned: 200,
         playerFinalScore: 1200,
       },
       stats: {

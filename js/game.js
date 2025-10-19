@@ -1052,7 +1052,7 @@ class AIHorizon {
 
       return {
         playerBaseScore: baseScore,
-        playerBonus: bonus,
+        playerBonusEarned: bonus,
         playerFinalScore: finalScoreNormalized,
         leaderBoardHighScore: highScoreValue,
         leaderBoardLowScore: lowScoreValue,
