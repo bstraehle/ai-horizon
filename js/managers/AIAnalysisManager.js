@@ -110,7 +110,7 @@ export class AIAnalysisManager {
     if (isRemote) {
       try {
         const p = document.createElement("p");
-        p.textContent = "✨ Analysis in progress ✨";
+        p.textContent = "✨ AI analysis in progress ✨";
         container.appendChild(p);
       } catch {
         /* non-critical immediate placeholder render */

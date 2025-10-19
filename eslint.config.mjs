@@ -58,6 +58,15 @@ export default [
       },
     },
   },
+  // Lambda functions: enable Node.js environment
+  {
+    files: ["server/lambda/**/*.js"],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
   // Test files: enable vitest globals and Node environment
   {
     files: ["tests/**/*.js", "**/*.test.js"],
