@@ -98,7 +98,14 @@ export const GameUI = {
           AIAnalysisManager.IS_REMOTE,
           (result) => {
             if (result.isRemote && result.rawResponse) {
-              game._lastAIAnalysis = result.rawResponse;
+              try {
+                game._lastAIAnalysis =
+                  typeof result.rawResponse === "string"
+                    ? JSON.parse(result.rawResponse)
+                    : result.rawResponse;
+              } catch {
+                game._lastAIAnalysis = result.rawResponse;
+              }
             } else {
               game._lastAIAnalysis = "";
             }
@@ -127,7 +134,14 @@ export const GameUI = {
                 AIAnalysisManager.IS_REMOTE,
                 (result) => {
                   if (result.isRemote && result.rawResponse) {
-                    game._lastAIAnalysis = result.rawResponse;
+                    try {
+                      game._lastAIAnalysis =
+                        typeof result.rawResponse === "string"
+                          ? JSON.parse(result.rawResponse)
+                          : result.rawResponse;
+                    } catch {
+                      game._lastAIAnalysis = result.rawResponse;
+                    }
                   } else {
                     game._lastAIAnalysis = "";
                   }
