@@ -59,6 +59,7 @@ export function handleGameOver(game) {
             remote: LeaderboardManager.IS_REMOTE,
             accuracy: game.accuracy,
             gameSummary: game._lastRunSummary,
+            aiAnalysis: game._lastAIAnalysis,
           });
           submittedScore = true;
           initialsInput.value = "";

@@ -18,7 +18,7 @@ export class AIAnalysisAdapter {
    * Analyze a run and return actionable suggestions.
    * Accepts either a plain stats object or a payload { stats, runSummary }.
    * @param {object} input
-   * @returns {Promise<{title:string, bullets:string[]}>}
+   * @returns {Promise<{title:string, bullets:string[], isRemote:boolean, rawResponse?:any}>}
    */
   async analyze(input) {
     /** @type {any} */
@@ -29,14 +29,14 @@ export class AIAnalysisAdapter {
         const response = await this._remoteAdapter.postJSON(this._endpoint, payload.runSummary);
         if (response) {
           var transformedResponse = this._transformRemoteResponse(response);
-          return transformedResponse;
+          return { ...transformedResponse, isRemote: true, rawResponse: response };
         }
       } catch {
         // AI analysis failed
       }
     }
 
-    return this._deterministicAnalysis(payload);
+    return { ...this._deterministicAnalysis(payload), isRemote: false };
   }
 
   /**

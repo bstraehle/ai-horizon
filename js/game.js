@@ -177,6 +177,8 @@ class AIHorizon {
     this._mouseDown = false;
     /** @type {any|null} */
     this._lastRunSummary = null;
+    /** @type {any|null} */
+    this._lastAIAnalysis = null;
 
     this.asteroidSpeed = this._isMobile
       ? CONFIG.SPEEDS.ASTEROID_MOBILE

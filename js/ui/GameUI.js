@@ -95,7 +95,14 @@ export const GameUI = {
             timerRemaining: game.timerRemaining || 0,
           },
           game._lastRunSummary || null,
-          AIAnalysisManager.IS_REMOTE
+          AIAnalysisManager.IS_REMOTE,
+          (result) => {
+            if (result.isRemote && result.rawResponse) {
+              game._lastAIAnalysis = result.rawResponse;
+            } else {
+              game._lastAIAnalysis = "";
+            }
+          }
         );
       } else if (postGame && msg) {
         const obs = new MutationObserver(() => {
@@ -117,7 +124,14 @@ export const GameUI = {
                   timerRemaining: game.timerRemaining || 0,
                 },
                 game._lastRunSummary || null,
-                AIAnalysisManager.IS_REMOTE
+                AIAnalysisManager.IS_REMOTE,
+                (result) => {
+                  if (result.isRemote && result.rawResponse) {
+                    game._lastAIAnalysis = result.rawResponse;
+                  } else {
+                    game._lastAIAnalysis = "";
+                  }
+                }
               );
               try {
                 obs.disconnect();

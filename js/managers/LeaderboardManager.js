@@ -14,6 +14,7 @@ import { CognitoAPIClient } from "../adapters/Cognito.js";
  * @property {number} [accuracy]
  * @property {string} [date]
  * @property {any} [game-summary]
+ * @property {any} [ai-analysis]
  */
 
 export class LeaderboardManager {
@@ -217,6 +218,7 @@ export class LeaderboardManager {
             accuracy: e.accuracy,
             date: e.date,
             "game-summary": e["game-summary"],
+            "ai-analysis": e["ai-analysis"],
           });
         }
         for (const e of entries) {
@@ -227,6 +229,7 @@ export class LeaderboardManager {
               accuracy: e.accuracy,
               date: e.date,
               "game-summary": e["game-summary"],
+              "ai-analysis": e["ai-analysis"],
             });
           }
         }
@@ -237,6 +240,8 @@ export class LeaderboardManager {
           if (data.date) entry.date = data.date;
           if (data["game-summary"] !== undefined && data["game-summary"] !== null)
             entry["game-summary"] = data["game-summary"];
+          if (data["ai-analysis"] !== undefined && data["ai-analysis"] !== null)
+            entry["ai-analysis"] = data["ai-analysis"];
           return entry;
         })
           .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
@@ -278,10 +283,10 @@ export class LeaderboardManager {
    * If the same initials already exist, only keep the higher score.
    * @param {number} score
    * @param {string} userId
-   * @param {{remote?:boolean, accuracy?:number, gameSummary?:any}=} options
+   * @param {{remote?:boolean, accuracy?:number, gameSummary?:any, aiAnalysis?:any}=} options
    * @returns {Promise<boolean>}
    */
-  static async submit(score, userId, { remote = false, accuracy, gameSummary } = {}) {
+  static async submit(score, userId, { remote = false, accuracy, gameSummary, aiAnalysis } = {}) {
     if (typeof score !== "number" || !Number.isFinite(score) || score <= 0) return false;
     /** @param {LeaderboardEntry} a @param {LeaderboardEntry} b */
     const compareEntries = (a, b) => b.score - a.score || a.id.localeCompare(b.id);
@@ -296,6 +301,9 @@ export class LeaderboardManager {
     }
     if (gameSummary !== undefined && gameSummary !== null) {
       newEntry["game-summary"] = gameSummary;
+    }
+    if (aiAnalysis !== undefined && aiAnalysis !== null) {
+      newEntry["ai-analysis"] = aiAnalysis;
     }
 
     const existingIndex = entries.findIndex((e) => e.id === id);

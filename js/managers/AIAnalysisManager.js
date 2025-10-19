@@ -11,9 +11,9 @@ import { LeaderboardManager } from "./LeaderboardManager.js";
 export class AIAnalysisManager {
   static IS_REMOTE = true;
 
-  /** @type {Promise<{title:string,bullets:string[]}>|null} */
+  /** @type {Promise<{title:string,bullets:string[],isRemote:boolean,rawResponse?:any}>|null} */
   static _pending = null;
-  /** @type {{title:string,bullets:string[]}|null} */
+  /** @type {{title:string,bullets:string[],isRemote:boolean,rawResponse?:any}|null} */
   static _cache = null;
 
   /**
@@ -50,7 +50,7 @@ export class AIAnalysisManager {
    * Kick off an asynchronous analysis. Returns a promise and caches result.
    * Never rejects; resolves to a default suggestion payload on failure.
    * @param {object} stats See AIAnalysisAdapter.analyze JSDoc for shape.
-   * @returns {Promise<{title:string,bullets:string[]}>}
+   * @returns {Promise<{title:string,bullets:string[],isRemote:boolean,rawResponse?:any}>}
    */
   static async analyze(stats) {
     if (AIAnalysisManager._pending) return AIAnalysisManager._pending;
@@ -76,8 +76,9 @@ export class AIAnalysisManager {
    * @param {object} stats
    * @param {object|null} runSummary
    * @param {boolean} isRemote Whether remote mode is enabled
+   * @param {((result: {title:string,bullets:string[],isRemote:boolean,rawResponse?:any}) => void)|null} [onComplete] Optional callback when analysis completes
    */
-  static render(container, stats, runSummary = null, isRemote = true) {
+  static render(container, stats, runSummary = null, isRemote = true, onComplete = null) {
     if (!container) return;
 
     const doRender = (payload) => {
@@ -119,7 +120,16 @@ export class AIAnalysisManager {
 
     const maybe = AIAnalysisManager.analyze({ stats, runSummary });
     if (maybe && typeof maybe.then === "function") {
-      maybe.then((res) => doRender(res));
+      maybe.then((res) => {
+        doRender(res);
+        if (onComplete && typeof onComplete === "function") {
+          try {
+            onComplete(res);
+          } catch {
+            /* ignore callback errors */
+          }
+        }
+      });
     }
   }
 
