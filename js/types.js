@@ -90,7 +90,7 @@
  * @property {number} highScore
  * @property {number} score
  * @property {number} [shotsFired]
- * @property {number} [asteroidsKilled]
+ * @property {number} [regularAsteroidsKilled]
  * @property {number} [hardenedAsteroidsKilled]
  * @property {number} [hardenedAsteroidHitBullets]
  * @property {number} [bonusAsteroidsKilled]
@@ -98,11 +98,11 @@
  * @property {number} [accuracy]
  * @property {number} [accuracyBonus]
  * @property {boolean} [_accuracyBonusApplied]
- * @property {number} [starsCollected]
+ * @property {number} [regularStarsCollected]
  * @property {number} [bonusStarsCollected]
- * @property {number} [starsSpawned]
+ * @property {number} [regularStarsSpawned]
  * @property {number} [bonusStarsSpawned]
- * @property {number} [asteroidsSpawned]
+ * @property {number} [regularAsteroidsSpawned]
  * @property {number} [bonusAsteroidsSpawned]
  * @property {number} [hardenedAsteroidsSpawned]
  * @property {InputState} input

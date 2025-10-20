@@ -21,9 +21,9 @@ import { Star } from "../entities/Star.js";
  * @property {StarPool | null | undefined} [starPool]
  * @property {Asteroid[]} asteroids
  * @property {Star[]} stars
- * @property {number} [starsSpawned]
+ * @property {number} [regularStarsSpawned]
  * @property {number} [bonusStarsSpawned]
- * @property {number} [asteroidsSpawned]
+ * @property {number} [regularAsteroidsSpawned]
  * @property {number} [bonusAsteroidsSpawned]
  * @property {number} [hardenedAsteroidsSpawned]
  */
@@ -143,7 +143,7 @@ export class SpawnManager {
       const asteroid = this.createAsteroid(game);
       game.asteroids.push(asteroid);
       try {
-        game.asteroidsSpawned = (game.asteroidsSpawned || 0) + 1;
+        game.regularAsteroidsSpawned = (game.regularAsteroidsSpawned || 0) + 1;
         if (asteroid && asteroid.isBonus) {
           game.bonusAsteroidsSpawned = (game.bonusAsteroidsSpawned || 0) + 1;
         }
@@ -158,7 +158,7 @@ export class SpawnManager {
       const star = this.createStar(game);
       game.stars.push(star);
       try {
-        game.starsSpawned = (game.starsSpawned || 0) + 1;
+        game.regularStarsSpawned = (game.regularStarsSpawned || 0) + 1;
         if (star && star.isRed) {
           game.bonusStarsSpawned = (game.bonusStarsSpawned || 0) + 1;
         }

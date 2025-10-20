@@ -126,20 +126,22 @@ class AIHorizon {
     this.highScore = 0;
     this.score = 0;
     this.shotsFired = 0;
-    this.asteroidsKilled = 0;
+    this.regularAsteroidsKilled = 0;
     this.hardenedAsteroidsKilled = 0;
     this.hardenedAsteroidHitBullets = 0;
     this.bonusAsteroidsKilled = 0;
     this.bonusAsteroidHitBullets = 0;
-    this.starsCollected = 0;
+    this.regularStarsCollected = 0;
     this.bonusStarsCollected = 0;
-    this.starsSpawned = 0;
+    this.regularStarsSpawned = 0;
     this.bonusStarsSpawned = 0;
-    this.asteroidsSpawned = 0;
+    this.regularAsteroidsSpawned = 0;
     this.bonusAsteroidsSpawned = 0;
     this.hardenedAsteroidsSpawned = 0;
     this.accuracy = 0;
     this.accuracyBonus = 0;
+    this.finaleBaseScore = 0;
+    this.finaleBonus = 0;
     try {
       this.updateHighScore();
     } catch (_e) {
@@ -1035,7 +1037,10 @@ class AIHorizon {
 
       return {
         playerBaseScore: baseScore,
-        playerBonusEarned: bonus,
+        playerAccuracyBonus: bonus,
+        playerBaseScoreFinale:
+          typeof this.finaleBaseScore === "number" ? this.finaleBaseScore : null,
+        playerFinaleBonus: typeof this.finaleBonus === "number" ? this.finaleBonus : null,
         playerFinalScore: finalScoreNormalized,
         leaderBoardHighScore: highScoreValue,
         differencePlayerFinalScoreToLeaderBoardHighScore,
@@ -1072,12 +1077,18 @@ class AIHorizon {
       const clamped = Math.max(0, Math.min(1, numerator / denominator));
       return Math.round(clamped * 100) / 100;
     };
-    const starsCollectedAccuracy = ratioOrNull(this.starsCollected, this.starsSpawned);
+    const regularStarsCollectedAccuracy = ratioOrNull(
+      this.regularStarsCollected,
+      this.regularStarsSpawned
+    );
     const bonusStarsCollectedAccuracy = ratioOrNull(
       this.bonusStarsCollected,
       this.bonusStarsSpawned
     );
-    const asteroidsKilledAccuracy = ratioOrNull(this.asteroidsKilled, this.asteroidsSpawned);
+    const regularAsteroidsKilledAccuracy = ratioOrNull(
+      this.regularAsteroidsKilled,
+      this.regularAsteroidsSpawned
+    );
     const hardenedAsteroidsKilledAccuracy = ratioOrNull(
       this.hardenedAsteroidsKilled,
       this.hardenedAsteroidsSpawned
@@ -1101,18 +1112,21 @@ class AIHorizon {
       },
       score: scoreSummary,
       stats: {
-        starsEncountered: typeof this.starsSpawned === "number" ? this.starsSpawned : null,
-        starsCollected: typeof this.starsCollected === "number" ? this.starsCollected : null,
-        starsCollectedAccuracy: starsCollectedAccuracy,
+        regularStarsEncountered:
+          typeof this.regularStarsSpawned === "number" ? this.regularStarsSpawned : null,
+        regularStarsCollected:
+          typeof this.regularStarsCollected === "number" ? this.regularStarsCollected : null,
+        regularStarsCollectedAccuracy: regularStarsCollectedAccuracy,
         bonusStarsEncountered:
           typeof this.bonusStarsSpawned === "number" ? this.bonusStarsSpawned : null,
         bonusStarsCollected:
           typeof this.bonusStarsCollected === "number" ? this.bonusStarsCollected : null,
         bonusStarsCollectedAccuracy: bonusStarsCollectedAccuracy,
-        asteroidsEncountered:
-          typeof this.asteroidsSpawned === "number" ? this.asteroidsSpawned : null,
-        asteroidsKilled: typeof this.asteroidsKilled === "number" ? this.asteroidsKilled : null,
-        asteroidsKilledAccuracy: asteroidsKilledAccuracy,
+        regularAsteroidsEncountered:
+          typeof this.regularAsteroidsSpawned === "number" ? this.regularAsteroidsSpawned : null,
+        regularAsteroidsKilled:
+          typeof this.regularAsteroidsKilled === "number" ? this.regularAsteroidsKilled : null,
+        regularAsteroidsKilledAccuracy: regularAsteroidsKilledAccuracy,
         hardenedAsteroidsEncountered:
           typeof this.hardenedAsteroidsSpawned === "number" ? this.hardenedAsteroidsSpawned : null,
         hardenedAsteroidsKilled:
@@ -1125,7 +1139,7 @@ class AIHorizon {
         bonusAsteroidsKilledAccuracy: bonusAsteroidsKilledAccuracy,
         shotsFiredTotal: typeof this.shotsFired === "number" ? this.shotsFired : null,
         shotsFiredHitTarget:
-          (typeof this.asteroidsKilled === "number" ? this.asteroidsKilled : 0) +
+          (typeof this.regularAsteroidsKilled === "number" ? this.regularAsteroidsKilled : 0) +
           (typeof this.hardenedAsteroidHitBullets === "number"
             ? this.hardenedAsteroidHitBullets
             : 0),

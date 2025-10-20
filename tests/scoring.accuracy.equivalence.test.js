@@ -6,7 +6,7 @@ describe("Accuracy hardened asteroid hit equivalence", () => {
     const game = {
       score: 1000,
       shotsFired: 10,
-      asteroidsKilled: 0,
+      regularAsteroidsKilled: 0,
       hardenedAsteroidHitBullets: 10,
     };
     const r = ScoringManager.applyAccuracyBonus(game);
@@ -19,7 +19,7 @@ describe("Accuracy hardened asteroid hit equivalence", () => {
     const game = {
       score: 500,
       shotsFired: 8,
-      asteroidsKilled: 0,
+      regularAsteroidsKilled: 0,
       hardenedAsteroidHitBullets: 4,
     };
     const r = ScoringManager.applyAccuracyBonus(game);

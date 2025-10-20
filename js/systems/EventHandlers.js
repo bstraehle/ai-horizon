@@ -108,7 +108,7 @@ export const EventHandlers = {
               game.bonusAsteroidsKilled = (game.bonusAsteroidsKilled || 0) + 1;
             }
           } else {
-            game.asteroidsKilled = (game.asteroidsKilled || 0) + 1;
+            game.regularAsteroidsKilled = (game.regularAsteroidsKilled || 0) + 1;
           }
         }
         game.createExplosion(asteroid.x + asteroid.width / 2, asteroid.y + asteroid.height / 2);
@@ -157,7 +157,7 @@ export const EventHandlers = {
         const add = star && star.isRed ? CONFIG.GAME.STAR_SCORE_BONUS : CONFIG.GAME.STAR_SCORE;
         const r = ScoringManager.add(game, add);
         try {
-          game.starsCollected = (game.starsCollected || 0) + 1;
+          game.regularStarsCollected = (game.regularStarsCollected || 0) + 1;
           if (star && star.isRed) {
             game.bonusStarsCollected = (game.bonusStarsCollected || 0) + 1;
           }

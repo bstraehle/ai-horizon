@@ -27,7 +27,7 @@ export const ScoringManager = {
   /**
    * Add base points and apply milestone bonuses.
    * Also applies a time-based finale multiplier when within the final N seconds of the timer.
-   * @param {{ score:number, timerRemaining?:number }} game Game-like object exposing mutable numeric 'score'.
+   * @param {{ score:number, timerRemaining?:number, finaleBaseScore?:number, finaleBonus?:number }} game Game-like object exposing mutable numeric 'score'.
    * @param {number} points Base points to add (must be finite & > 0).
    * @returns {{base:number, bonusCount:number, bonusPoints:number, totalAdded:number, newScore:number, appliedMultiplier:number}}
    */
@@ -55,16 +55,27 @@ export const ScoringManager = {
     const finaleWindow = CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS || 0;
     const finaleMult = CONFIG.GAME.FINALE_BONUS_MULTIPLIER || 1;
     let appliedMultiplier = 1;
-    if (
+    const isInFinale =
       finaleWindow > 0 &&
       finaleMult > 1 &&
       typeof game.timerRemaining === "number" &&
       game.timerRemaining <= finaleWindow &&
-      game.timerRemaining > 0
-    ) {
+      game.timerRemaining > 0;
+
+    if (isInFinale) {
       appliedMultiplier = finaleMult;
     }
     const effectivePoints = points * appliedMultiplier;
+
+    if (isInFinale) {
+      if (typeof game.finaleBaseScore === "number") {
+        game.finaleBaseScore += points;
+      }
+      if (typeof game.finaleBonus === "number") {
+        game.finaleBonus += points * (appliedMultiplier - 1);
+      }
+    }
+
     const threshold = CONFIG.GAME.SCORING_BONUS_THRESHOLD || 0;
     const bonusPer = CONFIG.GAME.SCORING_BONUS_POINTS || 0;
     const before = game.score;
@@ -102,14 +113,14 @@ export const ScoringManager = {
    * - Counts only destroyed asteroids (normal + hardened) as hits.
    * - Safe to call multiple times; bonus applied at most once (idempotent).
    * - Stores derived values on the game instance for UI / telemetry.
-   * @param {{ score:number, shotsFired?:number, asteroidsKilled?:number, hardenedAsteroidsKilled?:number, hardenedAsteroidHitBullets?:number, accuracyBonus?:number, accuracy?:number, _accuracyBonusApplied?:boolean }} game
+   * @param {{ score:number, shotsFired?:number, regularAsteroidsKilled?:number, hardenedAsteroidsKilled?:number, hardenedAsteroidHitBullets?:number, accuracyBonus?:number, accuracy?:number, _accuracyBonusApplied?:boolean }} game
    * @returns {{ applied:boolean, baseScore:number, accuracy:number, bonus:number, newScore:number }}
    */
   applyAccuracyBonus(game) {
     if (!game || typeof game.score !== "number")
       return { applied: false, baseScore: 0, accuracy: 0, bonus: 0, newScore: 0 };
     if (game._accuracyBonusApplied) {
-      const totalHits = (game.asteroidsKilled || 0) + (game.hardenedAsteroidHitBullets || 0);
+      const totalHits = (game.regularAsteroidsKilled || 0) + (game.hardenedAsteroidHitBullets || 0);
       const shots = game.shotsFired || 0;
       const acc = shots > 0 ? totalHits / shots : 0;
       return {
@@ -121,7 +132,7 @@ export const ScoringManager = {
       };
     }
     const baseScore = game.score;
-    const totalHits = (game.asteroidsKilled || 0) + (game.hardenedAsteroidHitBullets || 0);
+    const totalHits = (game.regularAsteroidsKilled || 0) + (game.hardenedAsteroidHitBullets || 0);
     const shots = game.shotsFired || 0;
     const accuracy = shots > 0 ? Math.min(1, totalHits / shots) : 0;
     const bonus = Math.round(baseScore * accuracy);

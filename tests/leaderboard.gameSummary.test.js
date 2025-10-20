@@ -22,12 +22,14 @@ describe("LeaderboardManager game-summary persistence", () => {
       },
       score: {
         playerBaseScore: 1000,
-        playerBonusEarned: 200,
+        playerAccuracyBonus: 200,
+        playerBaseScoreFinale: 300,
+        playerFinaleBonus: 300,
         playerFinalScore: 1200,
       },
       stats: {
-        starsCollected: 5,
-        asteroidsKilled: 10,
+        regularStarsCollected: 5,
+        regularAsteroidsKilled: 10,
         shotsFired: 50,
         shotsFiredAccuracy: 0.8,
       },

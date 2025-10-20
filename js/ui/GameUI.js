@@ -48,8 +48,8 @@ export const GameUI = {
         if (typeof game.shotsFired === "number") {
           scoreEl.dataset.shotsFired = String(game.shotsFired);
         }
-        if (typeof game.asteroidsKilled === "number") {
-          scoreEl.dataset.asteroidsKilled = String(game.asteroidsKilled);
+        if (typeof game.regularAsteroidsKilled === "number") {
+          scoreEl.dataset.regularAsteroidsKilled = String(game.regularAsteroidsKilled);
         }
         if (typeof game.hardenedAsteroidsKilled === "number") {
           scoreEl.dataset.hardenedAsteroidsKilled = String(game.hardenedAsteroidsKilled);
@@ -86,10 +86,10 @@ export const GameUI = {
             score: game.score || 0,
             accuracy: game.accuracy || 0,
             shotsFired: game.shotsFired || 0,
-            asteroidsKilled: game.asteroidsKilled || 0,
+            regularAsteroidsKilled: game.regularAsteroidsKilled || 0,
             hardenedAsteroidsKilled: game.hardenedAsteroidsKilled || 0,
             bonusAsteroidsKilled: game.bonusAsteroidsKilled || 0,
-            starsCollected: game.starsCollected || 0,
+            regularStarsCollected: game.regularStarsCollected || 0,
             bonusStarsCollected: game.bonusStarsCollected || 0,
             timerSeconds: game.timerSeconds || 60,
             timerRemaining: game.timerRemaining || 0,
@@ -122,10 +122,10 @@ export const GameUI = {
                   score: game.score || 0,
                   accuracy: game.accuracy || 0,
                   shotsFired: game.shotsFired || 0,
-                  asteroidsKilled: game.asteroidsKilled || 0,
+                  regularAsteroidsKilled: game.regularAsteroidsKilled || 0,
                   hardenedAsteroidsKilled: game.hardenedAsteroidsKilled || 0,
                   bonusAsteroidsKilled: game.bonusAsteroidsKilled || 0,
-                  starsCollected: game.starsCollected || 0,
+                  regularStarsCollected: game.regularStarsCollected || 0,
                   bonusStarsCollected: game.bonusStarsCollected || 0,
                   timerSeconds: game.timerSeconds || 60,
                   timerRemaining: game.timerRemaining || 0,
