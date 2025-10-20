@@ -106,6 +106,15 @@ export class AIAnalysisManager {
       } catch {
         /* non-critical creation of bullet list */
       }
+      try {
+        const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
+        if (okBtn) {
+          okBtn.style.display = "";
+          okBtn.focus();
+        }
+      } catch {
+        /* non-critical OK button show and focus */
+      }
     };
 
     if (isRemote) {
@@ -115,6 +124,14 @@ export class AIAnalysisManager {
         container.appendChild(p);
       } catch {
         /* non-critical immediate placeholder render */
+      }
+      try {
+        const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
+        if (okBtn) {
+          okBtn.style.display = "none";
+        }
+      } catch {
+        /* non-critical OK button hide */
       }
     }
 
