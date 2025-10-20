@@ -11,11 +11,26 @@ import { LeaderboardManager } from "../LeaderboardManager";
  * @property {number} rank   1‑based rank.
  * @property {string} badge  Sanitized / validated `id` ("???" fallback).
  * @property {string} medal  Medal emoji for top 3 or empty string.
- * @property {string} icon   Number emoji (4️⃣) for ranks 4-10 or empty string.
+ * @property {string} icon   Number emoji (4️⃣) for ranks 4-100 or empty string.
  * @property {string} text   Composite presentation string.
  * @property {string} accuracyFormatted Formatted accuracy (XX%) or empty string.
  * @property {string} dateFormatted Formatted date (YYYY-MM-DD) or empty string.
  */
+
+/**
+ * Convert a number (1-100) to emoji digit representation.
+ * Examples: 4 → "4️⃣", 10 → "1️⃣0️⃣", 42 → "4️⃣2️⃣", 100 → "1️⃣0️⃣0️⃣"
+ *
+ * @param {number} num The number to convert (should be 1-100).
+ * @returns {string} The emoji digit string.
+ */
+function numberToEmojiDigits(num) {
+  const digitEmojis = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"];
+  return String(num)
+    .split("")
+    .map((digit) => digitEmojis[parseInt(digit, 10)])
+    .join("");
+}
 
 /**
  * Normalize potentially untrusted raw data into safe immutable entries.
@@ -74,7 +89,7 @@ export function qualifiesForInitials(score, entries, max = LeaderboardManager.MA
  * Produce semantic + textual formatting for a single entry.
  * Presentation:
  * - Ranks 1–3 receive medal emoji (🥇🥈🥉).
- * - Ranks 4–10 receive number emoji (4️⃣5️⃣6️⃣7️⃣8️⃣9️⃣🔟).
+ * - Ranks 4–100 receive number emoji using digit emojis (4️⃣, 1️⃣0️⃣, 4️⃣2️⃣, 1️⃣0️⃣0️⃣, etc.).
  * - Badge is the validated initials (1–3 A–Z) or "???" fallback.
  * - Accuracy is formatted as XX% (rounded to whole number) or empty string if missing.
  * - Date is formatted as YYYY-MM-DD or empty string if missing.
@@ -88,9 +103,8 @@ export function formatRow(entry, index) {
   const rank = index + 1;
   const medals = ["🥇", "🥈", "🥉"];
   const medal = index < 3 ? medals[index] : "";
-  const numberEmojis = ["4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
   const needsNumberEmoji = !medal && rank >= 4 && rank <= LeaderboardManager.MAX_ENTRIES;
-  const icon = needsNumberEmoji ? numberEmojis[rank - 4] : "";
+  const icon = needsNumberEmoji ? numberToEmojiDigits(rank) : "";
   const badge = /^[A-Z]{1,3}$/.test(entry.id) ? entry.id : "???";
 
   let accuracyFormatted = "";

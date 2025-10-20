@@ -23,7 +23,7 @@ describe("LeaderboardManager accuracy and date formatting", () => {
     const formatted = LeaderboardManager.formatRow(entry, 9);
     expect(formatted.accuracyFormatted).toBe("95%");
     expect(formatted.text).toContain("95%");
-    expect(formatted.text).toContain("🔟");
+    expect(formatted.text).toContain("1️⃣0️⃣");
   });
 
   it("includes date in formatted text", () => {

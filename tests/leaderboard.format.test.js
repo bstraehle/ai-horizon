@@ -22,8 +22,8 @@ describe("LeaderboardManager.formatRow / formatRows", () => {
     expect(r4.text).toContain("4️⃣");
     const r10 = LeaderboardManager.formatRow(rows[9], 9);
     expect(r10.medal).toBe("");
-    expect(r10.icon).toBe("🔟");
-    expect(r10.text).toContain("🔟");
+    expect(r10.icon).toBe("1️⃣0️⃣");
+    expect(r10.text).toContain("1️⃣0️⃣");
   });
 
   it("falls back to ??? for invalid initials", () => {
