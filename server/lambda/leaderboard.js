@@ -20,10 +20,10 @@ export const handler = async (event) => {
     switch (httpMethod) {
       case "GET":
         if (queryStringParameters && queryStringParameters.id) {
-          console.log("DynamoDB request: ", queryStringParameters.id);
+          console.log("DynamoDB GET request: ", queryStringParameters.id);
           response = await getItem(Number(queryStringParameters.id));
           jsonResponse = JSON.stringify(response);
-          console.log("DynamoDB response: ", jsonResponse);
+          console.log("DynamoDB GET response: ", jsonResponse);
         } else {
           return { statusCode: 400, body: JSON.stringify({ message: "Missing id" }) };
         }
@@ -37,10 +37,10 @@ export const handler = async (event) => {
           return { statusCode: 400, body: JSON.stringify({ message: "Missing body" }) };
         }
         updateData = JSON.parse(body);
-        console.log("DynamoDB request: ", updateData);
+        console.log("DynamoDB PUT request: ", updateData);
         response = await updateItem(Number(queryStringParameters.id), updateData);
         jsonResponse = JSON.stringify(response);
-        console.log("DynamoDB response: ", jsonResponse);
+        console.log("DynamoDB PUT response: ", jsonResponse);
         if (response && response.conflict) {
           return {
             statusCode: 409,

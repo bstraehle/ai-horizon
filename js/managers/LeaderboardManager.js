@@ -161,7 +161,33 @@ export class LeaderboardManager {
    * @returns {Promise<boolean>}
    */
   static async save(entries, { remote = this.IS_REMOTE } = {}) {
-    const payload = entries.slice(0, LeaderboardManager.MAX_ENTRIES);
+    const payload = entries.slice(0, LeaderboardManager.MAX_ENTRIES).map((entry) => {
+      /** @type {LeaderboardEntry} */
+      const cleaned = { id: entry.id, score: entry.score };
+      if (typeof entry.accuracy === "number") cleaned.accuracy = entry.accuracy;
+      if (entry.date) cleaned.date = entry.date;
+      if (entry["game-summary"] !== undefined && entry["game-summary"] !== null) {
+        try {
+          cleaned["game-summary"] =
+            typeof entry["game-summary"] === "string"
+              ? entry["game-summary"]
+              : JSON.stringify(entry["game-summary"]);
+        } catch {
+          // If serialization fails, skip this field
+        }
+      }
+      if (entry["ai-analysis"] !== undefined && entry["ai-analysis"] !== null) {
+        try {
+          cleaned["ai-analysis"] =
+            typeof entry["ai-analysis"] === "string"
+              ? entry["ai-analysis"]
+              : JSON.stringify(entry["ai-analysis"]);
+        } catch {
+          // If serialization fails, skip this field
+        }
+      }
+      return cleaned;
+    });
     const repo = LeaderboardManager._createRepository();
     if (typeof LeaderboardManager._version === "number")
       repo._version = LeaderboardManager._version;
@@ -238,10 +264,26 @@ export class LeaderboardManager {
           const entry = { id, score: data.score };
           if (typeof data.accuracy === "number") entry.accuracy = data.accuracy;
           if (data.date) entry.date = data.date;
-          if (data["game-summary"] !== undefined && data["game-summary"] !== null)
-            entry["game-summary"] = data["game-summary"];
-          if (data["ai-analysis"] !== undefined && data["ai-analysis"] !== null)
-            entry["ai-analysis"] = data["ai-analysis"];
+          if (data["game-summary"] !== undefined && data["game-summary"] !== null) {
+            try {
+              entry["game-summary"] =
+                typeof data["game-summary"] === "string"
+                  ? data["game-summary"]
+                  : JSON.stringify(data["game-summary"]);
+            } catch {
+              // If serialization fails, skip this field
+            }
+          }
+          if (data["ai-analysis"] !== undefined && data["ai-analysis"] !== null) {
+            try {
+              entry["ai-analysis"] =
+                typeof data["ai-analysis"] === "string"
+                  ? data["ai-analysis"]
+                  : JSON.stringify(data["ai-analysis"]);
+            } catch {
+              // If serialization fails, skip this field
+            }
+          }
           return entry;
         })
           .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
@@ -300,10 +342,20 @@ export class LeaderboardManager {
       newEntry.accuracy = accuracy;
     }
     if (gameSummary !== undefined && gameSummary !== null) {
-      newEntry["game-summary"] = gameSummary;
+      try {
+        newEntry["game-summary"] =
+          typeof gameSummary === "string" ? gameSummary : JSON.stringify(gameSummary);
+      } catch {
+        // If serialization fails, skip this field
+      }
     }
     if (aiAnalysis !== undefined && aiAnalysis !== null) {
-      newEntry["ai-analysis"] = aiAnalysis;
+      try {
+        newEntry["ai-analysis"] =
+          typeof aiAnalysis === "string" ? aiAnalysis : JSON.stringify(aiAnalysis);
+      } catch {
+        // If serialization fails, skip this field
+      }
     }
 
     const existingIndex = entries.findIndex((e) => e.id === id);

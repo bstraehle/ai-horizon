@@ -6,6 +6,8 @@ import { LeaderboardManager } from "../LeaderboardManager";
  * @property {number} score Non‑negative integer score.
  * @property {number} [accuracy] Accuracy as decimal (0.0-1.0).
  * @property {string} [date] ISO date string (YYYY-MM-DD) when score was achieved.
+ * @property {string} [game-summary] JSON string containing game summary data.
+ * @property {string} [ai-analysis] JSON string containing AI analysis data.
  *
  * @typedef {Object} FormattedRow
  * @property {number} rank   1‑based rank.
@@ -37,6 +39,7 @@ function numberToEmojiDigits(num) {
  * - Always returns a new array (never mutates input).
  * - Coerces `id` to string (empty string fallback) and `score` to finite number (0 fallback).
  * - Preserves `date` field if present and valid string, otherwise omits it.
+ * - Preserves `ai-analysis` and `game-summary` fields if present and valid strings.
  * - Preserves original ordering and length (caller decides filtering / sorting separately).
  *
  * @param {any} arr Incoming value (expected array of objects with `id` & `score`).
@@ -52,6 +55,12 @@ export function normalize(arr) {
         }
         if (e?.date && typeof e.date === "string") {
           entry.date = e.date;
+        }
+        if (e?.["game-summary"] && typeof e["game-summary"] === "string") {
+          entry["game-summary"] = e["game-summary"];
+        }
+        if (e?.["ai-analysis"] && typeof e["ai-analysis"] === "string") {
+          entry["ai-analysis"] = e["ai-analysis"];
         }
         return entry;
       })

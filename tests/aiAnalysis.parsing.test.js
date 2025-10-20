@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { JSDOM } from "jsdom";
 import { LeaderboardManager } from "../js/managers/LeaderboardManager.js";
 
-describe("AI Analysis JSON parsing", () => {
+describe("AI Analysis persisted as JSON string", () => {
   beforeEach(() => {
     const dom = new JSDOM("<!doctype html><html><body></body></html>", {
       url: "http://localhost/",
@@ -12,7 +12,7 @@ describe("AI Analysis JSON parsing", () => {
     globalThis.localStorage = dom.window.localStorage;
   });
 
-  it("should store ai-analysis as JSON object when passed as object", async () => {
+  it("should store ai-analysis as JSON string when passed as object", async () => {
     const aiAnalysis = {
       feedback: "Great performance!",
       "improvement-tip-1": "Focus on collecting bonus stars",
@@ -30,12 +30,13 @@ describe("AI Analysis JSON parsing", () => {
 
     expect(entry).toBeDefined();
     expect(entry["ai-analysis"]).toBeDefined();
-    expect(typeof entry["ai-analysis"]).toBe("object");
-    expect(entry["ai-analysis"].feedback).toBe("Great performance!");
-    expect(entry["ai-analysis"]["improvement-tip-1"]).toBe("Focus on collecting bonus stars");
+    expect(typeof entry["ai-analysis"]).toBe("string");
+    const parsed = JSON.parse(entry["ai-analysis"]);
+    expect(parsed.feedback).toBe("Great performance!");
+    expect(parsed["improvement-tip-1"]).toBe("Focus on collecting bonus stars");
   });
 
-  it("should handle ai-analysis that is already a parsed object", async () => {
+  it("should handle ai-analysis that is already a JSON string", async () => {
     const aiAnalysis = {
       feedback: "Excellent work!",
       "improvement-tip-1": "Keep up the accuracy",
@@ -54,12 +55,13 @@ describe("AI Analysis JSON parsing", () => {
 
     expect(entry).toBeDefined();
     expect(entry["ai-analysis"]).toBeDefined();
-    expect(typeof entry["ai-analysis"]).toBe("object");
-    expect(entry["ai-analysis"].feedback).toBe("Excellent work!");
-    expect(Object.keys(entry["ai-analysis"]).length).toBeGreaterThan(0);
+    expect(typeof entry["ai-analysis"]).toBe("string");
+    const parsed = JSON.parse(entry["ai-analysis"]);
+    expect(parsed.feedback).toBe("Excellent work!");
+    expect(Object.keys(parsed).length).toBeGreaterThan(0);
   });
 
-  it("should preserve all properties of ai-analysis object", async () => {
+  it("should preserve all properties of ai-analysis object as JSON string", async () => {
     const aiAnalysis = {
       feedback: "Outstanding performance!",
       "improvement-tip-1": "Tip 1",
@@ -80,11 +82,12 @@ describe("AI Analysis JSON parsing", () => {
 
     expect(entry).toBeDefined();
     expect(entry["ai-analysis"]).toBeDefined();
-    expect(typeof entry["ai-analysis"]).toBe("object");
-    expect(entry["ai-analysis"]["improvement-tip-1"]).toBe("Tip 1");
-    expect(entry["ai-analysis"]["improvement-tip-2"]).toBe("Tip 2");
-    expect(entry["ai-analysis"]["improvement-tip-3"]).toBe("Tip 3");
-    expect(entry["ai-analysis"]["improvement-tip-4"]).toBe("Tip 4");
-    expect(entry["ai-analysis"]["improvement-tip-5"]).toBe("Tip 5");
+    expect(typeof entry["ai-analysis"]).toBe("string");
+    const parsed = JSON.parse(entry["ai-analysis"]);
+    expect(parsed["improvement-tip-1"]).toBe("Tip 1");
+    expect(parsed["improvement-tip-2"]).toBe("Tip 2");
+    expect(parsed["improvement-tip-3"]).toBe("Tip 3");
+    expect(parsed["improvement-tip-4"]).toBe("Tip 4");
+    expect(parsed["improvement-tip-5"]).toBe("Tip 5");
   });
 });
