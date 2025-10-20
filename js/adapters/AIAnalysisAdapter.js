@@ -29,10 +29,16 @@ export class AIAnalysisAdapter {
         const response = await this._remoteAdapter.postJSON(this._endpoint, payload.runSummary);
         if (response) {
           var transformedResponse = this._transformRemoteResponse(response);
-          return { ...transformedResponse, isRemote: true, rawResponse: response };
+          if (
+            transformedResponse.title &&
+            transformedResponse.bullets &&
+            transformedResponse.bullets.length > 0
+          ) {
+            return { ...transformedResponse, isRemote: true, rawResponse: response };
+          }
         }
       } catch {
-        // AI analysis failed
+        // AI analysis failed, will fall back to local analysis
       }
     }
 
