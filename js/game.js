@@ -725,6 +725,15 @@ class AIHorizon {
 
   /** Dismiss the post-game overlay and return focus to restart. */
   handlePostGameOkClick() {
+    try {
+      const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
+      if (okBtn && okBtn.disabled) {
+        return;
+      }
+    } catch {
+      /* ignore button check errors */
+    }
+
     /** @type {HTMLElement|null} */
     let initialsScreen = null;
     /** @type {HTMLElement|null} */

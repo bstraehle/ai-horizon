@@ -109,13 +109,24 @@ export class AIAnalysisManager {
       try {
         const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
         if (okBtn) {
-          okBtn.style.display = "";
+          okBtn.disabled = false;
           okBtn.focus();
         }
       } catch {
-        /* non-critical OK button show and focus */
+        /* non-critical OK button enable and focus */
       }
     };
+
+    if (isRemote) {
+      try {
+        const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
+        if (okBtn) {
+          okBtn.disabled = true;
+        }
+      } catch {
+        /* non-critical OK button disable */
+      }
+    }
 
     if (isRemote) {
       try {
@@ -124,14 +135,6 @@ export class AIAnalysisManager {
         container.appendChild(p);
       } catch {
         /* non-critical immediate placeholder render */
-      }
-      try {
-        const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
-        if (okBtn) {
-          okBtn.style.display = "none";
-        }
-      } catch {
-        /* non-critical OK button hide */
       }
     }
 
