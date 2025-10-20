@@ -30,6 +30,8 @@ export const handler = async (event) => {
         };
     }
 
+    console.log("Bedrock response: ", response);
+
     return {
       statusCode: 200,
       headers: {
@@ -41,8 +43,10 @@ export const handler = async (event) => {
       body: JSON.stringify(response),
     };
   } catch (error) {
-    //console.error("Error:", error);
     const message = error instanceof Error ? error.message : String(error);
+
+    console.error("Bedrock error:", message);
+
     return {
       statusCode: 500,
       headers: {
@@ -73,8 +77,8 @@ async function analysis(body) {
 
   const requestBody = {
     anthropic_version: "bedrock-2023-05-31",
-    temperature: 0.7,
     max_tokens: 1000,
+    temperature: 0.7,
     messages: [
       {
         role: "user",

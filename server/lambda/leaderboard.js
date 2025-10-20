@@ -7,34 +7,8 @@ const docClient = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = "ai-horizon-leaderboard";
 
 /**
- * Leaderboard Lambda HTTP handler (GET / PUT) with optimistic concurrency.
- *
- * Responsibilities:
- * - GET: Fetch the leaderboard record by numeric id; ensure a numeric `version` field exists (default 0).
- * - PUT: Conditionally update the record using a version check (if client supplies `version`) and atomically increment version.
- * - Emits 409 Conflict with latest item when version mismatch to allow client merge + retry.
- * - Adds permissive CORS headers for browser invocation.
- *
- * Request Shapes:
- * - GET  /?id=1
- * - PUT  /?id=1  body: { scores: [...], version?: number, ...extraMetadata }
- *   (Client should include the last observed version for optimistic concurrency; omitted means unconditional update.)
- *
- * Response Shapes:
- * - 200 OK: { ...item } (GET) or { message, item } (PUT success)
- * - 409 Conflict (PUT): { conflict:true, message:"Version mismatch", item:{...latest} }
- * - 400: { message } for validation errors
- * - 405: { message } unsupported method
- * - 500: { message, error }
- *
- * Environment / Config:
- * - Hard-coded region 'us-west-2' and table name TABLE_NAME; adapt via env vars in production if needed.
- *
- * Error Handling:
- * - All top-level errors caught; internal conditional check failures downgraded to 409 logic in updateItem.
- *
- * @param {{httpMethod:string,queryStringParameters?:Record<string,string>,body?:string}} event Lambda proxy event.
- * @returns {Promise<{statusCode:number, headers?:Record<string,string>, body:string}>}
+ * Lambda handler
+ * @param {{httpMethod:string,queryStringParameters?:Record<string,string>,body?:string}} event
  */
 export const handler = async (event) => {
   try {
@@ -66,7 +40,7 @@ export const handler = async (event) => {
             headers: {
               "Content-Type": "application/json",
               "Access-Control-Allow-Origin": "*",
-              "Access-Control-Allow-Methods": "GET, PUT",
+              "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
               "Access-Control-Allow-Headers": "Content-Type",
             },
             body: JSON.stringify(response),
@@ -81,27 +55,25 @@ export const handler = async (event) => {
         };
     }
 
+    console.log("DynamoDB response: ", response);
+
     return {
       statusCode: 200,
       headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, PUT",
+        "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
       },
       body: JSON.stringify(response),
     };
   } catch (error) {
-    //console.error("Error:", error);
     const message = error instanceof Error ? error.message : String(error);
+
+    console.error("DynamoDB error:", message);
+
     return {
       statusCode: 500,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, PUT",
-        "Access-Control-Allow-Headers": "Content-Type",
-      },
       body: JSON.stringify({
         message: "Internal server error",
         error: message,
@@ -111,11 +83,7 @@ export const handler = async (event) => {
 };
 
 /**
- * Fetch leaderboard item by id.
- * Ensures a numeric `version` property for clients performing optimistic concurrency.
- * @param {number} id Partition key.
- * @returns {Promise<any>} Item object with guaranteed version field.
- * @throws {Error} When item not found.
+ * @param {number} id
  */
 async function getItem(id) {
   const params = {
@@ -132,27 +100,16 @@ async function getItem(id) {
     throw new Error(`Item with id ${id} not found`);
   }
 
+  // ensure version property exists for clients implementing optimistic concurrency
   if (typeof result.Item.version !== "number") result.Item.version = 0;
   return result.Item;
 }
 
 /**
- * Update leaderboard record with optimistic concurrency and automatic version increment.
- *
- * Behavior:
- * - Strips client-supplied id/version from dynamic attribute update set; uses id as key; handles version separately.
- * - Adds/updates arbitrary fields provided in updateData (scores, metadata, timestamps, etc.).
- * - Always sets updatedAt ISO timestamp.
- * - Increments `version` atomically (if absent initializes to 0 then increments to 1) using if_not_exists.
- * - If client supplies `version` and it mismatches current value, returns conflict object (no throw) including latest item.
- *
- * DynamoDB Details:
- * - ConditionExpression enforces existence of id and optional version equality to detect lost update.
- * - Returns ALL_NEW attributes on success.
- *
- * @param {number} id Partition key.
- * @param {{[key:string]: any}} updateData Arbitrary fields including optional `version` (for concurrency) and `scores` array.
- * @returns {Promise<{message:string,item:any,conflict?:boolean}>} Success or conflict payload.
+ * Update an item in the leaderboard table.
+ * @param {number} id
+ * @param {{[key:string]: any}} updateData
+ * @returns {Promise<{message:string,item:any,conflict?:boolean}>}
  */
 async function updateItem(id, updateData) {
   /** @type {{[key:string]: any}} */
@@ -160,7 +117,9 @@ async function updateItem(id, updateData) {
   const nowIso = new Date().toISOString();
   updateData.updatedAt = nowIso;
 
+  // Optimistic concurrency: expect caller to send 'version'. If absent, treat as unconditional create of version (0 -> 1).
   const providedVersion = typeof updateData.version === "number" ? updateData.version : undefined;
+  // version is not directly updated in the dynamic loop below; we increment explicitly.
   delete updateData.version;
 
   /** @type {string[]} */
@@ -179,18 +138,19 @@ async function updateItem(id, updateData) {
     expressionAttributeValues[attributeValue] = updateData[key];
   });
 
+  // Always increment version atomically; add to update expression.
   updateExpressions.push("#ver = if_not_exists(#ver, :zero) + :one");
   expressionAttributeNames["#ver"] = "version";
   expressionAttributeValues[":one"] = 1;
   expressionAttributeValues[":zero"] = 0;
 
-  let condition = "attribute_exists(id)";
+  let condition = "attribute_exists(id)"; // ensure item exists
   if (providedVersion !== undefined) {
+    // Only match if current version equals providedVersion
     condition += " AND #ver = :expectedVersion";
     expressionAttributeValues[":expectedVersion"] = providedVersion;
   }
 
-  /** @type {import('@aws-sdk/lib-dynamodb').UpdateCommandInput} */
   const params = {
     TableName: TABLE_NAME,
     Key: { id },
@@ -215,6 +175,7 @@ async function updateItem(id, updateData) {
       "name" in err &&
       err.name === "ConditionalCheckFailedException"
     ) {
+      // Fetch current item so we can return latest version + scores for client to merge
       const current = await getItem(id);
       return { conflict: true, message: "Version mismatch", item: current };
     }
