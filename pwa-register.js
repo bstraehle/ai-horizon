@@ -33,6 +33,27 @@
           }
         }
 
+        // Schedule daily update check at midnight
+        function scheduleMidnightCheck() {
+          const now = new Date();
+          const midnight = new Date(now);
+          midnight.setHours(24, 0, 0, 0);
+          const msUntilMidnight = midnight - now;
+
+          setTimeout(() => {
+            if (reg.update) {
+              try {
+                reg.update();
+              } catch (_) {
+                // Expected: ignore failed update attempt (likely offline)
+              }
+            }
+            // Schedule next midnight check
+            scheduleMidnightCheck();
+          }, msUntilMidnight);
+        }
+        scheduleMidnightCheck();
+
         // When back online, ask SW to refresh core assets.
         window.addEventListener("online", () => {
           // Trigger a manual update check for the SW itself.
