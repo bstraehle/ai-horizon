@@ -14,12 +14,16 @@ export const handler = async (event) => {
   try {
     const { httpMethod, queryStringParameters, body } = event;
     let response;
+    let jsonResponse;
     let updateData;
 
     switch (httpMethod) {
       case "GET":
         if (queryStringParameters && queryStringParameters.id) {
+          console.log("DynamoDB request: ", queryStringParameters.id);
           response = await getItem(Number(queryStringParameters.id));
+          jsonResponse = JSON.stringify(response);
+          console.log("DynamoDB response: ", jsonResponse);
         } else {
           return { statusCode: 400, body: JSON.stringify({ message: "Missing id" }) };
         }
@@ -33,7 +37,10 @@ export const handler = async (event) => {
           return { statusCode: 400, body: JSON.stringify({ message: "Missing body" }) };
         }
         updateData = JSON.parse(body);
+        console.log("DynamoDB request: ", updateData);
         response = await updateItem(Number(queryStringParameters.id), updateData);
+        jsonResponse = JSON.stringify(response);
+        console.log("DynamoDB response: ", jsonResponse);
         if (response && response.conflict) {
           return {
             statusCode: 409,
@@ -43,7 +50,7 @@ export const handler = async (event) => {
               "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
               "Access-Control-Allow-Headers": "Content-Type",
             },
-            body: JSON.stringify(response),
+            body: jsonResponse,
           };
         }
         break;
@@ -55,8 +62,6 @@ export const handler = async (event) => {
         };
     }
 
-    console.log("DynamoDB response: ", response);
-
     return {
       statusCode: 200,
       headers: {
@@ -65,13 +70,11 @@ export const handler = async (event) => {
         "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
       },
-      body: JSON.stringify(response),
+      body: jsonResponse,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-
     console.error("DynamoDB error:", message);
-
     return {
       statusCode: 500,
       body: JSON.stringify({

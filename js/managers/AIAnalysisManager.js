@@ -106,27 +106,7 @@ export class AIAnalysisManager {
       } catch {
         /* non-critical creation of bullet list */
       }
-      try {
-        const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
-        if (okBtn) {
-          okBtn.disabled = false;
-          okBtn.focus();
-        }
-      } catch {
-        /* non-critical OK button enable and focus */
-      }
     };
-
-    if (isRemote) {
-      try {
-        const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
-        if (okBtn) {
-          okBtn.disabled = true;
-        }
-      } catch {
-        /* non-critical OK button disable */
-      }
-    }
 
     if (isRemote) {
       try {

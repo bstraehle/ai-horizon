@@ -17,7 +17,9 @@ export const handler = async (event) => {
     switch (httpMethod) {
       case "POST":
         if (body) {
+          console.log("Bedrock request: ", body);
           response = await analysis(body);
+          console.log("Bedrock response: ", response);
         } else {
           return { statusCode: 400, body: JSON.stringify({ message: "Missing request body" }) };
         }
@@ -29,8 +31,6 @@ export const handler = async (event) => {
           body: JSON.stringify({ message: "Method not allowed" }),
         };
     }
-
-    console.log("Bedrock response: ", response);
 
     return {
       statusCode: 200,
@@ -44,9 +44,7 @@ export const handler = async (event) => {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-
     console.error("Bedrock error:", message);
-
     return {
       statusCode: 500,
       headers: {
