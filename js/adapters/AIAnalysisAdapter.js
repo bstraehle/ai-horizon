@@ -41,7 +41,7 @@ export class AIAnalysisAdapter {
 
   /**
    * Transform the remote API response format to internal format.
-   * @param {any} response API response with feedback and specific-tip-* fields
+   * @param {any} response API response with feedback and improvement-tip-* fields
    * @returns {{title:string, bullets:string[]}}
    */
   _transformRemoteResponse(response) {
@@ -58,7 +58,7 @@ export class AIAnalysisAdapter {
     const bullets = [];
 
     for (let i = 1; i <= 8; i++) {
-      const tipKey = `specific-tip-${i}`;
+      const tipKey = `improvement-tip-${i}`;
       const value = parsedResponse[tipKey];
 
       if (value && String(value).trim() !== "") {

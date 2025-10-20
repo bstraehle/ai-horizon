@@ -15,8 +15,8 @@ describe("AI Analysis JSON parsing", () => {
   it("should store ai-analysis as JSON object when passed as object", async () => {
     const aiAnalysis = {
       feedback: "Great performance!",
-      "specific-tip-1": "Focus on collecting bonus stars",
-      "specific-tip-2": "Improve asteroid accuracy",
+      "improvement-tip-1": "Focus on collecting bonus stars",
+      "improvement-tip-2": "Improve asteroid accuracy",
     };
 
     await LeaderboardManager.submit(1800, "OBJ", {
@@ -32,15 +32,15 @@ describe("AI Analysis JSON parsing", () => {
     expect(entry["ai-analysis"]).toBeDefined();
     expect(typeof entry["ai-analysis"]).toBe("object");
     expect(entry["ai-analysis"].feedback).toBe("Great performance!");
-    expect(entry["ai-analysis"]["specific-tip-1"]).toBe("Focus on collecting bonus stars");
+    expect(entry["ai-analysis"]["improvement-tip-1"]).toBe("Focus on collecting bonus stars");
   });
 
   it("should handle ai-analysis that is already a parsed object", async () => {
     const aiAnalysis = {
       feedback: "Excellent work!",
-      "specific-tip-1": "Keep up the accuracy",
-      "specific-tip-2": "Work on survival time",
-      "specific-tip-3": "Focus on bonus items",
+      "improvement-tip-1": "Keep up the accuracy",
+      "improvement-tip-2": "Work on survival time",
+      "improvement-tip-3": "Focus on bonus items",
     };
 
     await LeaderboardManager.submit(2000, "PSR", {
@@ -62,11 +62,11 @@ describe("AI Analysis JSON parsing", () => {
   it("should preserve all properties of ai-analysis object", async () => {
     const aiAnalysis = {
       feedback: "Outstanding performance!",
-      "specific-tip-1": "Tip 1",
-      "specific-tip-2": "Tip 2",
-      "specific-tip-3": "Tip 3",
-      "specific-tip-4": "Tip 4",
-      "specific-tip-5": "Tip 5",
+      "improvement-tip-1": "Tip 1",
+      "improvement-tip-2": "Tip 2",
+      "improvement-tip-3": "Tip 3",
+      "improvement-tip-4": "Tip 4",
+      "improvement-tip-5": "Tip 5",
     };
 
     await LeaderboardManager.submit(2500, "MUL", {
@@ -81,10 +81,10 @@ describe("AI Analysis JSON parsing", () => {
     expect(entry).toBeDefined();
     expect(entry["ai-analysis"]).toBeDefined();
     expect(typeof entry["ai-analysis"]).toBe("object");
-    expect(entry["ai-analysis"]["specific-tip-1"]).toBe("Tip 1");
-    expect(entry["ai-analysis"]["specific-tip-2"]).toBe("Tip 2");
-    expect(entry["ai-analysis"]["specific-tip-3"]).toBe("Tip 3");
-    expect(entry["ai-analysis"]["specific-tip-4"]).toBe("Tip 4");
-    expect(entry["ai-analysis"]["specific-tip-5"]).toBe("Tip 5");
+    expect(entry["ai-analysis"]["improvement-tip-1"]).toBe("Tip 1");
+    expect(entry["ai-analysis"]["improvement-tip-2"]).toBe("Tip 2");
+    expect(entry["ai-analysis"]["improvement-tip-3"]).toBe("Tip 3");
+    expect(entry["ai-analysis"]["improvement-tip-4"]).toBe("Tip 4");
+    expect(entry["ai-analysis"]["improvement-tip-5"]).toBe("Tip 5");
   });
 });
