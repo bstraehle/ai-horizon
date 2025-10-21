@@ -76,7 +76,7 @@ async function analysis(body) {
   const requestBody = {
     anthropic_version: "bedrock-2023-05-31",
     max_tokens: 1000,
-    temperature: 0.7,
+    temperature: 0.0,
     messages: [
       {
         role: "user",

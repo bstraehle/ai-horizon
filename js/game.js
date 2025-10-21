@@ -560,6 +560,19 @@ class AIHorizon {
           return false;
         }
 
+        const isInteractive =
+          target &&
+          typeof target.closest === "function" &&
+          (target.closest("button") ||
+            target.closest("input") ||
+            target.closest("a") ||
+            target.closest("select") ||
+            target.closest("textarea"));
+
+        if (isInteractive) {
+          return false;
+        }
+
         if (e.cancelable) e.preventDefault();
         if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
 
@@ -606,6 +619,19 @@ class AIHorizon {
               (target && typeof target.closest === "function" && target.closest("#restartBtn"));
             if (isRestart) return false;
           }
+        }
+
+        const isInteractive =
+          target &&
+          typeof target.closest === "function" &&
+          (target.closest("button") ||
+            target.closest("input") ||
+            target.closest("a") ||
+            target.closest("select") ||
+            target.closest("textarea"));
+
+        if (isInteractive) {
+          return false;
         }
 
         if (e.cancelable) e.preventDefault();
