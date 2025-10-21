@@ -63,6 +63,16 @@ export const GameUI = {
     } catch {
       /* dataset optional */
     }
+
+    try {
+      const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
+      if (okBtn && AIAnalysisManager.IS_REMOTE) {
+        okBtn.disabled = true;
+      }
+    } catch {
+      /* non-critical pre-disable ok button */
+    }
+
     UIManager.showGameOver(
       game.leaderboardScreen || null,
       game.restartBtn || null,

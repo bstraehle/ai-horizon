@@ -628,7 +628,7 @@ export class UIManager {
     if (typeof score === "number" && score === 0) {
       preferred = restartBtn;
     }
-    if (postGameVisible && okBtn) {
+    if (postGameVisible && okBtn && !okBtn.disabled) {
       preferred = okBtn;
     }
 
@@ -808,55 +808,6 @@ export class UIManager {
           } catch (_) {
             /* ignore */
           }
-        }
-      });
-
-      UIManager._try(() => {
-        if (restartBtn) {
-          const btn = /** @type {HTMLButtonElement} */ (restartBtn);
-          btn.dataset.cooldown = "1";
-          /** @param {Event} e */
-          const suppress = (e) => {
-            if (btn.dataset.cooldown === "1") {
-              try {
-                e.stopPropagation();
-              } catch {
-                /* suppress propagation best-effort */
-              }
-              try {
-                if (e.cancelable) e.preventDefault();
-              } catch {
-                /* preventDefault may fail in synthetic events */
-              }
-            }
-          };
-          btn.addEventListener("click", suppress, true);
-          btn.addEventListener("touchend", suppress, true);
-          const clear = () => {
-            try {
-              delete btn.dataset.cooldown;
-            } catch {
-              /* dataset cleanup optional */
-            }
-            try {
-              btn.removeEventListener("click", suppress, true);
-              btn.removeEventListener("touchend", suppress, true);
-            } catch {
-              /* listener removal optional */
-            }
-          };
-          try {
-            window.addEventListener(
-              "pointerup",
-              () => {
-                setTimeout(clear, 100);
-              },
-              { once: true, capture: true }
-            );
-          } catch {
-            /* optional */
-          }
-          setTimeout(clear, 500);
         }
       });
 

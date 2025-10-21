@@ -106,6 +106,19 @@ export class AIAnalysisManager {
       } catch {
         /* non-critical creation of bullet list */
       }
+      try {
+        const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
+        if (okBtn) {
+          okBtn.disabled = false;
+          try {
+            okBtn.focus();
+          } catch {
+            /* non-critical focus */
+          }
+        }
+      } catch {
+        /* non-critical re-enable ok button */
+      }
     };
 
     if (isRemote) {
@@ -115,6 +128,19 @@ export class AIAnalysisManager {
         container.appendChild(p);
       } catch {
         /* non-critical immediate placeholder render */
+      }
+      try {
+        const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
+        if (okBtn) {
+          okBtn.disabled = true;
+          try {
+            okBtn.blur();
+          } catch {
+            /* non-critical blur */
+          }
+        }
+      } catch {
+        /* non-critical disable ok button during analysis */
       }
     }
 

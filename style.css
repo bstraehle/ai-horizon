@@ -273,7 +273,11 @@ body {
   transform: translateY(1px);
 }
 .action-button:disabled,
-.action-button[aria-disabled="true"],
+.action-button[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .action-button:focus-visible {
   outline: 3px solid var(--color-btn-focus-outline);
   outline-offset: -3px;

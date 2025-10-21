@@ -146,50 +146,9 @@ export function handleGameOver(game) {
           const restartBtn = /** @type {HTMLButtonElement|null} */ (
             document.getElementById("restartBtn")
           );
-          if (restartBtn) {
-            restartBtn.dataset.cooldown = "1";
-            const suppress = (e) => {
-              if (restartBtn.dataset.cooldown === "1") {
-                try {
-                  e.stopPropagation();
-                } catch {
-                  /* suppress propagation best-effort */
-                }
-                try {
-                  if (e.cancelable) e.preventDefault();
-                } catch {
-                  /* preventDefault may fail in synthetic events */
-                }
-              }
-            };
-            restartBtn.addEventListener("click", suppress, true);
-            const clear = () => {
-              try {
-                delete restartBtn.dataset.cooldown;
-              } catch {
-                /* dataset cleanup optional */
-              }
-              try {
-                restartBtn.removeEventListener("click", suppress, true);
-              } catch {
-                /* listener removal optional */
-              }
-            };
-            try {
-              window.addEventListener(
-                "pointerup",
-                () => {
-                  setTimeout(clear, 0);
-                },
-                { once: true, capture: true }
-              );
-            } catch {
-              /* optional */
-            }
-            setTimeout(clear, 1000);
-          }
+          if (restartBtn) UIManager.focusWithRetry(restartBtn);
         } catch {
-          /* non-critical restart gating */
+          /* ignore */
         }
 
         try {
