@@ -998,10 +998,11 @@ class AIHorizon {
       /* optional bonus application */
     }
     this.state.end();
+    const oldHighScore = this.highScore;
     this.updateHighScore();
     GameUI.hidePause(this);
     try {
-      this._lastRunSummary = this._logRunSummary(accuracySummary);
+      this._lastRunSummary = this._logRunSummary(accuracySummary, oldHighScore);
     } catch (_e) {
       this._lastRunSummary = null;
     }
@@ -1016,10 +1017,11 @@ class AIHorizon {
    * Build an aggregated run summary for downstream AI/analytics.
    * Instead of logging, this returns the JSON-friendly object so callers can send it.
    * @param {{ applied:boolean, baseScore:number, accuracy:number, bonus:number, newScore:number }|null} accuracySummary
+   * @param {number} [oldHighScore] The high score before this game ended (pre-update)
    * @returns {any}
    * @private
    */
-  _logRunSummary(accuracySummary) {
+  _logRunSummary(accuracySummary, oldHighScore) {
     let shotsFiredAccuracy = 0;
     const scoreSummary = (() => {
       if (!accuracySummary) return null;
@@ -1037,7 +1039,7 @@ class AIHorizon {
           : 0;
       shotsFiredAccuracy = roundedAccuracy;
       const finalScoreNormalized = typeof newScore === "number" ? newScore : (newScore ?? null);
-      const highScoreValue = Number.isFinite(this.highScore) ? this.highScore : null;
+      const highScoreValue = Number.isFinite(oldHighScore) ? oldHighScore : null;
 
       const differencePlayerFinalScoreToLeaderBoardHighScore =
         typeof highScoreValue === "number" && typeof finalScoreNormalized === "number"
