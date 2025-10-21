@@ -68,6 +68,7 @@ export const GameUI = {
       const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
       if (okBtn && AIAnalysisManager.IS_REMOTE) {
         okBtn.disabled = true;
+        okBtn.tabIndex = -1;
       }
     } catch {
       /* non-critical pre-disable ok button */

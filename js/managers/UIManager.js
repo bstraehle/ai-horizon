@@ -365,7 +365,16 @@ export class UIManager {
         return null;
       }
     };
+    const isDisabled = () => {
+      try {
+        return "disabled" in el && el.disabled;
+      } catch (_) {
+        return false;
+      }
+    };
     const attempt = () => {
+      // Don't attempt to focus if element is disabled
+      if (isDisabled()) return;
       try {
         attemptFn();
       } catch (_) {
@@ -375,16 +384,21 @@ export class UIManager {
     };
     attempt();
     if (hasDocument() && getActive() === el) return;
+    if (isDisabled()) return; // Don't retry if element is disabled
     requestAnimationFrame(() => {
+      if (isDisabled()) return;
       attempt();
       if (hasDocument() && getActive() === el) return;
       setTimeout(() => {
+        if (isDisabled()) return;
         attempt();
         if (hasDocument() && getActive() === el) return;
         setTimeout(() => {
+          if (isDisabled()) return;
           attempt();
           if (hasDocument() && getActive() === el) return;
           setTimeout(() => {
+            if (isDisabled()) return;
             attempt();
             if (hasDocument() && getActive() === el) return;
             if (forceCue) {
@@ -836,6 +850,12 @@ export class UIManager {
   /** @param {HTMLElement|null} el */
   static focusWithRetry(el) {
     if (!el) return;
+    // Prevent focusing disabled elements
+    try {
+      if ("disabled" in el && el.disabled) return;
+    } catch (_) {
+      /* ignore */
+    }
     UIManager._retryFocus(
       el,
       () => {
@@ -852,6 +872,12 @@ export class UIManager {
   /** @param {HTMLElement|null} el */
   static focusPreserveScroll(el) {
     if (!el) return;
+    // Prevent focusing disabled elements
+    try {
+      if ("disabled" in el && el.disabled) return;
+    } catch (_) {
+      /* ignore */
+    }
     UIManager._retryFocus(
       el,
       () => {

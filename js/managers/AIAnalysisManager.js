@@ -110,6 +110,7 @@ export class AIAnalysisManager {
         const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
         if (okBtn) {
           okBtn.disabled = false;
+          okBtn.tabIndex = 0;
           try {
             okBtn.focus();
           } catch {
@@ -133,6 +134,7 @@ export class AIAnalysisManager {
         const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
         if (okBtn) {
           okBtn.disabled = true;
+          okBtn.tabIndex = -1;
           try {
             okBtn.blur();
           } catch {
