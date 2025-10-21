@@ -373,7 +373,6 @@ export class UIManager {
       }
     };
     const attempt = () => {
-      // Don't attempt to focus if element is disabled
       if (isDisabled()) return;
       try {
         attemptFn();
@@ -384,7 +383,7 @@ export class UIManager {
     };
     attempt();
     if (hasDocument() && getActive() === el) return;
-    if (isDisabled()) return; // Don't retry if element is disabled
+    if (isDisabled()) return;
     requestAnimationFrame(() => {
       if (isDisabled()) return;
       attempt();
@@ -850,7 +849,6 @@ export class UIManager {
   /** @param {HTMLElement|null} el */
   static focusWithRetry(el) {
     if (!el) return;
-    // Prevent focusing disabled elements
     try {
       if ("disabled" in el && el.disabled) return;
     } catch (_) {
