@@ -34,6 +34,7 @@ export const InputBindings = {
     game.handleResize = game.handleResize.bind(game);
     game.handleStartScreenFocusGuard = game.handleStartScreenFocusGuard.bind(game);
     game.handleGameOverFocusGuard = game.handleGameOverFocusGuard.bind(game);
+    game.handleCanvasMouseDown = game.handleCanvasMouseDown.bind(game);
     game.handlePauseKeyDown = game.handlePauseKeyDown.bind(game);
     game.shouldTogglePause = game.shouldTogglePause.bind(game);
     game.handleScroll = game.handleScroll.bind(game);
@@ -75,6 +76,7 @@ export const InputBindings = {
         handleRestartKeyDown: game.handleRestartKeyDown,
         handleStartScreenFocusGuard: game.handleStartScreenFocusGuard,
         handleGameOverFocusGuard: game.handleGameOverFocusGuard,
+        handleCanvasMouseDown: game.handleCanvasMouseDown,
         handleWindowFocus: () =>
           UIManager.handleWindowFocus(
             /** @type {HTMLElement|null} */ (game.gameInfo || null),

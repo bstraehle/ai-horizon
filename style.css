@@ -83,6 +83,8 @@ body {
   height: 100%;
   width: 100%;
   touch-action: none;
+  outline: none;
+  pointer-events: auto;
 }
 .game-container {
   display: flex;

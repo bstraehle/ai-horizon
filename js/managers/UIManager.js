@@ -1256,21 +1256,29 @@ export class UIManager {
    */
   static handleStartScreenFocusGuard(e, gameInfo, startBtn) {
     if (!gameInfo || gameInfo.classList.contains("hidden")) return;
-    const t = UIManager.isElement(e && e.target) ? /** @type {Element} */ (e.target) : null;
-    const targetIsLink = t && typeof t.closest === "function" && t.closest("a");
-    const targetIsStart =
-      t === startBtn || (t && typeof t.closest === "function" && t.closest("#startBtn"));
 
     if (e.type === "blur") {
-      const related = /** @type {HTMLElement|null} */ (
-        (e && /** @type {any} */ (e).relatedTarget) || document.activeElement
-      );
+      const related = /** @type {HTMLElement|null} */ (e && /** @type {any} */ (e).relatedTarget);
       const movedToLink = related && typeof related.closest === "function" && related.closest("a");
       const movedInsideOverlay = gameInfo && related && gameInfo.contains(related);
       if (movedToLink && movedInsideOverlay) {
         return;
       }
+      if (startBtn) {
+        try {
+          if ("disabled" in startBtn && startBtn.disabled) return;
+          startBtn.focus();
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      return;
     }
+
+    const t = UIManager.isElement(e && e.target) ? /** @type {Element} */ (e.target) : null;
+    const targetIsLink = t && typeof t.closest === "function" && t.closest("a");
+    const targetIsStart =
+      t === startBtn || (t && typeof t.closest === "function" && t.closest("#startBtn"));
 
     if (targetIsLink) {
       return;
@@ -1301,8 +1309,52 @@ export class UIManager {
     const gameOverVisible = !!(gameOverScreen && !gameOverScreen.classList.contains("hidden"));
     const postGameVisibleCheck = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
     if (!gameOverVisible && !postGameVisibleCheck) return;
-    const t = UIManager.isElement(e && e.target) ? /** @type {Element} */ (e.target) : null;
+
     const postGameVisible = postGameVisibleCheck;
+
+    if (e && e.type === "blur") {
+      if (postGameVisible) {
+        const okTarget =
+          postGameOkBtn ||
+          /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn")) ||
+          restartBtn;
+        if (okTarget) {
+          try {
+            if (!("disabled" in okTarget && okTarget.disabled)) {
+              okTarget.focus();
+            }
+          } catch (_) {
+            /* ignore */
+          }
+        }
+        return;
+      }
+
+      const initialsInput = document.getElementById("initialsInput");
+      if (initialsInput && !initialsInput.classList.contains("hidden")) {
+        try {
+          if (!("disabled" in initialsInput && initialsInput.disabled)) {
+            initialsInput.focus();
+          }
+        } catch (_) {
+          /* ignore */
+        }
+        return;
+      }
+
+      if (restartBtn) {
+        try {
+          if (!("disabled" in restartBtn && restartBtn.disabled)) {
+            restartBtn.focus();
+          }
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      return;
+    }
+
+    const t = UIManager.isElement(e && e.target) ? /** @type {Element} */ (e.target) : null;
     if (postGameVisible) {
       const okTarget =
         postGameOkBtn ||
@@ -1312,10 +1364,6 @@ export class UIManager {
       const targetIsOk =
         t === okTarget || (t && typeof t.closest === "function" && t.closest("#okBtn"));
       if (targetIsOk) {
-        if (e && e.type === "blur") {
-          if (UIManager._preserveFocus) UIManager.focusPreserveScroll(okTarget);
-          else UIManager.focusWithRetry(okTarget);
-        }
         return;
       }
 
@@ -1380,25 +1428,15 @@ export class UIManager {
       submitEl &&
       !submitEl.classList.contains("hidden") &&
       (t === submitEl || (t && typeof t.closest === "function" && t.closest("#submitScoreBtn")));
+
     if (targetIsRestart) {
-      if (
-        e &&
-        e.type === "blur" &&
-        (!initialsEl || initialsEl.classList.contains("hidden")) &&
-        (!submitEl || submitEl.classList.contains("hidden"))
-      ) {
-        if (UIManager._preserveFocus) UIManager.focusPreserveScroll(restartBtn);
-        else UIManager.focusWithRetry(restartBtn);
-      }
       return;
     }
+
     if (targetIsSubmit) {
-      if (e && e.type === "blur" && submitEl && !submitEl.classList.contains("hidden")) {
-        if (UIManager._preserveFocus) UIManager.focusPreserveScroll(submitEl);
-        else UIManager.focusWithRetry(submitEl);
-      }
       return;
     }
+
     if (targetIsInitials) return;
 
     if (UIManager._preserveFocus) UIManager.focusPreserveScroll(restartBtn);

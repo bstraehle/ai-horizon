@@ -82,5 +82,7 @@ export class InputManager {
     document.addEventListener("visibilitychange", handlers.handleVisibilityChange);
     document.addEventListener("focusin", handlers.handleDocumentFocusIn, true);
     window.addEventListener("scroll", handlers.handleScroll, { passive: true });
+
+    document.addEventListener("mousedown", handlers.handleCanvasMouseDown, true);
   }
 }

@@ -208,6 +208,7 @@
  * @property {(e:KeyboardEvent)=>void} handleRestartKeyDown
  * @property {(e:Event)=>void} handleStartScreenFocusGuard
  * @property {(e:Event)=>void} handleGameOverFocusGuard
+ * @property {(e:MouseEvent)=>void} handleCanvasMouseDown
  * @property {()=>void} handleWindowFocus
  * @property {()=>void} handleVisibilityChange
  * @property {(e:FocusEvent)=>void} handleDocumentFocusIn

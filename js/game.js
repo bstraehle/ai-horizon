@@ -542,6 +542,94 @@ class AIHorizon {
   }
 
   /**
+   * Prevent canvas clicks from removing focus when overlays are visible.
+   * @param {MouseEvent} e
+   */
+  handleCanvasMouseDown(e) {
+    try {
+      const target = e && e.target;
+
+      const startVisible = this.gameInfo && !this.gameInfo.classList.contains("hidden");
+      if (startVisible) {
+        const isStartBtn =
+          target === this.startBtn ||
+          (target && typeof target.closest === "function" && target.closest("#startBtn"));
+        const isLink = target && typeof target.closest === "function" && target.closest("a");
+
+        if (isStartBtn || isLink) {
+          return false;
+        }
+
+        if (e.cancelable) e.preventDefault();
+        if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+
+        setTimeout(() => {
+          if (this.startBtn && !this.startBtn.disabled) {
+            this.startBtn.focus();
+            setTimeout(() => {
+              if (document.activeElement !== this.startBtn) {
+                this.startBtn.focus();
+              }
+            }, 10);
+          }
+        }, 0);
+        return false;
+      }
+
+      const leaderboardVisible =
+        this.leaderboardScreen && !this.leaderboardScreen.classList.contains("hidden");
+      const postGameVisible =
+        this.gameOverScreen && !this.gameOverScreen.classList.contains("hidden");
+
+      if (leaderboardVisible || postGameVisible) {
+        let focusTarget = null;
+
+        if (postGameVisible && this.okBtn && !this.okBtn.disabled) {
+          focusTarget = this.okBtn;
+          const isOkBtn =
+            target === this.okBtn ||
+            (target && typeof target.closest === "function" && target.closest("#okBtn"));
+          if (isOkBtn) return false;
+        } else {
+          const initialsInput = document.getElementById("initialsInput");
+          if (initialsInput && !initialsInput.classList.contains("hidden")) {
+            focusTarget = initialsInput;
+            const isInitials =
+              target && typeof target.closest === "function" && target.closest("#initialsInput");
+            const isSubmit =
+              target && typeof target.closest === "function" && target.closest("#submitScoreBtn");
+            if (isInitials || isSubmit) return false;
+          } else {
+            focusTarget = this.restartBtn;
+            const isRestart =
+              target === this.restartBtn ||
+              (target && typeof target.closest === "function" && target.closest("#restartBtn"));
+            if (isRestart) return false;
+          }
+        }
+
+        if (e.cancelable) e.preventDefault();
+        if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+
+        setTimeout(() => {
+          if (focusTarget && !focusTarget.disabled) {
+            focusTarget.focus();
+            setTimeout(() => {
+              if (document.activeElement !== focusTarget) {
+                focusTarget.focus();
+              }
+            }, 10);
+          }
+        }, 0);
+        return false;
+      }
+    } catch (_err) {
+      // Silently fail to not break game
+    }
+    return false;
+  }
+
+  /**
    * Ensure the correct overlay button is focused if an overlay is visible.
    * Useful when the user switches tabs/apps and returns.
    */
