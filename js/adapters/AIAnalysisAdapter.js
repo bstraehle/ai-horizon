@@ -105,7 +105,7 @@ export class AIAnalysisAdapter {
 
       if (bonusAsteroidsKilled < 5) {
         bullets.push(
-          "🪨💎 Destroy all 8 bonus asteroids. Destroyed: " +
+          "🪨💎 Destroy all 8 bonus asteroids. You destroyed " +
             bonusAsteroidsKilled +
             " of " +
             bonusAsteroidsSpawned +
@@ -141,31 +141,6 @@ export class AIAnalysisAdapter {
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
-      const shotsFiredAccuracy = payload.runSummary.stats.shotsFiredAccuracy ?? 0;
-      const shotsFiredOnTarget = payload.runSummary.stats.shotsFiredOnTarget ?? 0;
-      const shotsFired = payload.runSummary.stats.shotsFired ?? 0;
-
-      if (shotsFiredAccuracy < 1) {
-        bullets.push(
-          "🎯 Increase shots fired accuracy for end of mission bonus (0-100%). Your accuracy is " +
-            (shotsFiredAccuracy * 100).toFixed(0) +
-            "% (" +
-            shotsFiredOnTarget +
-            " of " +
-            shotsFired +
-            ")."
-        );
-      } else {
-        bullets.push(
-          "🎯 Great job, your shots fired accuracy for end of mission bonus is 100% (" +
-            shotsFiredOnTarget +
-            " of " +
-            shotsFired +
-            ")."
-        );
-      }
-    }
-    if (payload.runSummary && payload.runSummary.stats) {
       const hardenedAsteroidsKilledAccuracy =
         payload.runSummary.stats.hardenedAsteroidsKilledAccuracy ?? 0;
       const hardenedAsteroidsKilled = payload.runSummary.stats.hardenedAsteroidsKilled ?? 0;
@@ -187,6 +162,31 @@ export class AIAnalysisAdapter {
             hardenedAsteroidsKilled +
             " of " +
             hardenedAsteroidsSpawned +
+            ")."
+        );
+      }
+    }
+    if (payload.runSummary && payload.runSummary.stats) {
+      const shotsFiredAccuracy = payload.runSummary.stats.shotsFiredAccuracy ?? 0;
+      const shotsFiredOnTarget = payload.runSummary.stats.shotsFiredOnTarget ?? 0;
+      const shotsFired = payload.runSummary.stats.shotsFired ?? 0;
+
+      if (shotsFiredAccuracy < 1) {
+        bullets.push(
+          "🎯 Increase shots fired accuracy for end of mission bonus (0-100%). Your accuracy is " +
+            (shotsFiredAccuracy * 100).toFixed(0) +
+            "% (" +
+            shotsFiredOnTarget +
+            " of " +
+            shotsFired +
+            ")."
+        );
+      } else {
+        bullets.push(
+          "🎯 Great job, your shots fired accuracy for end of mission bonus is 100% (" +
+            shotsFiredOnTarget +
+            " of " +
+            shotsFired +
             ")."
         );
       }
