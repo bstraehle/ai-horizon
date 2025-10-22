@@ -5,6 +5,7 @@
 import { LeaderboardManager } from "./LeaderboardManager.js";
 import { CONFIG } from "../constants.js";
 import { BackgroundManager } from "./BackgroundManager.js";
+import { FocusManager } from "./FocusManager.js";
 export class UIManager {
   static _preserveFocus = false;
   /** @type {(() => void)|null} */
@@ -731,6 +732,31 @@ export class UIManager {
     } catch (_) {
       /* ignore */
     }
+
+    try {
+      const { initialsScreen, initialsEntry } = UIManager._getInitialsElements();
+      if (preferred === okBtn && okBtn) {
+        FocusManager.lock(okBtn, {
+          scope: gameOverScreen || null,
+          allowedSelectors: ["#okBtn"],
+          preserveScroll: true,
+        });
+      } else if (preferred === visibleInitials && visibleInitials) {
+        FocusManager.lock(visibleInitials, {
+          scope: initialsScreen || initialsEntry || null,
+          allowedSelectors: ["#initialsInput", "#initialsLabel", "#submitScoreBtn"],
+          preserveScroll: true,
+        });
+      } else if (preferred === restartBtn && restartBtn) {
+        FocusManager.lock(restartBtn, {
+          scope: leaderboardScreen || null,
+          allowedSelectors: ["#restartBtn", "a", "#leaderboardList"],
+          preserveScroll: true,
+        });
+      }
+    } catch (_) {
+      /* focus lock optional */
+    }
   }
 
   /** @param {HTMLElement|null} gameOverScreen @param {HTMLElement|null} [postGameScreen=null] */
@@ -756,6 +782,12 @@ export class UIManager {
     } catch (_) {
       /* ignore */
     }
+
+    try {
+      FocusManager.unlock();
+    } catch (_) {
+      /* ignore */
+    }
   }
 
   /** @param {HTMLElement|null} postGameScreen */
@@ -768,6 +800,11 @@ export class UIManager {
       } catch (_) {
         /* ignore */
       }
+    } catch (_) {
+      /* ignore */
+    }
+    try {
+      FocusManager.unlock();
     } catch (_) {
       /* ignore */
     }
@@ -811,6 +848,16 @@ export class UIManager {
         }
       });
 
+      UIManager._try(() => {
+        if (initialsInput) {
+          FocusManager.lock(initialsInput, {
+            scope: initialsScreen || null,
+            allowedSelectors: ["#initialsInput", "#initialsLabel", "#submitScoreBtn"],
+            preserveScroll: true,
+          });
+        }
+      });
+
       return "initials";
     } else {
       UIManager._try(() => {
@@ -830,6 +877,16 @@ export class UIManager {
         }
       });
 
+      UIManager._try(() => {
+        if (restartBtn) {
+          FocusManager.lock(restartBtn, {
+            scope: leaderboardScreen || null,
+            allowedSelectors: ["#restartBtn", "a", "#leaderboardList"],
+            preserveScroll: true,
+          });
+        }
+      });
+
       return "leaderboard";
     }
   }
@@ -843,6 +900,11 @@ export class UIManager {
       } catch (_) {
         /* ignore */
       }
+    }
+    try {
+      FocusManager.unlock();
+    } catch (_) {
+      /* ignore */
     }
   }
 
@@ -1089,6 +1151,13 @@ export class UIManager {
     postGameScreen = null,
     postGameOkBtn = null
   ) {
+    try {
+      if (typeof FocusManager !== "undefined" && FocusManager.isActive && FocusManager.isActive()) {
+        return;
+      }
+    } catch (_) {
+      /* ignore */
+    }
     const postGameVisible = !!(postGameScreen && !postGameScreen.classList.contains("hidden"));
     if (postGameVisible) {
       const okTarget =
@@ -1118,6 +1187,22 @@ export class UIManager {
     if (gameInfo && !gameInfo.classList.contains("hidden")) {
       if (UIManager._preserveFocus) UIManager.focusPreserveScroll(startBtn);
       else UIManager.focusWithRetry(startBtn);
+      try {
+        if (
+          typeof FocusManager !== "undefined" &&
+          FocusManager.isActive &&
+          !FocusManager.isActive() &&
+          startBtn
+        ) {
+          FocusManager.lock(startBtn, {
+            scope: gameInfo || null,
+            allowedSelectors: ["#startBtn", "a"],
+            preserveScroll: true,
+          });
+        }
+      } catch (_) {
+        /* ignore */
+      }
       return;
     }
   }
@@ -1138,6 +1223,13 @@ export class UIManager {
     postGameScreen = null,
     postGameOkBtn = null
   ) {
+    try {
+      if (typeof FocusManager !== "undefined" && FocusManager.isActive && FocusManager.isActive()) {
+        return;
+      }
+    } catch (_) {
+      /* ignore */
+    }
     UIManager.ensureOverlayFocus(
       gameInfo,
       startBtn,
@@ -1165,6 +1257,17 @@ export class UIManager {
     postGameOkBtn = null
   ) {
     if (!document.hidden) {
+      try {
+        if (
+          typeof FocusManager !== "undefined" &&
+          FocusManager.isActive &&
+          FocusManager.isActive()
+        ) {
+          return;
+        }
+      } catch (_) {
+        /* ignore */
+      }
       UIManager.ensureOverlayFocus(
         gameInfo,
         startBtn,
@@ -1194,6 +1297,13 @@ export class UIManager {
     postGameScreen = null,
     postGameOkBtn = null
   ) {
+    try {
+      if (typeof FocusManager !== "undefined" && FocusManager.isActive && FocusManager.isActive()) {
+        return;
+      }
+    } catch (_) {
+      /* ignore */
+    }
     const overlayPostGameVisible = !!(
       postGameScreen && !postGameScreen.classList.contains("hidden")
     );
@@ -1249,49 +1359,6 @@ export class UIManager {
     }
   }
 
-  /** Interaction guard while Start overlay visible (restrict focus to Start button & links).
-   * @param {Event} e
-   * @param {HTMLElement|null} gameInfo
-   * @param {HTMLElement|null} startBtn
-   */
-  static handleStartScreenFocusGuard(e, gameInfo, startBtn) {
-    if (!gameInfo || gameInfo.classList.contains("hidden")) return;
-
-    if (e.type === "blur") {
-      const related = /** @type {HTMLElement|null} */ (e && /** @type {any} */ (e).relatedTarget);
-      const movedToLink = related && typeof related.closest === "function" && related.closest("a");
-      const movedInsideOverlay = gameInfo && related && gameInfo.contains(related);
-      if (movedToLink && movedInsideOverlay) {
-        return;
-      }
-      if (startBtn) {
-        try {
-          if ("disabled" in startBtn && startBtn.disabled) return;
-          startBtn.focus();
-        } catch (_) {
-          /* ignore */
-        }
-      }
-      return;
-    }
-
-    const t = UIManager.isElement(e && e.target) ? /** @type {Element} */ (e.target) : null;
-    const targetIsLink = t && typeof t.closest === "function" && t.closest("a");
-    const targetIsStart =
-      t === startBtn || (t && typeof t.closest === "function" && t.closest("#startBtn"));
-
-    if (targetIsLink) {
-      return;
-    }
-    if (!targetIsStart) {
-      if (e.cancelable) e.preventDefault();
-      e.stopPropagation();
-    }
-
-    if (UIManager._preserveFocus) UIManager.focusPreserveScroll(startBtn);
-    else UIManager.focusWithRetry(startBtn);
-  }
-
   /** Interaction guard while Game Over overlay visible (keeps restart/initials controls focused).
    * @param {Event} e
    * @param {HTMLElement|null} gameOverScreen
@@ -1312,48 +1379,15 @@ export class UIManager {
 
     const postGameVisible = postGameVisibleCheck;
 
-    if (e && e.type === "blur") {
-      if (postGameVisible) {
-        const okTarget =
-          postGameOkBtn ||
-          /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn")) ||
-          restartBtn;
-        if (okTarget) {
-          try {
-            if (!("disabled" in okTarget && okTarget.disabled)) {
-              okTarget.focus();
-            }
-          } catch (_) {
-            /* ignore */
-          }
-        }
+    if (e && e.type === "blur") return;
+
+    try {
+      if (typeof FocusManager !== "undefined" && FocusManager.isActive && FocusManager.isActive()) {
         return;
       }
-
-      const initialsInput = document.getElementById("initialsInput");
-      if (initialsInput && !initialsInput.classList.contains("hidden")) {
-        try {
-          if (!("disabled" in initialsInput && initialsInput.disabled)) {
-            initialsInput.focus();
-          }
-        } catch (_) {
-          /* ignore */
-        }
-        return;
-      }
-
-      if (restartBtn) {
-        try {
-          if (!("disabled" in restartBtn && restartBtn.disabled)) {
-            restartBtn.focus();
-          }
-        } catch (_) {
-          /* ignore */
-        }
-      }
-      return;
+    } catch (_) {
+      /* ignore */
     }
-
     const t = UIManager.isElement(e && e.target) ? /** @type {Element} */ (e.target) : null;
     if (postGameVisible) {
       const okTarget =

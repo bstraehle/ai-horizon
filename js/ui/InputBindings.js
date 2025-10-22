@@ -32,7 +32,6 @@ export const InputBindings = {
     game.handleRestartKeyDown = game.handleRestartKeyDown.bind(game);
     game.resizeCanvas = game.resizeCanvas.bind(game);
     game.handleResize = game.handleResize.bind(game);
-    game.handleStartScreenFocusGuard = game.handleStartScreenFocusGuard.bind(game);
     game.handleGameOverFocusGuard = game.handleGameOverFocusGuard.bind(game);
     game.handleCanvasMouseDown = game.handleCanvasMouseDown.bind(game);
     game.handlePauseKeyDown = game.handlePauseKeyDown.bind(game);
@@ -74,7 +73,6 @@ export const InputBindings = {
         handlePostGameOkKeyDown: game.handlePostGameOkKeyDown,
         handleStartKeyDown: game.handleStartKeyDown,
         handleRestartKeyDown: game.handleRestartKeyDown,
-        handleStartScreenFocusGuard: game.handleStartScreenFocusGuard,
         handleGameOverFocusGuard: game.handleGameOverFocusGuard,
         handleCanvasMouseDown: game.handleCanvasMouseDown,
         handleWindowFocus: () =>

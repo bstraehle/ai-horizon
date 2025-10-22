@@ -3,6 +3,7 @@ import { AIAnalysisAdapter } from "../adapters/AIAnalysisAdapter.js";
 import { RemoteStorageAdapter } from "../adapters/RemoteStorageAdapter.js";
 import { CognitoAPIClient } from "../adapters/Cognito.js";
 import { LeaderboardManager } from "./LeaderboardManager.js";
+import { FocusManager } from "./FocusManager.js";
 
 /**
  * AIAnalysisManager – static facade to compute and render post-game AI analysis.
@@ -115,6 +116,18 @@ export class AIAnalysisManager {
             okBtn.focus();
           } catch {
             /* non-critical focus */
+          }
+          try {
+            const postGame = /** @type {HTMLElement|null} */ (
+              document.getElementById("gameOverScreen")
+            );
+            FocusManager.lock(okBtn, {
+              scope: postGame || null,
+              allowedSelectors: ["#okBtn"],
+              preserveScroll: true,
+            });
+          } catch {
+            /* focus lock optional */
           }
         }
       } catch {

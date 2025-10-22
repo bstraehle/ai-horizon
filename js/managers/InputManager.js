@@ -58,11 +58,6 @@ export class InputManager {
     }
     startBtn.addEventListener("keydown", handlers.handleStartKeyDown);
     restartBtn.addEventListener("keydown", handlers.handleRestartKeyDown);
-    startBtn.addEventListener("blur", handlers.handleStartScreenFocusGuard, true);
-    gameInfo.addEventListener("mousedown", handlers.handleStartScreenFocusGuard, true);
-    gameInfo.addEventListener("touchstart", handlers.handleStartScreenFocusGuard, {
-      passive: false,
-    });
     restartBtn.addEventListener("blur", handlers.handleGameOverFocusGuard, true);
     leaderboardScreen.addEventListener("mousedown", handlers.handleGameOverFocusGuard, true);
     leaderboardScreen.addEventListener("touchstart", handlers.handleGameOverFocusGuard, {

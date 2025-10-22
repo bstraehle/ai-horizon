@@ -206,7 +206,6 @@
  * @property {(e:KeyboardEvent)=>void} handlePostGameOkKeyDown
  * @property {(e:KeyboardEvent)=>void} handleStartKeyDown
  * @property {(e:KeyboardEvent)=>void} handleRestartKeyDown
- * @property {(e:Event)=>void} handleStartScreenFocusGuard
  * @property {(e:Event)=>void} handleGameOverFocusGuard
  * @property {(e:MouseEvent)=>void} handleCanvasMouseDown
  * @property {()=>void} handleWindowFocus

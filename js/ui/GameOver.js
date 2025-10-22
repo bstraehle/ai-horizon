@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { LeaderboardManager } from "../managers/LeaderboardManager.js";
 import { UIManager } from "../managers/UIManager.js";
+import { FocusManager } from "../managers/FocusManager.js";
 import { GameUI } from "./GameUI.js";
 
 /**
@@ -146,9 +147,18 @@ export function handleGameOver(game) {
           const restartBtn = /** @type {HTMLButtonElement|null} */ (
             document.getElementById("restartBtn")
           );
-          if (restartBtn) UIManager.focusWithRetry(restartBtn);
+          const leaderboardScreen = /** @type {HTMLElement|null} */ (
+            document.getElementById("leaderboardScreen")
+          );
+          if (restartBtn) {
+            FocusManager.lock(restartBtn, {
+              scope: leaderboardScreen || null,
+              allowedSelectors: ["#restartBtn", "a", "#leaderboardList"],
+              preserveScroll: true,
+            });
+          }
         } catch {
-          /* ignore */
+          /* optional focus lock */
         }
 
         try {

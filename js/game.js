@@ -518,15 +518,6 @@ class AIHorizon {
   }
 
   /**
-   * Keep focus on the start button when the Start overlay is visible.
-   * Prevents taps/clicks from removing focus on mobile.
-   * @param {Event} e
-   */
-  handleStartScreenFocusGuard(e) {
-    UIManager.handleStartScreenFocusGuard(e, this.gameInfo, this.startBtn);
-  }
-
-  /**
    * Keep focus on the restart button when the Game Over overlay is visible.
    * Prevents taps/clicks from removing focus on mobile.
    * @param {Event} e

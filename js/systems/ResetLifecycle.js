@@ -2,6 +2,7 @@
 import { BackgroundManager } from "../managers/BackgroundManager.js";
 import { SpawnManager } from "../managers/SpawnManager.js";
 import { UIManager } from "../managers/UIManager.js";
+import { FocusManager } from "../managers/FocusManager.js";
 import { GameStateMachine } from "../core/GameStateMachine.js";
 import { EventHandlers } from "../systems/EventHandlers.js";
 import { SpriteManager } from "../managers/SpriteManager.js";
@@ -150,6 +151,15 @@ export function fullReset(game) {
 
   try {
     UIManager.focusWithRetry(game.startBtn);
+    try {
+      FocusManager.lock(/** @type {HTMLElement|null} */ (game.startBtn || null), {
+        scope: /** @type {HTMLElement|null} */ (game.gameInfo || null),
+        allowedSelectors: ["#startBtn", "a"],
+        preserveScroll: true,
+      });
+    } catch {
+      /* optional start overlay focus lock */
+    }
   } catch {
     /* ignore */
   }
