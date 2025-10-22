@@ -2,6 +2,11 @@
  * AIAnalysisAdapter – provides AI analysis of gameplay runs via REST API or mock fallback.
  * Sends run summaries to POST /leaderboard endpoint and transforms responses into actionable suggestions.
  */
+import { CONFIG } from "../constants.js";
+const TIMER_SECONDS = CONFIG?.GAME?.TIMER_SECONDS ?? 90;
+const FINALE_SECONDS = CONFIG?.GAME?.FINALE_BONUS_WINDOW_SECONDS ?? 15;
+const BONUS_ASTEROID_COUNT = CONFIG?.GAME?.BONUS_ASTEROID_COUNT ?? 8;
+
 export class AIAnalysisAdapter {
   /**
    * Create an AIAnalysisAdapter.
@@ -90,34 +95,46 @@ export class AIAnalysisAdapter {
 
       if (survivedSeconds > 0) {
         bullets.push(
-          "🚀 Don't get hit by an asteroid, fly the full 90 seconds. You flew " +
+          "🚀 Don't get hit by an asteroid, fly the full " +
+            TIMER_SECONDS +
+            " seconds. You flew " +
             survivedSeconds +
             " seconds."
         );
       } else {
-        bullets.push("🚀 Great job, you didn't get hit by an asteroid, flew the full 90 seconds.");
+        bullets.push(
+          "🚀 Great job, you didn't get hit by an asteroid, flew the full " +
+            TIMER_SECONDS +
+            " seconds."
+        );
       }
     }
-    bullets.push("🔥 Finish strong during the double-point finale (last 15 seconds).");
+    bullets.push(
+      "🔥 Finish strong during the double-point finale (last " + FINALE_SECONDS + " seconds)."
+    );
     if (payload.runSummary && payload.runSummary.stats) {
       const bonusAsteroidsKilled = payload.runSummary.stats.bonusAsteroidsKilled ?? 0;
-      const bonusAsteroidsSpawned = payload.runSummary.stats.bonusAsteroidsSpawned ?? 0;
+      const bonusAsteroidsEncountered = payload.runSummary.stats.bonusAsteroidsEncountered ?? 0;
 
-      if (bonusAsteroidsKilled < 5) {
+      if (bonusAsteroidsKilled < BONUS_ASTEROID_COUNT) {
         bullets.push(
-          "🪨💎 Destroy all 8 bonus asteroids. You destroyed " +
+          "🪨💎 Destroy all " +
+            BONUS_ASTEROID_COUNT +
+            " bonus asteroids. You destroyed " +
             bonusAsteroidsKilled +
             " of " +
-            bonusAsteroidsSpawned +
+            bonusAsteroidsEncountered +
             "."
         );
       } else {
-        bullets.push("🪨💎 Great job, you destroyed all 8 bonus asteroids.");
+        bullets.push(
+          "🪨💎 Great job, you destroyed all " + BONUS_ASTEROID_COUNT + " bonus asteroids."
+        );
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
       const bonusStarsCollected = payload.runSummary.stats.bonusStarsCollected ?? 0;
-      const bonusStarsSpawned = payload.runSummary.stats.bonusStarsSpawned ?? 0;
+      const bonusStarsEncountered = payload.runSummary.stats.bonusStarsEncountered ?? 0;
       const bonusStarsCollectedAccuracy = payload.runSummary.stats.bonusStarsCollectedAccuracy ?? 0;
 
       if (bonusStarsCollected < 5) {
@@ -127,7 +144,7 @@ export class AIAnalysisAdapter {
             "% (" +
             bonusStarsCollected +
             " of " +
-            bonusStarsSpawned +
+            bonusStarsEncountered +
             ")."
         );
       } else {
@@ -135,7 +152,7 @@ export class AIAnalysisAdapter {
           "⭐💎 Great job, you collected all bonus stars (" +
             bonusStarsCollected +
             " of " +
-            bonusStarsSpawned +
+            bonusStarsEncountered +
             ")."
         );
       }
@@ -144,7 +161,8 @@ export class AIAnalysisAdapter {
       const hardenedAsteroidsKilledAccuracy =
         payload.runSummary.stats.hardenedAsteroidsKilledAccuracy ?? 0;
       const hardenedAsteroidsKilled = payload.runSummary.stats.hardenedAsteroidsKilled ?? 0;
-      const hardenedAsteroidsSpawned = payload.runSummary.stats.hardenedAsteroidsSpawned ?? 0;
+      const hardenedAsteroidsEncountered =
+        payload.runSummary.stats.hardenedAsteroidsEncountered ?? 0;
 
       if (hardenedAsteroidsKilledAccuracy < 1) {
         bullets.push(
@@ -153,7 +171,7 @@ export class AIAnalysisAdapter {
             "% (" +
             hardenedAsteroidsKilled +
             " of " +
-            hardenedAsteroidsSpawned +
+            hardenedAsteroidsEncountered +
             ")."
         );
       } else {
@@ -161,15 +179,15 @@ export class AIAnalysisAdapter {
           "🪨🛡️ Great job, you destroyed all hardened asteroids (" +
             hardenedAsteroidsKilled +
             " of " +
-            hardenedAsteroidsSpawned +
+            hardenedAsteroidsEncountered +
             ")."
         );
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
       const shotsFiredAccuracy = payload.runSummary.stats.shotsFiredAccuracy ?? 0;
-      const shotsFiredOnTarget = payload.runSummary.stats.shotsFiredOnTarget ?? 0;
-      const shotsFired = payload.runSummary.stats.shotsFired ?? 0;
+      const shotsFiredOnTarget = payload.runSummary.stats.shotsFiredHitTarget ?? 0;
+      const shotsFired = payload.runSummary.stats.shotsFiredTotal ?? 0;
 
       if (shotsFiredAccuracy < 1) {
         bullets.push(
@@ -192,9 +210,9 @@ export class AIAnalysisAdapter {
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
-      const starsCollectedAccuracy = payload.runSummary.stats.starsCollectedAccuracy ?? 0;
-      const starsCollected = payload.runSummary.stats.starsCollected ?? 0;
-      const starsSpawned = payload.runSummary.stats.starsSpawned ?? 0;
+      const starsCollectedAccuracy = payload.runSummary.stats.regularStarsCollectedAccuracy ?? 0;
+      const starsCollected = payload.runSummary.stats.regularStarsCollected ?? 0;
+      const starsEncountered = payload.runSummary.stats.regularStarsEncountered ?? 0;
 
       if (starsCollectedAccuracy < 1) {
         bullets.push(
@@ -203,7 +221,7 @@ export class AIAnalysisAdapter {
             "% (" +
             starsCollected +
             " of " +
-            starsSpawned +
+            starsEncountered +
             ")."
         );
       } else {
@@ -211,15 +229,15 @@ export class AIAnalysisAdapter {
           "⭐ Great job, you collected all regular stars (" +
             starsCollected +
             " of " +
-            starsSpawned +
+            starsEncountered +
             ")."
         );
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
-      const asteroidsKilledAccuracy = payload.runSummary.stats.asteroidsKilledAccuracy ?? 0;
-      const asteroidsKilled = payload.runSummary.stats.asteroidsKilled ?? 0;
-      const asteroidsSpawned = payload.runSummary.stats.asteroidsSpawned ?? 0;
+      const asteroidsKilledAccuracy = payload.runSummary.stats.regularAsteroidsKilledAccuracy ?? 0;
+      const asteroidsKilled = payload.runSummary.stats.regularAsteroidsKilled ?? 0;
+      const asteroidsEncountered = payload.runSummary.stats.regularAsteroidsEncountered ?? 0;
 
       if (asteroidsKilledAccuracy < 1) {
         bullets.push(
@@ -228,7 +246,7 @@ export class AIAnalysisAdapter {
             "% (" +
             asteroidsKilled +
             " of " +
-            asteroidsSpawned +
+            asteroidsEncountered +
             ")."
         );
       } else {
@@ -236,13 +254,13 @@ export class AIAnalysisAdapter {
           "🪨 Great job, you destroyed all regular asteroids (" +
             asteroidsKilled +
             " of " +
-            asteroidsSpawned +
+            asteroidsEncountered +
             ")."
         );
       }
     }
     return {
-      title: "👨‍🚀 Mission Analysis",
+      title: "Mission Analysis",
       bullets,
     };
   }
