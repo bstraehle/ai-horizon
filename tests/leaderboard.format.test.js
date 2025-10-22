@@ -39,9 +39,9 @@ describe("LeaderboardManager.formatRow / formatRows", () => {
     expect(row.text).not.toContain("6 •");
   });
 
-  it("formatRows caps at 100 entries", () => {
+  it("formatRows caps at MAX_ENTRIES entries", () => {
     const many = Array.from({ length: 150 }, (_, i) => ({ id: "AAA", score: i }));
     const lines = LeaderboardManager.formatRows(many);
-    expect(lines.length).toBe(100);
+    expect(lines.length).toBe(LeaderboardManager.MAX_ENTRIES);
   });
 });

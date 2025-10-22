@@ -13,15 +13,15 @@ import { LeaderboardManager } from "../LeaderboardManager";
  * @property {number} rank   1‑based rank.
  * @property {string} badge  Sanitized / validated `id` ("???" fallback).
  * @property {string} medal  Medal emoji for top 3 or empty string.
- * @property {string} icon   Number emoji (4️⃣) for ranks 4-100 or empty string.
+ * @property {string} icon   Number emoji (4️⃣) for ranks 4-MAX_ENTRIES or empty string.
  * @property {string} text   Composite presentation string.
  * @property {string} accuracyFormatted Formatted accuracy (XX%) or empty string.
  * @property {string} dateFormatted Formatted date (YYYY-MM-DD) or empty string.
  */
 
 /**
- * Convert a number (1-100) to emoji digit representation.
- * Examples: 4 → "4️⃣", 10 → "1️⃣0️⃣", 42 → "4️⃣2️⃣", 100 → "1️⃣0️⃣0️⃣"
+ * Convert a number (1-MAX_ENTRIES) to emoji digit representation.
+ * Examples: 4 → "4️⃣", 10 → "1️⃣0️⃣", 42 → "4️⃣2️⃣"
  *
  * @param {number} num The number to convert (should be 1-100).
  * @returns {string} The emoji digit string.
@@ -133,12 +133,12 @@ export function formatRow(entry, index) {
 
 /**
  * Vectorized convenience wrapper: returns presentation strings for many entries.
- * Safeguards: caps output at 100 rows to avoid excessive DOM inflation.
+ * Safeguards: caps output at MAX_ENTRIES rows to avoid excessive DOM inflation.
  *
  * @param {LeaderboardEntry[]} entries Pre‑sorted normalized entries.
  * @returns {string[]} Presentation strings (<=100 length).
  */
 export function formatRows(entries) {
   if (!Array.isArray(entries) || entries.length === 0) return [];
-  return entries.slice(0, 100).map((e, idx) => formatRow(e, idx).text);
+  return entries.slice(0, LeaderboardManager.MAX_ENTRIES).map((e, idx) => formatRow(e, idx).text);
 }
