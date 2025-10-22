@@ -90,31 +90,29 @@ export class AIAnalysisAdapter {
 
       if (survivedSeconds > 0) {
         bullets.push(
-          "⏱️ Play full 90 seconds without getting killed by an asteroid. Played: " +
+          "🚀 Don't get hit by an asteroid, fly the full 90 seconds. You flew " +
             survivedSeconds +
             " seconds."
         );
       } else {
-        bullets.push(
-          "⏱️ Great job, you played full 90 seconds without getting killed by an asteroid."
-        );
+        bullets.push("🚀 Great job, you didn't get hit by an asteroid, flew the full 90 seconds.");
       }
     }
-    bullets.push("🎮 Finish strong during double-point finale (last 15 seconds).");
+    bullets.push("🔥 Finish strong during the double-point finale (last 15 seconds).");
     if (payload.runSummary && payload.runSummary.stats) {
       const bonusAsteroidsKilled = payload.runSummary.stats.bonusAsteroidsKilled ?? 0;
       const bonusAsteroidsSpawned = payload.runSummary.stats.bonusAsteroidsSpawned ?? 0;
 
       if (bonusAsteroidsKilled < 5) {
         bullets.push(
-          "🌑 Destroy all 8 bonus asteroids. Destroyed: " +
+          "🪨💎 Destroy all 8 bonus asteroids. Destroyed: " +
             bonusAsteroidsKilled +
             " of " +
             bonusAsteroidsSpawned +
             "."
         );
       } else {
-        bullets.push("🌑 Great job, you destroyed all 8 bonus asteroids.");
+        bullets.push("🪨💎 Great job, you destroyed all 8 bonus asteroids.");
       }
     }
     if (payload.runSummary && payload.runSummary.stats) {
@@ -124,7 +122,7 @@ export class AIAnalysisAdapter {
 
       if (bonusStarsCollected < 5) {
         bullets.push(
-          "🌟 Collect more bonus stars. Accuracy: " +
+          "⭐💎 Collect more bonus stars. Your accuracy is " +
             (bonusStarsCollectedAccuracy * 100).toFixed(0) +
             "% (" +
             bonusStarsCollected +
@@ -134,7 +132,7 @@ export class AIAnalysisAdapter {
         );
       } else {
         bullets.push(
-          "🌟 Great job, you collected all bonus stars (" +
+          "⭐💎 Great job, you collected all bonus stars (" +
             bonusStarsCollected +
             " of " +
             bonusStarsSpawned +
@@ -149,7 +147,7 @@ export class AIAnalysisAdapter {
 
       if (shotsFiredAccuracy < 1) {
         bullets.push(
-          "🎯 Increase shots fired accuracy for end of flight bonus (0-100%). Accuracy: " +
+          "🎯 Increase shots fired accuracy for end of mission bonus (0-100%). Your accuracy is " +
             (shotsFiredAccuracy * 100).toFixed(0) +
             "% (" +
             shotsFiredOnTarget +
@@ -159,7 +157,7 @@ export class AIAnalysisAdapter {
         );
       } else {
         bullets.push(
-          "🎯 Great job, shots fired accuracy for end of flight bonus is 100% (" +
+          "🎯 Great job, your shots fired accuracy for end of mission bonus is 100% (" +
             shotsFiredOnTarget +
             " of " +
             shotsFired +
@@ -175,7 +173,7 @@ export class AIAnalysisAdapter {
 
       if (hardenedAsteroidsKilledAccuracy < 1) {
         bullets.push(
-          "🛡️ Destroy more hardened asteroids. Accuracy: " +
+          "🪨🛡️ Destroy more hardened asteroids. Your accuracy is " +
             (hardenedAsteroidsKilledAccuracy * 100).toFixed(0) +
             "% (" +
             hardenedAsteroidsKilled +
@@ -185,7 +183,7 @@ export class AIAnalysisAdapter {
         );
       } else {
         bullets.push(
-          "🛡️ Great job, you destroyed all hardened asteroids (" +
+          "🪨🛡️ Great job, you destroyed all hardened asteroids (" +
             hardenedAsteroidsKilled +
             " of " +
             hardenedAsteroidsSpawned +
@@ -200,7 +198,7 @@ export class AIAnalysisAdapter {
 
       if (starsCollectedAccuracy < 1) {
         bullets.push(
-          "⭐ Collect more regular stars. Accuracy: " +
+          "⭐ Collect more regular stars. Your accuracy is " +
             (starsCollectedAccuracy * 100).toFixed(0) +
             "% (" +
             starsCollected +
@@ -225,7 +223,7 @@ export class AIAnalysisAdapter {
 
       if (asteroidsKilledAccuracy < 1) {
         bullets.push(
-          "🪨 Destroy more regular asteroids. Accuracy: " +
+          "🪨 Destroy more regular asteroids. Your accuracy is " +
             (asteroidsKilledAccuracy * 100).toFixed(0) +
             "% (" +
             asteroidsKilled +
@@ -244,7 +242,7 @@ export class AIAnalysisAdapter {
       }
     }
     return {
-      title: "How to improve your score",
+      title: "👨‍🚀 Mission analysis.",
       bullets,
     };
   }

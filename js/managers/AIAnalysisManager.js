@@ -138,7 +138,7 @@ export class AIAnalysisManager {
     if (isRemote) {
       try {
         const p = document.createElement("p");
-        p.textContent = "✨ AI analysis by 👨‍🚀 space force officer ✨";
+        p.textContent = "✨ Mission analysis by space force officer ✨";
         container.appendChild(p);
       } catch {
         /* non-critical immediate placeholder render */
