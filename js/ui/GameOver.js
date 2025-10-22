@@ -135,6 +135,12 @@ export function handleGameOver(game) {
         }
 
         try {
+          UIManager._resetLeaderboardScroll();
+        } catch {
+          /* non-critical */
+        }
+
+        try {
           const restartBtn = /** @type {HTMLButtonElement|null} */ (
             document.getElementById("restartBtn")
           );

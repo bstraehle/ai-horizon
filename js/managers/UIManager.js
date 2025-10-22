@@ -872,6 +872,10 @@ export class UIManager {
       });
 
       UIManager._try(() => {
+        UIManager._resetLeaderboardScroll();
+      });
+
+      UIManager._try(() => {
         if (restartBtn) {
           UIManager.focusWithRetry(restartBtn);
         }
