@@ -149,7 +149,7 @@ export class AIAnalysisAdapter {
 
       if (shotsFiredAccuracy < 1) {
         bullets.push(
-          "🎯 Increase shots fired accuracy for end of run bonus (0-100%). Accuracy: " +
+          "🎯 Increase shots fired accuracy for end of flight bonus (0-100%). Accuracy: " +
             (shotsFiredAccuracy * 100).toFixed(0) +
             "% (" +
             shotsFiredOnTarget +
@@ -159,7 +159,7 @@ export class AIAnalysisAdapter {
         );
       } else {
         bullets.push(
-          "🎯 Great job, shots fired accuracy for end of run bonus is 100% (" +
+          "🎯 Great job, shots fired accuracy for end of flight bonus is 100% (" +
             shotsFiredOnTarget +
             " of " +
             shotsFired +
