@@ -242,7 +242,7 @@ export class AIAnalysisAdapter {
       }
     }
     return {
-      title: "👨‍🚀 Mission analysis.",
+      title: "👨‍🚀 Mission Analysis",
       bullets,
     };
   }
