@@ -138,7 +138,7 @@ export class AIAnalysisManager {
     if (isRemote) {
       try {
         const p = document.createElement("p");
-        p.textContent = "✨ AI debrief protocol initiated...";
+        p.textContent = "✨ Mission debrief protocol initiated...";
         container.appendChild(p);
       } catch {
         /* non-critical immediate placeholder render */

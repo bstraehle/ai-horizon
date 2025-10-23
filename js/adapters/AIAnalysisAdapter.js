@@ -260,7 +260,7 @@ export class AIAnalysisAdapter {
       }
     }
     return {
-      title: "Debrief protocol concluded. Here are your performance insights:",
+      title: "Mission debrief protocol concluded. Here are your performance insights:",
       bullets,
     };
   }
