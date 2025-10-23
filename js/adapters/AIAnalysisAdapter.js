@@ -137,7 +137,7 @@ export class AIAnalysisAdapter {
       const bonusStarsEncountered = payload.runSummary.stats.bonusStarsEncountered ?? 0;
       const bonusStarsCollectedAccuracy = payload.runSummary.stats.bonusStarsCollectedAccuracy ?? 0;
 
-      if (bonusStarsCollected < 5) {
+      if (bonusStarsCollectedAccuracy < 1) {
         bullets.push(
           "⭐💎 Collect more bonus stars. Your accuracy is " +
             (bonusStarsCollectedAccuracy * 100).toFixed(0) +
@@ -260,7 +260,7 @@ export class AIAnalysisAdapter {
       }
     }
     return {
-      title: "Debrief protocol completed. Here are your performance insights:",
+      title: "Debrief protocol concluded. Here are your performance insights:",
       bullets,
     };
   }
