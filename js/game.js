@@ -1275,12 +1275,18 @@ class AIHorizon {
           typeof this.bonusAsteroidsKilled === "number" ? this.bonusAsteroidsKilled : null,
         bonusAsteroidsKilledAccuracy: bonusAsteroidsKilledAccuracy,
         shotsFiredTotal: typeof this.shotsFired === "number" ? this.shotsFired : null,
-        shotsFiredHitTarget:
-          (typeof this.regularAsteroidsKilled === "number" ? this.regularAsteroidsKilled : 0) +
-          (typeof this.hardenedAsteroidHitBullets === "number"
-            ? this.hardenedAsteroidHitBullets
-            : 0) +
-          (typeof this.bonusAsteroidHitBullets === "number" ? this.bonusAsteroidHitBullets : 0),
+        shotsFiredHitTarget: (() => {
+          const regular =
+            typeof this.regularAsteroidsKilled === "number" ? this.regularAsteroidsKilled : 0;
+          const hardenedHits =
+            typeof this.hardenedAsteroidHitBullets === "number"
+              ? this.hardenedAsteroidHitBullets
+              : 0;
+          const bonusHits =
+            typeof this.bonusAsteroidHitBullets === "number" ? this.bonusAsteroidHitBullets : 0;
+          const hardenedUnion = Math.max(hardenedHits, bonusHits);
+          return regular + hardenedUnion;
+        })(),
         shotsFiredAccuracy: shotsFiredAccuracy,
       },
       device: (() => {
