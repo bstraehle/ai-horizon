@@ -95,7 +95,7 @@ export class AIAnalysisAdapter {
 
       if (survivedSeconds > 0) {
         bullets.push(
-          "🚀 Don't get hit by an asteroid, fly the full " +
+          "🚀 Don't eject early, fly the full " +
             TIMER_SECONDS +
             " seconds. You flew " +
             survivedSeconds +
@@ -103,9 +103,7 @@ export class AIAnalysisAdapter {
         );
       } else {
         bullets.push(
-          "🚀 Great job, you didn't get hit by an asteroid, flew the full " +
-            TIMER_SECONDS +
-            " seconds."
+          "🚀 Great job, you didn't eject early, flew the full " + TIMER_SECONDS + " seconds."
         );
       }
     }
