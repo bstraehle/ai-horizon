@@ -90,6 +90,13 @@ const COLORS = deepFreeze({
     SHADOW: "#ff6b6b",
     TRAIL: "rgba(255, 107, 107, 0.5)",
   },
+  BULLET_UPGRADED: {
+    GRAD_BOTTOM: "#33d1ff",
+    GRAD_MID: "#7ae4ff",
+    GRAD_TOP: "#a6f0ff",
+    SHADOW: "#7ae4ff",
+    TRAIL: "rgba(122, 228, 255, 0.55)",
+  },
   EXPLOSION: {
     GRAD_IN: "rgba(255, 255, 255, ",
     GRAD_MID1: "rgba(255, 200, 100, ",
@@ -225,11 +232,13 @@ export const CONFIG = deepFreeze({
     },
   },
   BULLET: {
+    WIDTH: 4,
     HEIGHT: 15,
+    SHADOW_BLUR: 8,
     SPAWN_OFFSET: 0,
     TRAIL: 10,
-    WIDTH: 4,
-    SHADOW_BLUR: 8,
+    WIDTH_UPGRADED: 6,
+    HEIGHT_UPGRADED: 18,
   },
   COLORS: COLORS,
   EXPLOSION: {
@@ -278,6 +287,8 @@ export const CONFIG = deepFreeze({
     FINALE_BONUS_MULTIPLIER: 2,
     SCORING_BONUS_THRESHOLD: 1000,
     SCORING_BONUS_POINTS: 250,
+    BULLET_UPGRADE_SCORE: 2500,
+    BULLET_UPGRADE_HARDENED_HITS_FACTOR: 0.5,
   },
   INPUT: {
     CONFIRM_CODES: ["Enter"].sort(),

@@ -23,6 +23,8 @@ export class Bullet {
     this.width = width;
     this.height = height;
     this.speed = speed;
+    /** @type {"normal"|"upgraded"} */
+    this.style = "normal";
   }
 
   /**
@@ -38,12 +40,12 @@ export class Bullet {
    * @param {CanvasRenderingContext2D} ctx 2D context (state saved/restored outside caller responsibility).
    */
   draw(ctx) {
-    const sprite = Bullet._getSprite(this.width, this.height);
+    const sprite = Bullet._getSprite(this.width, this.height, this.style);
     if (sprite) {
       ctx.drawImage(sprite.canvas, this.x - sprite.padX, this.y - sprite.padY);
       return;
     }
-    Bullet._drawBullet(ctx, this.width, this.height, this.x, this.y);
+    Bullet._drawBullet(ctx, this.width, this.height, this.x, this.y, this.style);
   }
 
   /**
@@ -62,12 +64,13 @@ export class Bullet {
    * @param {number} height Height
    * @param {number} speed Upward speed
    */
-  reset(x, y, width, height, speed) {
+  reset(x, y, width, height, speed, style = "normal") {
     this.x = x;
     this.y = y;
     this.width = width;
     this.height = height;
     this.speed = speed;
+    this.style = style === "upgraded" ? "upgraded" : "normal";
   }
 
   /**
@@ -78,17 +81,21 @@ export class Bullet {
    * @param {number} originY
    * @private
    */
-  static _drawBullet(ctx, width, height, originX, originY) {
+  static _drawBullet(ctx, width, height, originX, originY, style = "normal") {
+    const palette =
+      style === "upgraded" && CONFIG.COLORS.BULLET_UPGRADED
+        ? CONFIG.COLORS.BULLET_UPGRADED
+        : CONFIG.COLORS.BULLET;
     ctx.save();
-    ctx.shadowColor = CONFIG.COLORS.BULLET.SHADOW;
+    ctx.shadowColor = palette.SHADOW;
     ctx.shadowBlur = CONFIG.BULLET.SHADOW_BLUR;
     const gradient = ctx.createLinearGradient(originX, originY, originX, originY + height);
-    gradient.addColorStop(0, CONFIG.COLORS.BULLET.GRAD_TOP);
-    gradient.addColorStop(0.5, CONFIG.COLORS.BULLET.GRAD_MID);
-    gradient.addColorStop(1, CONFIG.COLORS.BULLET.GRAD_BOTTOM);
+    gradient.addColorStop(0, palette.GRAD_TOP);
+    gradient.addColorStop(0.5, palette.GRAD_MID);
+    gradient.addColorStop(1, palette.GRAD_BOTTOM);
     ctx.fillStyle = gradient;
     ctx.fillRect(originX, originY, width, height);
-    ctx.fillStyle = CONFIG.COLORS.BULLET.TRAIL;
+    ctx.fillStyle = palette.TRAIL || CONFIG.COLORS.BULLET.TRAIL;
     ctx.fillRect(originX, originY + height, width, CONFIG.BULLET.TRAIL);
     ctx.restore();
   }
@@ -100,14 +107,14 @@ export class Bullet {
    * @returns {{ canvas: OffscreenCanvas | HTMLCanvasElement, padX: number, padY: number } | null}
    * @private
    */
-  static _getSprite(width, height) {
+  static _getSprite(width, height, style = "normal") {
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
       return null;
     }
     if (!Bullet._spriteCache) {
       Bullet._spriteCache = new Map();
     }
-    const key = `${width.toFixed(2)}x${height.toFixed(2)}`;
+    const key = `${style}:${width.toFixed(2)}x${height.toFixed(2)}`;
     const cached = Bullet._spriteCache.get(key);
     if (cached) return cached;
 
@@ -129,7 +136,7 @@ export class Bullet {
     const offCtx = canvas.getContext("2d");
     if (!offCtx) return null;
     offCtx.clearRect(0, 0, canvasWidth, canvasHeight);
-    Bullet._drawBullet(offCtx, width, height, padX, padY);
+    Bullet._drawBullet(offCtx, width, height, padX, padY, style);
     const sprite = { canvas, padX, padY };
     Bullet._spriteCache.set(key, sprite);
     return sprite;
@@ -137,7 +144,12 @@ export class Bullet {
 
   /** Preload the canonical bullet sprite used by the atlas. */
   static preloadSprites() {
-    Bullet._getSprite(CONFIG.BULLET.WIDTH, CONFIG.BULLET.HEIGHT);
+    Bullet._getSprite(CONFIG.BULLET.WIDTH, CONFIG.BULLET.HEIGHT, "normal");
+    if (CONFIG.COLORS && CONFIG.COLORS.BULLET_UPGRADED) {
+      const w2 = CONFIG.BULLET.WIDTH_UPGRADED || CONFIG.BULLET.WIDTH;
+      const h2 = CONFIG.BULLET.HEIGHT_UPGRADED || CONFIG.BULLET.HEIGHT;
+      Bullet._getSprite(w2, h2, "upgraded");
+    }
   }
 }
 

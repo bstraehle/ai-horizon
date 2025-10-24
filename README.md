@@ -244,6 +244,7 @@ Common adjustments:
 | More bonus stars                      | Decrease `GAME.STAR_NORMAL_BEFORE_BONUS`                                                     |
 | Cap visual density on low-end devices | Reduce `GAME.STARFIELD_COUNT_MOBILE`, `NEBULA.COUNT_MOBILE`, adjust `VIEW.DPR_MOBILE_MAX`    |
 | Faster player                         | Increase `SPEEDS.PLAYER` (watch collision balance)                                           |
+| Mid-run bullet power-up               | Set `GAME.BULLET_UPGRADE_SCORE` and tweak `GAME.BULLET_UPGRADE_HARDENED_HITS_FACTOR`         |
 
 Adding a new constant: add under the appropriate namespace, maintain UPPER_SNAKE_CASE, and ensure tests referencing balance still pass. Because `CONFIG` is deeply frozen, attempts to mutate at runtime will throw in strict mode, surfacing mistakes early.
 

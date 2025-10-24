@@ -100,7 +100,7 @@ export class Asteroid {
         : null;
     this.speed = speedFactor ? speed * speedFactor : speed;
     this._hits = 0;
-    // Damage crack storage (fixed-size) to avoid per-hit object allocations.
+    this._effectiveMaxHits = CONFIG.ASTEROID.HARDENED_HITS || 10;
     /** @private */ this._damageLineAngles = new Float32Array(8);
     /** @private */ this._damageLineLens = new Float32Array(8);
     /** @private */ this._damageLineCount = 0;
@@ -174,10 +174,11 @@ export class Asteroid {
       const hlEnd = highlightCenter + arcSpan / 2;
       const shStart = shadowCenter - arcSpan / 2;
       const shEnd = shadowCenter + arcSpan / 2;
+      const maxHitsForSeverity = this.isHardened
+        ? Math.max(1, this._effectiveMaxHits || CONFIG.ASTEROID.HARDENED_HITS || 10)
+        : CONFIG.ASTEROID.HARDENED_HITS || 10;
       const severity =
-        this.isHardened && this._hits > 0
-          ? Math.min(1, this._hits / (CONFIG.ASTEROID.HARDENED_HITS || 10))
-          : 0;
+        this.isHardened && this._hits > 0 ? Math.min(1, this._hits / maxHitsForSeverity) : 0;
       const darkenScale = cfg.SHADOW_DARKEN_SCALE || 0;
       const fadeScale = cfg.HIGHLIGHT_FADE_SCALE || 0;
       const midAlpha = (cfg.SHADOW_ALPHA_MID || 0.25) * (1 + darkenScale * severity);
@@ -229,7 +230,11 @@ export class Asteroid {
     ctx.stroke();
     if (this.isHardened && this._hits > 0) {
       ctx.save();
-      const severity = Math.min(1, this._hits / (CONFIG.ASTEROID.HARDENED_HITS || 10));
+      const maxHitsForSeverity2 = Math.max(
+        1,
+        this._effectiveMaxHits || CONFIG.ASTEROID.HARDENED_HITS || 10
+      );
+      const severity = Math.min(1, this._hits / maxHitsForSeverity2);
       const lines = 1 + Math.floor(severity * 4);
       let damageColor;
       if (palette && palette.NAME === "ICE") damageColor = "rgba(255,255,255,0.85)";
@@ -314,6 +319,7 @@ export class Asteroid {
     this.isBonus = false;
     this._shieldFlash = 0;
     this._hits = 0;
+    this._effectiveMaxHits = CONFIG.ASTEROID.HARDENED_HITS || 10;
     this._damageLineCount = 0;
     const radius = this.width / 2;
     const rand =
@@ -386,6 +392,23 @@ export class Asteroid {
     if (!this.isHardened) return true;
     this._hits = (this._hits || 0) + 1;
     try {
+      const baseMax = CONFIG.ASTEROID.HARDENED_HITS || 10;
+      let eff = baseMax;
+      const threshold = (CONFIG.GAME && CONFIG.GAME.BULLET_UPGRADE_SCORE | 0) || 0;
+      const factor =
+        CONFIG.GAME && typeof CONFIG.GAME.BULLET_UPGRADE_HARDENED_HITS_FACTOR === "number"
+          ? CONFIG.GAME.BULLET_UPGRADE_HARDENED_HITS_FACTOR
+          : 0.5;
+      const score = game && typeof game.score === "number" ? game.score : 0;
+      if (threshold > 0 && score >= threshold) {
+        const reduced = Math.ceil(baseMax * Math.max(0.05, Math.min(1, factor)));
+        eff = Math.max(1, reduced);
+      }
+      this._effectiveMaxHits = eff;
+    } catch {
+      /* ignore upgrade calc errors */
+    }
+    try {
       if (this._damageLineCount < this._damageLineAngles.length) {
         const rand =
           this._rng && typeof this._rng.nextFloat === "function"
@@ -429,7 +452,7 @@ export class Asteroid {
     if (newCraters.length && game) {
       for (const c of newCraters) this._spawnCraterDust(c, game);
     }
-    return this._hits >= (CONFIG.ASTEROID.HARDENED_HITS || 10);
+    return this._hits >= (this._effectiveMaxHits || CONFIG.ASTEROID.HARDENED_HITS || 10);
   }
 
   /**

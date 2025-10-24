@@ -33,16 +33,16 @@ describe("ScoringManager.applyAccuracyBonus", () => {
     expect(newScore).toBe(1700);
   });
 
-  it("counts hardened bullets as hits", () => {
+  it("uses kills (regular + hardened) for accuracy", () => {
     const game = makeGame({
       score: 1000,
       shotsFired: 10,
-      regularAsteroidsKilled: 2,
-      hardenedAsteroidHitBullets: 8,
+      regularAsteroidsKilled: 3,
+      hardenedAsteroidsKilled: 2,
     });
     const r = ScoringManager.applyAccuracyBonus(game);
-    expect(r.accuracy).toBe(1.0);
-    expect(r.bonus).toBe(1000);
+    expect(r.accuracy).toBeCloseTo(0.5, 10);
+    expect(r.bonus).toBe(500);
   });
 
   it("caps accuracy at 100%", () => {

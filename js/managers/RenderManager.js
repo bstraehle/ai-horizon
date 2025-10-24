@@ -48,16 +48,19 @@ export class RenderManager {
    * @param {number} viewHeight
    */
   static drawBullets(ctx, bullets, sprites, viewWidth, viewHeight) {
-    const spr = sprites && sprites.bullet;
+    const sprNormal = sprites && sprites.bullet;
+    const sprUpgraded = sprites && /** @type {any} */ (sprites).bulletUpgraded;
     const trail = (sprites && sprites.bulletTrail) || CONFIG.BULLET.TRAIL;
-    if (spr) {
-      const sw = spr.width,
-        sh = spr.height;
+    if (sprNormal) {
       for (let i = 0; i < bullets.length; i++) {
         const b = bullets[i];
         if (!isOnscreen(b, viewWidth, viewHeight, trail || 8)) continue;
         const dh = b.height + trail;
-        ctx.drawImage(spr, 0, 0, sw, sh, b.x, b.y, b.width, dh);
+        const useUp =
+          /** @type {any} */ (b).style === "upgraded" && sprUpgraded ? sprUpgraded : sprNormal;
+        const sw = useUp.width;
+        const sh = useUp.height;
+        ctx.drawImage(useUp, 0, 0, sw, sh, b.x, b.y, b.width, dh);
       }
     } else {
       for (let i = 0; i < bullets.length; i++) {

@@ -39,6 +39,28 @@ export class SpriteManager {
       }
     }
 
+    const bulletUpCanvas = document.createElement("canvas");
+    bulletUpCanvas.width = bw;
+    bulletUpCanvas.height = bh;
+    {
+      const c = bulletUpCanvas.getContext("2d");
+      if (c) {
+        const palette = CONFIG.COLORS.BULLET_UPGRADED || CONFIG.COLORS.BULLET;
+        c.save();
+        c.shadowColor = palette.SHADOW;
+        c.shadowBlur = 8;
+        const grad = c.createLinearGradient(0, 0, 0, CONFIG.BULLET.HEIGHT);
+        grad.addColorStop(0, palette.GRAD_TOP);
+        grad.addColorStop(0.5, palette.GRAD_MID);
+        grad.addColorStop(1, palette.GRAD_BOTTOM);
+        c.fillStyle = grad;
+        c.fillRect(0, 0, bw, CONFIG.BULLET.HEIGHT);
+        c.fillStyle = palette.TRAIL || CONFIG.COLORS.BULLET.TRAIL;
+        c.fillRect(0, CONFIG.BULLET.HEIGHT, bw, trail);
+        c.restore();
+      }
+    }
+
     const starBaseSize = 64;
     const starCanvas = document.createElement("canvas");
     starCanvas.width = starBaseSize;
@@ -141,6 +163,7 @@ export class SpriteManager {
 
     const atlas = {
       bullet: bulletCanvas,
+      bulletUpgraded: bulletUpCanvas,
       bulletTrail: trail,
       star: starCanvas,
       starBlue: starBlueCanvas,

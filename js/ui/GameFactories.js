@@ -15,8 +15,20 @@ export const GameFactories = {
   createBullet(game) {
     const player = /** @type {any} */ (game.player);
     const pool = /** @type {any} */ (game.bulletPool);
-    const bx = player.x + (player.width - CONFIG.BULLET.WIDTH) / 2 + CONFIG.BULLET.SPAWN_OFFSET;
-    return pool.acquire(bx, player.y, CONFIG.BULLET.WIDTH, CONFIG.BULLET.HEIGHT, game.bulletSpeed);
+    const upgraded =
+      (CONFIG.GAME && CONFIG.GAME.BULLET_UPGRADE_SCORE | 0) > 0 &&
+      typeof game.score === "number" &&
+      game.score >= (CONFIG.GAME.BULLET_UPGRADE_SCORE | 0);
+    const bw =
+      upgraded && (CONFIG.BULLET.WIDTH_UPGRADED || 0) > 0
+        ? CONFIG.BULLET.WIDTH_UPGRADED
+        : CONFIG.BULLET.WIDTH;
+    const bh =
+      upgraded && (CONFIG.BULLET.HEIGHT_UPGRADED || 0) > 0
+        ? CONFIG.BULLET.HEIGHT_UPGRADED
+        : CONFIG.BULLET.HEIGHT;
+    const bx = player.x + (player.width - bw) / 2 + CONFIG.BULLET.SPAWN_OFFSET;
+    return pool.acquire(bx, player.y, bw, bh, game.bulletSpeed, upgraded ? "upgraded" : "normal");
   },
   /**
    * Spawn an explosion entity & its particle cloud subject to performance budget.
