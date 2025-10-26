@@ -18,7 +18,7 @@ describe("LeaderboardManager game-summary and ai-analysis persistence as strings
       timer: {
         totalSeconds: 90,
         survivedSeconds: 45,
-        toPlaySeconds: 45,
+        missedSeconds: 45,
       },
       score: {
         playerBaseScore: 1000,

@@ -1216,7 +1216,7 @@ class AIHorizon {
     const finaleWindowSeconds = CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS || 0;
     const totalSecondsFinale = finaleWindowSeconds > 0 ? finaleWindowSeconds : null;
     let survivedSecondsFinale = null;
-    let toPlaySecondsFinale = null;
+    let missedSecondsFinale = null;
     if (
       totalSecondsFinale !== null &&
       typeof totalSecondsInt === "number" &&
@@ -1225,10 +1225,10 @@ class AIHorizon {
       const timeIntoFinale = Math.max(0, totalSecondsInt - finaleWindowSeconds);
       if (runtimeSecondsInt !== null && runtimeSecondsInt >= timeIntoFinale) {
         survivedSecondsFinale = Math.min(finaleWindowSeconds, runtimeSecondsInt - timeIntoFinale);
-        toPlaySecondsFinale = Math.max(0, finaleWindowSeconds - survivedSecondsFinale);
+        missedSecondsFinale = Math.max(0, finaleWindowSeconds - survivedSecondsFinale);
       } else {
         survivedSecondsFinale = 0;
-        toPlaySecondsFinale = finaleWindowSeconds;
+        missedSecondsFinale = finaleWindowSeconds;
       }
     }
     const summary = {
@@ -1242,10 +1242,10 @@ class AIHorizon {
       timer: {
         totalSeconds: totalSecondsInt,
         survivedSeconds: runtimeSecondsInt,
-        toPlaySeconds: remainingSecondsInt,
+        missedSeconds: remainingSecondsInt,
         totalSecondsFinale: totalSecondsFinale,
         survivedSecondsFinale: survivedSecondsFinale,
-        toPlaySecondsFinale: toPlaySecondsFinale,
+        missedSecondsFinale: missedSecondsFinale,
       },
       score: scoreSummary,
       stats: {
