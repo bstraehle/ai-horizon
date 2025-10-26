@@ -112,6 +112,7 @@ Gameplay / visuals:
 - Layered starfield + nebula fog with parallax
 - Hardened planetary asteroids (shield + multi-hit) altering pacing & scoring
 - Particle FX: explosions, engine trail, crater dust puffs, score popups
+- Dramatic end sequence on player–asteroid collision (impact cluster + screen flash)
 
 Systems / architecture:
 

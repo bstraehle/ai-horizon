@@ -1,6 +1,7 @@
 import { CONFIG } from "../constants.js";
 import { ScoringManager } from "../managers/ScoringManager.js";
 import { BackgroundManager } from "../managers/BackgroundManager.js";
+import { UIManager } from "../managers/UIManager.js";
 
 /**
  * EventHandlers – centralized wiring of EventBus driven gameplay side‑effects.
@@ -137,6 +138,29 @@ export const EventHandlers = {
 
     unsubs.push(
       events.on("playerHitAsteroid", () => {
+        if (game && /** @type {any} */ (game)._dramaticEndPlayed) {
+          game.gameOver();
+          return;
+        }
+        /** @type {any} */ (game)._dramaticEndPlayed = true;
+        try {
+          const p = /** @type {any} */ (game.player);
+          if (p && typeof game.createExplosion === "function") {
+            const cx = (p.x || 0) + (p.width || 0) / 2;
+            const cy = (p.y || 0) + (p.height || 0) / 2;
+            /** @param {number} min @param {number} max @returns {number} */
+            game.createExplosion(cx, cy);
+          }
+        } catch {
+          /* ignore explosion side-effects */
+        }
+        try {
+          if (UIManager && typeof UIManager.showDramaticEnd === "function") {
+            UIManager.showDramaticEnd();
+          }
+        } catch {
+          /* optional UI flourish */
+        }
         game.gameOver();
       })
     );

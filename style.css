@@ -56,6 +56,7 @@
     var(--leaderboard-line-height) + (2 * var(--leaderboard-row-padding-block)) +
       (2 * var(--leaderboard-row-border))
   );
+  --dramatic-duration: 500ms;
 }
 /* 2. Base / Reset ---------------------------------------- */
 * {
@@ -204,6 +205,45 @@ body {
   z-index: 2000;
   overscroll-behavior: none;
   touch-action: none;
+}
+.dramatic-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.92);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 4000;
+}
+@keyframes dramatic-flash {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.dramatic-overlay.show {
+  animation: dramatic-flash var(--dramatic-duration) ease-out both;
+}
+@keyframes screen-punch {
+  0% {
+    transform: translateZ(0) scale(1);
+  }
+  14% {
+    transform: translateZ(0) scale(1.05);
+  }
+  100% {
+    transform: translateZ(0) scale(1);
+  }
+}
+.screen-punch {
+  animation: screen-punch var(--dramatic-duration) cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 @media (max-width: 480px) {
   .game-over-screen {

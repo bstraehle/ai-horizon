@@ -22,6 +22,121 @@ export class UIManager {
     }
   }
 
+  /**
+   * Brief full-screen flash and subtle screen punch when the player is destroyed.
+   * Safe in non-DOM environments; all operations are guarded.
+   * Unified effect for all asteroid types (regular, hardened, bonus).
+   */
+  static showDramaticEnd() {
+    try {
+      if (typeof document === "undefined") return;
+      /** @type {string} */
+      let baseHex = "#ffffff";
+      try {
+        const palette =
+          typeof BackgroundManager?.getCurrentNebulaPalette === "function"
+            ? BackgroundManager.getCurrentNebulaPalette()
+            : "red";
+        if (palette === "blue" && CONFIG?.COLORS?.STAR_BLUE?.BASE) {
+          baseHex = CONFIG.COLORS.STAR_BLUE.BASE;
+        } else if (CONFIG?.COLORS?.STAR_RED?.BASE) {
+          baseHex = CONFIG.COLORS.STAR_RED.BASE;
+        }
+      } catch (_) {
+        /* ignore palette lookup */
+      }
+      /** Convert hex to rgba; unified intensity regardless of asteroid type.
+       * @param {string} hex
+       * @param {number} [alpha]
+       */
+      const toRgba = (hex, alpha = 0.9) => {
+        try {
+          const h = String(hex || "").replace("#", "");
+          const v =
+            h.length === 3
+              ? h
+                  .split("")
+                  .map((/** @type {string} */ c) => c + c)
+                  .join("")
+              : h.padEnd(6, "0");
+          const r = parseInt(v.slice(0, 2), 16);
+          const g = parseInt(v.slice(2, 4), 16);
+          const b = parseInt(v.slice(4, 6), 16);
+          if ([r, g, b].some((n) => Number.isNaN(n))) throw new Error("bad hex");
+          return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        } catch (_) {
+          return `rgba(255,255,255,${alpha})`;
+        }
+      };
+      const overlayId = "dramaticEndOverlay";
+      /** @type {HTMLElement|null} */
+      let overlay = /** @type {HTMLElement|null} */ (document.getElementById(overlayId));
+      if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = overlayId;
+        document.body.appendChild(overlay);
+      }
+      try {
+        overlay.classList.remove("show");
+        overlay.classList.add("dramatic-overlay", "show");
+        overlay.style.background = toRgba(baseHex, 0.9);
+      } catch (_) {
+        /* ignore */
+      }
+      const cleanupOverlay = () => {
+        try {
+          overlay?.classList.remove("show");
+          if (overlay && overlay.parentElement) overlay.parentElement.removeChild(overlay);
+        } catch (_) {
+          /* ignore */
+        }
+      };
+      try {
+        overlay.addEventListener(
+          "animationend",
+          () => {
+            cleanupOverlay();
+          },
+          { once: true }
+        );
+      } catch (_) {
+        setTimeout(cleanupOverlay, 600);
+      }
+      try {
+        const container = /** @type {HTMLElement|null} */ (
+          document.querySelector?.(".game-container") || document.body
+        );
+        if (!container) return;
+        try {
+          container.classList.remove("screen-punch");
+        } catch (_) {
+          /* ignore */
+        }
+        try {
+          void (/** @type {any} */ (container).offsetWidth);
+        } catch (_) {
+          /* ignore */
+        }
+        try {
+          container.classList.add("screen-punch");
+        } catch (_) {
+          /* ignore */
+        }
+        setTimeout(() => {
+          try {
+            container.classList.remove("screen-punch");
+          } catch (_) {
+            /* ignore */
+          }
+        }, 650);
+      } catch (_) {
+        /* ignore */
+      }
+    } catch (_) {
+      /* ignore top-level */
+    }
+  }
+
   /** @param {string} id */
   static _byId(id) {
     try {

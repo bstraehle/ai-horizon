@@ -50,6 +50,7 @@ export function resetCoreRuntimeState(game) {
   game.finaleBaseScore = 0;
   game.finaleBonus = 0;
   game._accuracyBonusApplied = false;
+  game._dramaticEndPlayed = false;
   game.updateScore();
   game.timerRemaining = game.timerSeconds;
   try {
