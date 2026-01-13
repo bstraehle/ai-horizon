@@ -3,8 +3,23 @@ import { CONFIG } from "../constants.js";
 
 /**
  * Warm object pools with representative instances to reduce first-frame latency.
- * Implementation is defensive; absence of a pool or warmUp method is silently ignored.
- * @param {AIHorizon} game
+ *
+ * Pre-allocates entities in each pool using typical game parameters to avoid
+ * allocation stutter during the first seconds of gameplay. Called during game
+ * initialization and after platform changes.
+ *
+ * Pools Warmed:
+ *  - bulletPool: 64 instances with standard bullet dimensions.
+ *  - asteroidPool: 32 instances with average asteroid size.
+ *  - starPool: 32 instances with average star size.
+ *  - particlePool: 256 instances for explosion particles.
+ *  - explosionPool: 16 instances for explosion effects.
+ *
+ * Error Handling:
+ *  - Defensive implementation; absence of a pool or warmUp method is silently ignored.
+ *  - All warmup operations wrapped in try/catch to prevent initialization failures.
+ *
+ * @param {AIHorizon} game Game instance containing object pools to warm.
  */
 export function warmUpPools(game) {
   if (!game) return;

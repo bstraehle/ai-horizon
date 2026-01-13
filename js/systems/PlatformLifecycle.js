@@ -6,9 +6,23 @@ import { SpriteManager } from "../managers/SpriteManager.js";
 
 /**
  * Soft reinitialize platform-dependent parameters without clearing active gameplay state.
- * Adjusts speeds, spawn manager counters, partial pool warmups, and sprite atlas.
- * @param {AIHorizon} game
- * @param {boolean} nowMobile
+ *
+ * Called when the platform detection changes (e.g., window resize crossing mobile threshold)
+ * to adjust game parameters for the new platform context while preserving current session.
+ *
+ * Adjustments Made:
+ *  - Updates _isMobile flag and recalculates asteroid/star speeds from CONFIG.
+ *  - Resets SpawnManager counters for fresh spawn scheduling.
+ *  - Clears nebulaConfigs to trigger regeneration on next background draw.
+ *  - Warms up star and asteroid pools with platform-appropriate parameters.
+ *  - Recreates sprite atlas via SpriteManager.
+ *
+ * Performance:
+ *  - Lightweight operation suitable for mid-game platform transitions.
+ *  - Pool warmups are bounded and defensive (silently ignored if pools unavailable).
+ *
+ * @param {AIHorizon} game Game instance to reinitialize.
+ * @param {boolean} nowMobile Whether the current platform is mobile.
  */
 export function softReinitForPlatformChange(game, nowMobile) {
   game._isMobile = nowMobile;

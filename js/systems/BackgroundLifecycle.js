@@ -6,10 +6,23 @@ import { RNG } from "../utils/RNG.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
 /**
- * Initialize background (nebula configs + starfield) using current game context & performance flags.
- * @param {AIHorizon} game
- * @param {{ preservePalette?: boolean }} [options] Optional settings
- *   preservePalette: If true, keeps current nebula palette instead of flipping (for performance adjustments)
+ * Initialize background layers (nebula configs + starfield) using current game context.
+ *
+ * Creates or regenerates the procedural background elements based on current view dimensions,
+ * platform detection, and performance settings. Skips reinitialization during game over state
+ * if backgrounds already exist to preserve visual continuity.
+ *
+ * Behavior:
+ *  - Builds GameContext snapshot with current performance flags (_starfieldScale, _isLowPowerMode).
+ *  - Generates fresh RNG seed if not provided via URL parameter for varied backgrounds.
+ *  - Delegates to BackgroundManager.init for actual nebula and starfield generation.
+ *
+ * Side Effects:
+ *  - Mutates game.nebulaConfigs and game.starField with new background data.
+ *
+ * @param {AIHorizon} game Game instance to initialize backgrounds for.
+ * @param {{ preservePalette?: boolean }} [options] Optional settings.
+ *   preservePalette: If true, keeps current nebula palette instead of flipping (for performance adjustments).
  */
 export function initBackgroundLifecycle(game, options = {}) {
   try {
@@ -50,8 +63,14 @@ export function initBackgroundLifecycle(game, options = {}) {
 }
 
 /**
- * Draw only the background (nebula/starfield layers) for the current frame.
- * @param {AIHorizon} game
+ * Draw only the background layers (nebula and starfield) for the current frame.
+ *
+ * Builds a GameContext snapshot and delegates to BackgroundManager.draw for actual rendering.
+ * Supports optional nebula suppression for performance or visual effect purposes.
+ *
+ * @param {AIHorizon} game Game instance containing background data and rendering context.
+ * @param {{ suppressNebula?: boolean }} [options] Optional rendering flags.
+ *   suppressNebula: If true, skips nebula layer rendering (useful during transitions).
  */
 export function drawBackgroundLifecycle(game, options) {
   const ctx = getGameContext(game);

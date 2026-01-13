@@ -11,6 +11,13 @@ import { InputState } from "../core/InputState.js";
 import { warmUpPools } from "../ui/PoolWarmup.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
+/**
+ * Release all items in an array back to their associated object pool.
+ *
+ * @param {any[]} arr Array of pooled objects to release.
+ * @param {import('../utils/ObjectPool.js').ObjectPool<any>} pool Target pool for recycling.
+ * @private
+ */
 function releaseAll(arr, pool) {
   if (!arr || !pool) return;
   for (const it of arr) {
@@ -22,6 +29,14 @@ function releaseAll(arr, pool) {
   }
 }
 
+/**
+ * Release all dynamic game entities back to their respective object pools.
+ *
+ * Releases asteroids, bullets, explosions, particles, and stars to minimize
+ * memory pressure and prepare pools for reuse on game restart.
+ *
+ * @param {AIHorizon} game Game instance containing entity arrays and pools.
+ */
 export function releaseAllDynamic(game) {
   releaseAll(game.asteroids, game.asteroidPool);
   releaseAll(game.bullets, game.bulletPool);
@@ -30,6 +45,21 @@ export function releaseAllDynamic(game) {
   releaseAll(game.stars, game.starPool);
 }
 
+/**
+ * Reset all core runtime state variables to their initial values.
+ *
+ * Clears score, statistics counters, accuracy tracking, and timer. Reinitializes
+ * empty entity arrays and resets input state. Called during both soft and full
+ * game resets to ensure clean slate for new gameplay session.
+ *
+ * Side Effects:
+ *  - Mutates game.score, game.shotsFired, and all stat counters to zero.
+ *  - Clears entity arrays (asteroids, bullets, explosions, particles, stars, scorePopups).
+ *  - Resets fire rate limiter and creates fresh InputState.
+ *  - Updates UI timer display.
+ *
+ * @param {AIHorizon} game Game instance to reset.
+ */
 export function resetCoreRuntimeState(game) {
   game.score = 0;
   game.shotsFired = 0;
@@ -68,6 +98,15 @@ export function resetCoreRuntimeState(game) {
   game.input = new InputState();
 }
 
+/**
+ * Reset game state for a new session while preserving infrastructure.
+ *
+ * Combines entity pool release with core state reset. Optionally clears nebula
+ * configuration to force regeneration on next background init.
+ *
+ * @param {AIHorizon} game Game instance to reset.
+ * @param {boolean} [forceNebula=false] If true, clears nebulaConfigs to trigger regeneration.
+ */
 export function resetGameState(game, forceNebula = false) {
   releaseAllDynamic(game);
   resetCoreRuntimeState(game);
@@ -75,6 +114,27 @@ export function resetGameState(game, forceNebula = false) {
   if (forceNebula) game.nebulaConfigs = undefined;
 }
 
+/**
+ * Perform a complete game reset including infrastructure teardown and reinitialization.
+ *
+ * Stops the game loop, resets performance monitoring, releases all pooled entities,
+ * clears runtime state, reinitializes platform-dependent parameters, warms up pools,
+ * recreates sprites and background, hides overlays, and sets up fresh state machine
+ * and event handlers.
+ *
+ * Use Cases:
+ *  - Initial game setup after page load.
+ *  - Complete restart from game over screen.
+ *  - Recovery from corrupted state.
+ *
+ * Side Effects:
+ *  - Stops and restarts game loop.
+ *  - Reinitializes all managers and systems.
+ *  - Resets UI overlays and focus state.
+ *  - Unsubscribes and re-registers event handlers.
+ *
+ * @param {AIHorizon} game Game instance to fully reset.
+ */
 export function fullReset(game) {
   if (game.loop) {
     try {
