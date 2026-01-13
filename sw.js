@@ -18,7 +18,15 @@ const PRECACHE_CORE = [
   "/pwa-register.js",
 ];
 
-// Detect which bundle path exists (dev vs prod) without logging expected 404 noise.
+/**
+ * Detect which bundle path exists (dev vs prod) without logging expected 404 noise.
+ *
+ * Probes candidate bundle locations using HEAD requests to avoid 404 console errors.
+ * Returns the first path that responds with a 2xx status.
+ *
+ * @returns {Promise<string|null>} The detected bundle path, or null if none found.
+ * @private
+ */
 async function detectBundlePath() {
   const candidates = ["/dist/bundle.js", "/bundle.js"];
   for (const c of candidates) {
@@ -73,8 +81,22 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Helper: stale-while-revalidate for static assets
-// Returns cached response immediately (if any) while updating cache in background.
+/**
+ * Stale-while-revalidate caching strategy for static assets.
+ *
+ * Returns cached response immediately (if available) while updating the cache
+ * in the background. Provides instant load times for returning visitors while
+ * ensuring assets stay fresh.
+ *
+ * Behavior:
+ *  - If cached: returns cached response immediately, fetches fresh in background.
+ *  - If not cached: fetches from network and caches the response.
+ *  - Broadcasts 'asset-updated' message to all clients when cache is refreshed.
+ *
+ * @param {Request} request The fetch request to handle.
+ * @returns {Promise<Response>} The cached or fresh response.
+ * @private
+ */
 async function staleWhileRevalidate(request) {
   const cache = await caches.open(STATIC_CACHE);
   const cached = await cache.match(request, { ignoreSearch: true });
@@ -118,14 +140,42 @@ async function staleWhileRevalidate(request) {
   }
 }
 
-// Helper: small timeout wrapper for fetch to avoid long hangs on flaky/offline mobile networks
+/**
+ * Fetch with timeout to avoid long hangs on flaky/offline mobile networks.
+ *
+ * Wraps fetch with an AbortController that cancels the request after the
+ * specified timeout. Essential for mobile PWA reliability where network
+ * conditions can be unpredictable.
+ *
+ * @param {Request} request The fetch request to execute.
+ * @param {{ timeoutMs?: number }} [options] Options object.
+ * @param {number} [options.timeoutMs=900] Timeout in milliseconds before aborting.
+ * @returns {Promise<Response>} The fetch response or rejection on timeout.
+ * @private
+ */
 function fetchWithTimeout(request, { timeoutMs = 900 } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   return fetch(request, { signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 
-// Helper: cache-first + background update for navigations (fast offline)
+/**
+ * Cache-first strategy with background update for navigation requests.
+ *
+ * Provides fast offline page loads by serving cached HTML immediately while
+ * updating the cache in the background. Falls back to app shell (/index.html)
+ * if both cache and network are unavailable.
+ *
+ * Behavior:
+ *  - If cached: returns cached response, triggers background update via event.waitUntil.
+ *  - If not cached: attempts network fetch with timeout, caches successful response.
+ *  - On failure: falls back to cached /index.html or returns 503 Offline response.
+ *
+ * @param {Request} request The navigation request to handle.
+ * @param {FetchEvent} [event] The fetch event for background update scheduling.
+ * @returns {Promise<Response>} The cached, fresh, or fallback response.
+ * @private
+ */
 async function navigationCacheFirst(request, event) {
   const cache = await caches.open(STATIC_CACHE);
   const cached = await cache.match(request, { ignoreSearch: true });
@@ -160,7 +210,23 @@ async function navigationCacheFirst(request, event) {
   }
 }
 
-// Helper: network-first for API (with graceful offline fallback)
+/**
+ * Network-first caching strategy for API requests with graceful offline fallback.
+ *
+ * Prioritizes fresh data from the network while caching successful GET responses
+ * for offline use. Returns cached response when offline, or a structured offline
+ * error response for API Gateway endpoints.
+ *
+ * Behavior:
+ *  - Attempts network fetch first.
+ *  - Caches successful GET responses in RUNTIME_CACHE.
+ *  - On network failure: returns cached response if available.
+ *  - For execute-api endpoints: returns JSON offline message with 503 status.
+ *
+ * @param {Request} request The API request to handle.
+ * @returns {Promise<Response>} The fresh, cached, or offline error response.
+ * @private
+ */
 async function networkFirstAPI(request) {
   const cache = await caches.open(RUNTIME_CACHE);
   try {

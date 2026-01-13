@@ -5,10 +5,26 @@ import { FocusManager } from "../managers/FocusManager.js";
 import { GameUI } from "./GameUI.js";
 
 /**
- * Orchestrates Game Over UI workflow: optional initials capture, leaderboard refresh,
- * layout updates, and focus management. Heavily guarded with try/catch to avoid
- * breaking core loop termination if DOM is partially missing.
- * @param {import('../game.js').AIHorizon} game
+ * Orchestrates the complete Game Over UI workflow.
+ *
+ * Manages the end-of-game sequence including optional initials capture for high scores,
+ * leaderboard refresh and rendering, layout transitions, and focus management. All DOM
+ * operations are heavily guarded with try/catch to ensure core game loop termination
+ * proceeds even if UI elements are partially missing or inaccessible.
+ *
+ * Workflow:
+ *  1. If score > 0, shows initials input screen for high score submission.
+ *  2. Validates initials (3 uppercase letters) with visual feedback on invalid input.
+ *  3. Submits score to LeaderboardManager with accuracy and AI analysis metadata.
+ *  4. Transitions from initials screen to leaderboard screen.
+ *  5. Renders updated leaderboard and manages focus to restart button.
+ *  6. Applies focus lock to prevent focus escape from game over overlay.
+ *
+ * Error Handling:
+ *  - All DOM operations wrapped in try/catch to prevent UI errors from breaking game flow.
+ *  - Gracefully degrades if elements are missing (non-DOM test environments).
+ *
+ * @param {import('../game.js').AIHorizon} game Game instance containing score and UI references.
  */
 export function handleGameOver(game) {
   let submittedScore = false;

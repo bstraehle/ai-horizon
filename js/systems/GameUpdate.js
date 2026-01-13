@@ -16,8 +16,27 @@ import { UIManager } from "../managers/UIManager.js";
 
 /**
  * Core per-frame update routine extracted from AIHorizon.update.
- * @param {AIHorizon} game
- * @param {number} dtSec
+ *
+ * Orchestrates all per-tick game logic in deterministic order:
+ *  1. Nebula animation (if running and configs exist).
+ *  2. Entity updates (asteroids, bullets, engine trail, explosions, particles, stars).
+ *  3. Player shooting (if fire input held).
+ *  4. Entity spawning via SpawnManager.
+ *  5. Collision detection via CollisionManager.
+ *  6. Player movement update.
+ *  7. Timer countdown and game over trigger.
+ *
+ * Determinism:
+ *  - All updates use dtSec for frame-rate independence.
+ *  - Order of operations is fixed to ensure reproducible behavior.
+ *
+ * Side Effects:
+ *  - Mutates entity arrays and pools.
+ *  - May trigger game over via game.gameOver().
+ *  - Updates UI timer display.
+ *
+ * @param {AIHorizon} game Game instance to update.
+ * @param {number} [dtSec=CONFIG.TIME.DEFAULT_DT] Delta time in seconds for this tick.
  */
 export function updateGame(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
   if (

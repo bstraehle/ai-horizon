@@ -1,5 +1,19 @@
-// Service Worker registration isolated in external file to comply with strict CSP (no inline scripts allowed)
-// Handles Trusted Types enforcement (CSP: require-trusted-types-for 'script').
+/**
+ * Service Worker Registration Module
+ *
+ * Isolated in external file to comply with strict Content Security Policy
+ * (no inline scripts allowed). Handles Trusted Types enforcement for
+ * CSP: require-trusted-types-for 'script'.
+ *
+ * Features:
+ *  - Trusted Types policy creation for SW script URLs.
+ *  - Automatic update checks on page load and at midnight.
+ *  - Online event handling to refresh cached assets.
+ *  - Auto-activation of waiting service workers with page reload.
+ *  - Asset update notification listener for potential UI hooks.
+ *
+ * @module pwa-register
+ */
 (() => {
   if (!("serviceWorker" in navigator)) return;
 
