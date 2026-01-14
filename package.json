@@ -57,5 +57,10 @@
     "@aws-sdk/client-api-gateway": "^3.890.0",
     "@aws-sdk/credential-providers": "^3.890.0",
     "@aws-sdk/signature-v4-multi-region": "^3.890.0"
+  },
+  "overrides": {
+    "@smithy/config-resolver": "^4.4.0",
+    "js-yaml": "^4.1.1",
+    "vite": "^7.1.11"
   }
 }
