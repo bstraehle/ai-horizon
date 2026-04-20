@@ -28,9 +28,15 @@ flowchart TB
     subgraph AWS ["AWS Backend (us-west-2)"]
         APIGW["API Gateway"]
         Cognito["Cognito Identity"]
+        LeaderboardLambda["Lambda\nleaderboard.js"]
+        AnalysisLambda["Lambda\nanalysis.js"]
+        Bedrock["Amazon Bedrock"]
         DynamoDB[("DynamoDB (Leaderboard)")]
 
-        APIGW --> DynamoDB
+        APIGW --> LeaderboardLambda
+        APIGW --> AnalysisLambda
+        LeaderboardLambda --> DynamoDB
+        AnalysisLambda --> Bedrock
         Cognito --> APIGW
     end
 
