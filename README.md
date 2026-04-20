@@ -60,8 +60,9 @@ flowchart TB
     end
 
     Canvas --> GameFeatures
-    Leaderboard -->|"Submit/Fetch Scores"| APIGW
+    Leaderboard -->|"Fetch Scores"| APIGW
     GameOver -->|"Game Analysis"| APIGW
+    Initials -->|"Submit Score"| APIGW
 ```
 
 ## AI HORIZON

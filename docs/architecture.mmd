@@ -1,8 +1,8 @@
 ---
-query: In the attached diagram order the build and dev tools in order of
-  execution.  Also, draw a line from "Game Over" to "API Gateway" for game
-  analysis
+query: In the attached diagram, draw a line from "Player Initials Entry" to "API
+  Gateway" for "Persist Initials"
 references:
+  - "File: /docs/architecture.mmd"
   - >+
     Reference: <agents>
 
@@ -31,7 +31,7 @@ references:
 
     </agents>
 
-generationTime: 2026-04-20T02:55:28.074Z
+generationTime: 2026-04-20T03:02:14.439Z
 ---
 flowchart TB
     subgraph Client ["Client (Browser/PWA)"]
@@ -92,5 +92,6 @@ flowchart TB
     end
 
     Canvas --> GameFeatures
-    Leaderboard -->|"Submit/Fetch Scores"| APIGW
+    Leaderboard -->|"Fetch Scores"| APIGW
     GameOver -->|"Game Analysis"| APIGW
+    Initials -->|"Submit Score"| APIGW
