@@ -18,11 +18,17 @@ flowchart TB
     end
 
     subgraph BuildTools ["Build & Dev Tools"]
-        ESBuild["esbuild (bundler)"]
-        Vitest["Vitest (testing)"]
+        direction TB
+        Husky["Husky (git hooks)"]
         ESLint["ESLint + Prettier"]
         TypeScript["TypeScript (type checking)"]
-        Husky["Husky (git hooks)"]
+        Vitest["Vitest (testing)"]
+        ESBuild["esbuild (bundler)"]
+
+        Husky --> ESLint
+        ESLint --> TypeScript
+        TypeScript --> Vitest
+        Vitest --> ESBuild
     end
 
     subgraph AWS ["AWS Backend (us-west-2)"]
@@ -40,18 +46,22 @@ flowchart TB
         Cognito --> APIGW
     end
 
-    JS --> |"HTTPS REST API"| APIGW
-    JS --> |"Auth"| Cognito
+    JS -->|"HTTPS REST API"| APIGW
+    JS -->|"Auth"| Cognito
 
     subgraph GameFeatures ["Game Features"]
+        direction LR
+        HighScore["High Score"]
         Score["Score Tracking"]
         Timer["Timer (1:00)"]
-        Leaderboard["Leaderboard System"]
+        GameOver["Game Over"]
         Initials["Player Initials Entry"]
+        Leaderboard["Leaderboard System"]
     end
 
     Canvas --> GameFeatures
-    Leaderboard --> |"Submit/Fetch Scores"| APIGW
+    Leaderboard -->|"Submit/Fetch Scores"| APIGW
+    GameOver -->|"Game Analysis"| APIGW
 ```
 
 ## AI HORIZON

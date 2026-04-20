@@ -1,9 +1,8 @@
 ---
-query: Create an architecture diagram of this NodeJS app
+query: In the attached diagram order the build and dev tools in order of
+  execution.  Also, draw a line from "Game Over" to "API Gateway" for game
+  analysis
 references:
-  - "File: /package.json"
-  - "File: /index.html"
-  - "File: /server"
   - >+
     Reference: <agents>
 
@@ -32,7 +31,7 @@ references:
 
     </agents>
 
-generationTime: 2026-04-20T00:17:32.973Z
+generationTime: 2026-04-20T02:55:28.074Z
 ---
 flowchart TB
     subgraph Client ["Client (Browser/PWA)"]
@@ -43,7 +42,7 @@ flowchart TB
         SW["Service Worker (sw.js)"]
         PWA["PWA Register"]
         Canvas["Game Canvas"]
-        
+
         HTML --> JS
         HTML --> CSS
         HTML --> Canvas
@@ -51,11 +50,17 @@ flowchart TB
     end
 
     subgraph BuildTools ["Build & Dev Tools"]
-        ESBuild["esbuild (bundler)"]
-        Vitest["Vitest (testing)"]
+        direction TB
+        Husky["Husky (git hooks)"]
         ESLint["ESLint + Prettier"]
         TypeScript["TypeScript (type checking)"]
-        Husky["Husky (git hooks)"]
+        Vitest["Vitest (testing)"]
+        ESBuild["esbuild (bundler)"]
+
+        Husky --> ESLint
+        ESLint --> TypeScript
+        TypeScript --> Vitest
+        Vitest --> ESBuild
     end
 
     subgraph AWS ["AWS Backend (us-west-2)"]
@@ -65,7 +70,7 @@ flowchart TB
         AnalysisLambda["Lambda\nanalysis.js"]
         Bedrock["Amazon Bedrock"]
         DynamoDB[("DynamoDB (Leaderboard)")]
-        
+
         APIGW --> LeaderboardLambda
         APIGW --> AnalysisLambda
         LeaderboardLambda --> DynamoDB
@@ -73,15 +78,19 @@ flowchart TB
         Cognito --> APIGW
     end
 
-    JS --> |"HTTPS REST API"| APIGW
-    JS --> |"Auth"| Cognito
-    
+    JS -->|"HTTPS REST API"| APIGW
+    JS -->|"Auth"| Cognito
+
     subgraph GameFeatures ["Game Features"]
+        direction LR
+        HighScore["High Score"]
         Score["Score Tracking"]
         Timer["Timer (1:00)"]
-        Leaderboard["Leaderboard System"]
+        GameOver["Game Over"]
         Initials["Player Initials Entry"]
+        Leaderboard["Leaderboard System"]
     end
 
     Canvas --> GameFeatures
-    Leaderboard --> |"Submit/Fetch Scores"| APIGW
+    Leaderboard -->|"Submit/Fetch Scores"| APIGW
+    GameOver -->|"Game Analysis"| APIGW
