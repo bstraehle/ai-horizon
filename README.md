@@ -1,3 +1,53 @@
+## Architecture Overview
+
+```mermaid
+flowchart TB
+    subgraph Client ["Client (Browser/PWA)"]
+        direction TB
+        HTML["index.html"]
+        JS["game.js (esbuild bundle)"]
+        CSS["style.css"]
+        SW["Service Worker (sw.js)"]
+        PWA["PWA Register"]
+        Canvas["Game Canvas"]
+
+        HTML --> JS
+        HTML --> CSS
+        HTML --> Canvas
+        PWA --> SW
+    end
+
+    subgraph BuildTools ["Build & Dev Tools"]
+        ESBuild["esbuild (bundler)"]
+        Vitest["Vitest (testing)"]
+        ESLint["ESLint + Prettier"]
+        TypeScript["TypeScript (type checking)"]
+        Husky["Husky (git hooks)"]
+    end
+
+    subgraph AWS ["AWS Backend (us-west-2)"]
+        APIGW["API Gateway"]
+        Cognito["Cognito Identity"]
+        DynamoDB[("DynamoDB (Leaderboard)")]
+
+        APIGW --> DynamoDB
+        Cognito --> APIGW
+    end
+
+    JS --> |"HTTPS REST API"| APIGW
+    JS --> |"Auth"| Cognito
+
+    subgraph GameFeatures ["Game Features"]
+        Score["Score Tracking"]
+        Timer["Timer (1:00)"]
+        Leaderboard["Leaderboard System"]
+        Initials["Player Initials Entry"]
+    end
+
+    Canvas --> GameFeatures
+    Leaderboard --> |"Submit/Fetch Scores"| APIGW
+```
+
 ## AI HORIZON
 
 Fast, responsive HTML5 Canvas space shooter written in modern (native ESM) vanilla JavaScript. Collect stars, survive escalating asteroid waves (including hardened "planet" variants), and chase a local + optional remote leaderboard.
