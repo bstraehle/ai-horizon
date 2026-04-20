@@ -60,6 +60,7 @@ flowchart TB
     end
 
     Canvas --> GameFeatures
+    HighScore -->|"Fetch Scores"| APIGW
     Leaderboard -->|"Fetch Scores"| APIGW
     GameOver -->|"Game Analysis"| APIGW
     Initials -->|"Submit Score"| APIGW
