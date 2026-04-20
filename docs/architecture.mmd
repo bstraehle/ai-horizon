@@ -1,0 +1,81 @@
+---
+query: Create an architecture diagram of this NodeJS app
+references:
+  - "File: /package.json"
+  - "File: /index.html"
+  - "File: /server"
+  - >+
+    Reference: <agents>
+
+    Here is a list of agents that can be used when running a subagent.
+
+    Each agent has optionally a description with the agent's purpose and
+    expertise. When asked to run a subagent, choose the most appropriate agent
+    from this list.
+
+    Use the #tool:agent/runSubagent tool with the agent name to run the
+    subagent.
+
+    <agent>
+
+    <name>Explore</name>
+
+    <description>Fast read-only codebase exploration and Q&A subagent. Prefer
+    over manually chaining multiple search and file-reading operations to avoid
+    cluttering the main conversation. Safe to call in parallel. Specify
+    thoroughness: quick, medium, or thorough.</description>
+
+    <argumentHint>Describe WHAT you're looking for and desired thoroughness
+    (quick/medium/thorough)</argumentHint>
+
+    </agent>
+
+    </agents>
+
+generationTime: 2026-04-20T00:17:32.973Z
+---
+flowchart TB
+    subgraph Client ["Client (Browser/PWA)"]
+        direction TB
+        HTML["index.html"]
+        JS["game.js (esbuild bundle)"]
+        CSS["style.css"]
+        SW["Service Worker (sw.js)"]
+        PWA["PWA Register"]
+        Canvas["Game Canvas"]
+        
+        HTML --> JS
+        HTML --> CSS
+        HTML --> Canvas
+        PWA --> SW
+    end
+
+    subgraph BuildTools ["Build & Dev Tools"]
+        ESBuild["esbuild (bundler)"]
+        Vitest["Vitest (testing)"]
+        ESLint["ESLint + Prettier"]
+        TypeScript["TypeScript (type checking)"]
+        Husky["Husky (git hooks)"]
+    end
+
+    subgraph AWS ["AWS Backend (us-west-2)"]
+        APIGW["API Gateway"]
+        Cognito["Cognito Identity"]
+        DynamoDB[("DynamoDB (Leaderboard)")]
+        
+        APIGW --> DynamoDB
+        Cognito --> APIGW
+    end
+
+    JS --> |"HTTPS REST API"| APIGW
+    JS --> |"Auth"| Cognito
+    
+    subgraph GameFeatures ["Game Features"]
+        Score["Score Tracking"]
+        Timer["Timer (1:00)"]
+        Leaderboard["Leaderboard System"]
+        Initials["Player Initials Entry"]
+    end
+
+    Canvas --> GameFeatures
+    Leaderboard --> |"Submit/Fetch Scores"| APIGW
