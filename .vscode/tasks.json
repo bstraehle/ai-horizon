@@ -23,14 +23,6 @@
       "args": ["run", "build"],
       "isBackground": false,
       "group": "build"
-    },
-    {
-      "label": "build-dist-once",
-      "type": "shell",
-      "command": "npm",
-      "args": ["run", "build"],
-      "isBackground": false,
-      "group": "build"
     }
   ]
 }
