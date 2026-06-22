@@ -8,7 +8,7 @@
   "sideEffects": false,
   "scripts": {
     "build": "esbuild js/game.js --bundle --minify --sourcemap --target=es2018 --outfile=dist/bundle.js",
-    "postbuild": "powershell -NoProfile -Command \"New-Item -ItemType Directory -Force -Path dist > $null; Copy-Item -Force .\\favicon.png, .\\style.css, .\\manifest.webmanifest, .\\sw.js, .\\pwa-register.js .\\dist\\; (Get-Content .\\index.prod.html) -replace 'dist/bundle.js','bundle.js' | Set-Content .\\dist\\index.html\"",
+    "postbuild": "powershell -NoProfile -Command \"New-Item -ItemType Directory -Force -Path dist > $null; Copy-Item -Force .\\favicon.png, .\\style.css, .\\manifest.webmanifest, .\\sw.js, .\\pwa-register.js, .\\about.html, .\\privacy.html .\\dist\\; (Get-Content .\\index.prod.html) -replace 'dist/bundle.js','bundle.js' | Set-Content .\\dist\\index.html\"",
     "watch": "esbuild js/game.js --bundle --minify --sourcemap --target=es2018 --outfile=dist/bundle.js --watch",
     "serve": "esbuild js/game.js --bundle --minify --sourcemap --target=es2018 --outfile=dist/bundle.js --serve=8000 --servedir=.",
     "lint": "eslint .",

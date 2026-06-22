@@ -1,7 +1,7 @@
 {
   "name": "AI HORIZON",
   "short_name": "AI HORIZON",
-  "description": "A fast, arcade-style space shooter — collect stars, blast asteroids, and beat the clock.",
+  "description": "An arcade-style space shooter — collect stars, blast asteroids, and beat the clock.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
