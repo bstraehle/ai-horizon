@@ -66,27 +66,28 @@ export const handler = async (event) => {
  * @param {string} body - The game summary / prompt to analyze
  */
 async function analysis(body) {
-  const modelId =
-    "arn:aws:bedrock:us-west-2:819097794827:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0";
-
   var prompt = process.env.PROMPT;
-
   prompt = prompt.replace("%%prompt%%", body);
 
   const requestBody = {
-    anthropic_version: "bedrock-2023-05-31",
-    max_tokens: 1000,
-    temperature: 0.0,
     messages: [
       {
         role: "user",
-        content: prompt,
+        content: [
+          {
+            text: prompt,
+          },
+        ],
       },
     ],
+    inferenceConfig: {
+      maxTokens: 1000,
+      temperature: 1.0,
+    },
   };
 
   const command = new InvokeModelCommand({
-    modelId: modelId,
+    modelId: process.env.MODEL_ID,
     contentType: "application/json",
     accept: "application/json",
     body: JSON.stringify(requestBody),
@@ -95,5 +96,9 @@ async function analysis(body) {
   const response = await bedrockClient.send(command);
   const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
-  return responseBody.content[0].text;
+  let responseText = responseBody.output.message.content[0].text;
+
+  responseText = responseText.replace(/^```json\s*/i, "").replace(/```\s*$/, "");
+
+  return responseText;
 }
