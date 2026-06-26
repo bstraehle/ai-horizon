@@ -23,6 +23,525 @@
       "args": ["run", "build"],
       "isBackground": false,
       "group": "build"
+    },
+    {
+      "label": "build web app",
+      "type": "shell",
+      "command": "npm run build",
+      "isBackground": false,
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "check bubblewrap",
+      "type": "shell",
+      "command": "bubblewrap --version",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check bubblewrap cmd",
+      "type": "shell",
+      "command": "bubblewrap.cmd --version",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check live manifest response",
+      "type": "shell",
+      "command": "curl.exe -L -I https://agentmode.dev/manifest.webmanifest ; curl.exe -L https://agentmode.dev/manifest.webmanifest",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check www manifest response",
+      "type": "shell",
+      "command": "curl.exe -L -I https://www.agentmode.dev/manifest.webmanifest ; curl.exe -L https://www.agentmode.dev/manifest.webmanifest",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "bubblewrap init help",
+      "type": "shell",
+      "command": "bubblewrap.cmd init --help",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "bubblewrap help",
+      "type": "shell",
+      "command": "bubblewrap.cmd help",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "bubblewrap init ai horizon android",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android; bubblewrap.cmd init --manifest=https://www.agentmode.dev/manifest.webmanifest",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "locate bubblewrap package",
+      "type": "shell",
+      "command": "Get-ChildItem \"$env:APPDATA\\npm\\node_modules\" -Directory | Select-Object -ExpandProperty FullName; Get-ChildItem \"$env:APPDATA\\npm\\node_modules\" -Recurse -Filter \"*bubblewrap*\" -ErrorAction SilentlyContinue | Select-Object -First 40 -ExpandProperty FullName",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "search bubblewrap init flags",
+      "type": "shell",
+      "command": "Get-ChildItem \"$env:APPDATA\\npm\\node_modules\\@bubblewrap\\cli\" -Recurse -Include *.js,*.ts,*.json -File | Select-String -Pattern \"--manifest|applicationId|packageId|displayMode|signingKey|inquirer|prompts\" | Select-Object -First 120 | ForEach-Object { \"$($_.Path):$($_.LineNumber): $($_.Line.Trim())\" }",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "search bubblewrap init flags fixed",
+      "type": "shell",
+      "command": "Get-ChildItem \"$env:APPDATA\\npm\\node_modules\\@bubblewrap\\cli\" -Recurse -Include *.js,*.ts,*.json -File | Select-String -Pattern \"--manifest|applicationId|packageId|displayMode|signingKey|inquirer|prompts\" | Select-Object -First 160 | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "search bubblewrap init flags quoted",
+      "type": "shell",
+      "command": "$pattern = '--manifest|applicationId|packageId|displayMode|signingKey|inquirer|prompts'; Get-ChildItem \"$env:APPDATA\\npm\\node_modules\\@bubblewrap\\cli\" -Recurse -Include *.js,*.ts,*.json -File | Select-String -Pattern $pattern | Select-Object -First 160 | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "find existing keystores",
+      "type": "shell",
+      "command": "Get-ChildItem c:\\temp,$env:USERPROFILE -Recurse -Include *.jks,*.keystore,android-keystore -File -ErrorAction SilentlyContinue | Select-Object -First 50 -ExpandProperty FullName",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "bubblewrap init noninteractive",
+      "type": "shell",
+      "command": "if (Test-Path c:\\temp\\ai-horizon-android) { Remove-Item c:\\temp\\ai-horizon-android -Recurse -Force }; New-Item -ItemType Directory -Force -Path c:\\temp\\ai-horizon-android | Out-Null; Set-Location c:\\temp\\ai-horizon-android; $answers = @('', '', '', '', 'dev.agentmode.aihorizon', '', '', '', '', '', '', '', '', '', '', '', '', 'n') -join \"`n\"; $answers | bubblewrap.cmd init --manifest=https://www.agentmode.dev/manifest.webmanifest",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "bubblewrap init noninteractive fixed",
+      "type": "shell",
+      "command": "if (Test-Path c:\\temp\\ai-horizon-android) { Remove-Item c:\\temp\\ai-horizon-android -Recurse -Force }; New-Item -ItemType Directory -Force -Path c:\\temp\\ai-horizon-android | Out-Null; Set-Location c:\\temp\\ai-horizon-android; $nl = [Environment]::NewLine; $answers = @('', '', '', '', 'dev.agentmode.aihorizon', '', '', '', '', '', '', '', '', '', '', '', '', 'n') -join $nl; $answers | bubblewrap.cmd init --manifest=https://www.agentmode.dev/manifest.webmanifest",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "generate android wrapper",
+      "type": "shell",
+      "command": "if (Test-Path c:\\temp\\ai-horizon-android-build) { Remove-Item c:\\temp\\ai-horizon-android-build -Recurse -Force }; New-Item -ItemType Directory -Force -Path c:\\temp\\ai-horizon-android-build | Out-Null; node c:\\temp\\ai-horizon\\scripts\\init-bubblewrap-noninteractive.cjs c:\\temp\\ai-horizon-android-build",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "regenerate android wrapper",
+      "type": "shell",
+      "command": "if (Test-Path c:\\temp\\ai-horizon-android-build) { Remove-Item c:\\temp\\ai-horizon-android-build -Recurse -Force }; New-Item -ItemType Directory -Force -Path c:\\temp\\ai-horizon-android-build | Out-Null; node c:\\temp\\ai-horizon\\scripts\\init-bubblewrap-noninteractive.cjs c:\\temp\\ai-horizon-android-build",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "bubblewrap release build",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; $env:BUBBLEWRAP_KEYSTORE_PASSWORD='aihorizon-local-build-only'; $env:BUBBLEWRAP_KEY_PASSWORD='aihorizon-local-build-only'; bubblewrap.cmd build",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "bubblewrap release build retry",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; $env:BUBBLEWRAP_KEYSTORE_PASSWORD='aihorizon-local-build-only'; $env:BUBBLEWRAP_KEY_PASSWORD='aihorizon-local-build-only'; bubblewrap.cmd build",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check java installations",
+      "type": "shell",
+      "command": "java -version; where.exe java; Get-ChildItem 'C:\\Program Files\\Java','C:\\Program Files\\Eclipse Adoptium','C:\\Program Files\\Microsoft','C:\\Program Files\\Android' -Recurse -Filter java.exe -ErrorAction SilentlyContinue | Select-Object -First 30 -ExpandProperty FullName",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check bubblewrap java",
+      "type": "shell",
+      "command": "& 'C:\\Users\\bstra\\.bubblewrap\\jdk\\jdk-11.0.9.1+1\\bin\\java.exe' -XshowSettings:properties -version 2>&1 | Select-String -Pattern 'os.arch|sun.arch.data.model|java.version|java.vendor'; & 'C:\\Users\\bstra\\.bubblewrap\\jdk\\jdk-11.0.9.1+1\\bin\\java.exe' -Xmx2048m -version",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check winget",
+      "type": "shell",
+      "command": "winget --version",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check chocolatey",
+      "type": "shell",
+      "command": "choco --version",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "install temurin jdk 11",
+      "type": "shell",
+      "command": "winget install EclipseAdoptium.Temurin.11.JDK --accept-package-agreements --accept-source-agreements --silent",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "locate temurin java",
+      "type": "shell",
+      "command": "Get-ChildItem 'C:\\Program Files\\Eclipse Adoptium','C:\\Program Files\\Java' -Recurse -Filter java.exe -ErrorAction SilentlyContinue | Select-Object -First 20 -ExpandProperty FullName",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "bubblewrap release build 64bit jdk",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; $env:BUBBLEWRAP_KEYSTORE_PASSWORD='aihorizon-local-build-only'; $env:BUBBLEWRAP_KEY_PASSWORD='aihorizon-local-build-only'; bubblewrap.cmd build",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "copy and verify aab",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Copy-Item -Force .\\app-release-bundle.aab .\\app-release.aab; Get-Item .\\app-release.aab, .\\app-release-bundle.aab, .\\app-release-signed.apk | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "rebuild aab min sdk 21",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; $env:BUBBLEWRAP_KEYSTORE_PASSWORD='aihorizon-local-build-only'; $env:BUBBLEWRAP_KEY_PASSWORD='aihorizon-local-build-only'; bubblewrap.cmd build; Copy-Item -Force .\\app-release-bundle.aab .\\app-release.aab; Get-Item .\\app-release.aab, .\\app-release-bundle.aab | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "refresh checksum rebuild aab",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; (Get-FileHash .\\twa-manifest.json -Algorithm SHA1).Hash.ToLowerInvariant() | Set-Content -NoNewline .\\manifest-checksum.txt; $env:BUBBLEWRAP_KEYSTORE_PASSWORD='aihorizon-local-build-only'; $env:BUBBLEWRAP_KEY_PASSWORD='aihorizon-local-build-only'; bubblewrap.cmd build; if (Test-Path .\\app-release-bundle.aab) { Copy-Item -Force .\\app-release-bundle.aab .\\app-release.aab }; Get-Item .\\app-release.aab, .\\app-release-bundle.aab -ErrorAction SilentlyContinue | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "verify min sdk filesystem",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Select-String -Path .\\twa-manifest.json, .\\app\\build.gradle -Pattern 'minSdkVersion' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }; Get-ChildItem . -Filter *.aab | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize; Get-ChildItem .\\app\\build -Recurse -Filter AndroidManifest.xml -ErrorAction SilentlyContinue | Select-Object -First 20 -ExpandProperty FullName",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "rebuild aab version code 2",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; (Get-FileHash .\\twa-manifest.json -Algorithm SHA1).Hash.ToLowerInvariant() | Set-Content -NoNewline .\\manifest-checksum.txt; $env:BUBBLEWRAP_KEYSTORE_PASSWORD='aihorizon-local-build-only'; $env:BUBBLEWRAP_KEY_PASSWORD='aihorizon-local-build-only'; bubblewrap.cmd build; if (Test-Path .\\app-release-bundle.aab) { Copy-Item -Force .\\app-release-bundle.aab .\\app-release.aab }; Get-Item .\\app-release.aab, .\\app-release-bundle.aab | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "verify version code all manifests",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Select-String -Path .\\twa-manifest.json, .\\app\\build.gradle -Pattern 'appVersion|versionCode|versionName|minSdkVersion' | ForEach-Object { '{0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line.Trim() }; Get-ChildItem .\\app\\build -Recurse -Filter AndroidManifest.xml | ForEach-Object { $m = Select-String -Path $_.FullName -Pattern 'versionCode|versionName|minSdkVersion' -ErrorAction SilentlyContinue; if ($m) { '--- ' + $_.FullName; $m | ForEach-Object { $_.Line.Trim() } } }",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "list android sdk platforms",
+      "type": "shell",
+      "command": "Get-ChildItem 'C:\\Users\\bstra\\.bubblewrap\\android_sdk\\platforms' -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "list sdkmanager",
+      "type": "shell",
+      "command": "Get-ChildItem 'C:\\Users\\bstra\\.bubblewrap\\android_sdk' -Recurse -Filter sdkmanager.bat -ErrorAction SilentlyContinue | Select-Object -First 5 -ExpandProperty FullName",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "install android api 35",
+      "type": "shell",
+      "command": "$env:JAVA_HOME='C:\\Program Files\\Eclipse Adoptium\\jdk-11.0.31.11-hotspot'; $env:PATH=\"$env:JAVA_HOME\\bin;$env:PATH\"; & 'C:\\Users\\bstra\\.bubblewrap\\android_sdk\\tools\\bin\\sdkmanager.bat' 'platforms;android-35' 'build-tools;35.0.0'",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "install android api 35 fixed",
+      "type": "shell",
+      "command": "$env:JAVA_HOME='C:\\Program Files\\Eclipse Adoptium\\jdk-11.0.31.11-hotspot'; $env:PATH=($env:JAVA_HOME + '\\bin;' + $env:PATH); & 'C:\\Users\\bstra\\.bubblewrap\\android_sdk\\tools\\bin\\sdkmanager.bat' 'platforms;android-35' 'build-tools;35.0.0'",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "install api 35 sdk root",
+      "type": "shell",
+      "command": "$env:JAVA_HOME='C:\\Program Files\\Eclipse Adoptium\\jdk-11.0.31.11-hotspot'; $env:PATH=($env:JAVA_HOME + '\\bin;' + $env:PATH); & 'C:\\Users\\bstra\\.bubblewrap\\android_sdk\\tools\\bin\\sdkmanager.bat' --sdk_root='C:\\Users\\bstra\\.bubblewrap\\android_sdk' 'platforms;android-35' 'build-tools;35.0.0'",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "confirm api 35 installed",
+      "type": "shell",
+      "command": "Get-ChildItem 'C:\\Users\\bstra\\.bubblewrap\\android_sdk\\platforms','C:\\Users\\bstra\\.bubblewrap\\android_sdk\\build-tools' -Directory -ErrorAction SilentlyContinue | Select-Object FullName",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "rebuild aab api 35 vc3",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; (Get-FileHash .\\twa-manifest.json -Algorithm SHA1).Hash.ToLowerInvariant() | Set-Content -NoNewline .\\manifest-checksum.txt; $env:BUBBLEWRAP_KEYSTORE_PASSWORD='aihorizon-local-build-only'; $env:BUBBLEWRAP_KEY_PASSWORD='aihorizon-local-build-only'; bubblewrap.cmd build; if (Test-Path .\\app-release-bundle.aab) { Copy-Item -Force .\\app-release-bundle.aab .\\app-release.aab }; Get-Item .\\app-release.aab, .\\app-release-bundle.aab | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check aab after api35",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Get-Item .\\app-release.aab, .\\app-release-bundle.aab -ErrorAction SilentlyContinue | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check jdk17 installed",
+      "type": "shell",
+      "command": "Get-ChildItem 'C:\\Program Files\\Eclipse Adoptium','C:\\Program Files\\Java' -Recurse -Filter java.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "install temurin jdk 17",
+      "type": "shell",
+      "command": "winget install EclipseAdoptium.Temurin.17.JDK --accept-package-agreements --accept-source-agreements --silent",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "locate jdk17 after install",
+      "type": "shell",
+      "command": "Get-ChildItem 'C:\\Program Files\\Eclipse Adoptium' -Recurse -Filter java.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "download portable jdk17",
+      "type": "shell",
+      "command": "$url='https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.19%2B10/OpenJDK17U-jdk_x64_windows_hotspot_17.0.19_10.zip'; $zip='C:\\Users\\bstra\\.bubblewrap\\jdk17.zip'; $dest='C:\\Users\\bstra\\.bubblewrap\\jdk17'; if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }; Invoke-WebRequest -Uri $url -OutFile $zip; Expand-Archive -Path $zip -DestinationPath $dest -Force; Get-ChildItem $dest -Recurse -Filter java.exe | Select-Object -First 5 -ExpandProperty FullName",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "verify portable jdk17",
+      "type": "shell",
+      "command": "Get-ChildItem 'C:\\Users\\bstra\\.bubblewrap\\jdk17' -Recurse -Filter java.exe -ErrorAction SilentlyContinue | Select-Object -First 10 -ExpandProperty FullName; Get-Item 'C:\\Users\\bstra\\.bubblewrap\\jdk17.zip' -ErrorAction SilentlyContinue | Select-Object FullName,Length",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "extract portable jdk17",
+      "type": "shell",
+      "command": "$zip='C:\\Users\\bstra\\.bubblewrap\\jdk17.zip'; $dest='C:\\Users\\bstra\\.bubblewrap\\jdk17'; if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }; Expand-Archive -Path $zip -DestinationPath $dest -Force; $java=(Get-ChildItem $dest -Recurse -Filter java.exe | Select-Object -First 1 -ExpandProperty FullName); & $java -version; Split-Path (Split-Path $java -Parent) -Parent",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check locks and jdk17",
+      "type": "shell",
+      "command": "Get-Process powershell,msiexec,winget -ErrorAction SilentlyContinue | Select-Object Id,ProcessName,StartTime,Path | Format-Table -AutoSize; Get-ChildItem 'C:\\Program Files\\Eclipse Adoptium' -Recurse -Filter java.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "stop stuck installers",
+      "type": "shell",
+      "command": "Get-CimInstance Win32_Process | Where-Object { ($_.Name -in @('winget.exe','msiexec.exe')) -or ($_.Name -eq 'powershell.exe' -and $_.CommandLine -like '*jdk17.zip*') } | ForEach-Object { Write-Host \"Stopping $($_.ProcessId) $($_.Name)\"; Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "download extract jdk17 fresh",
+      "type": "shell",
+      "command": "$url='https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.19%2B10/OpenJDK17U-jdk_x64_windows_hotspot_17.0.19_10.zip'; $zip='C:\\Users\\bstra\\.bubblewrap\\jdk17-fresh.zip'; $dest='C:\\Users\\bstra\\.bubblewrap\\jdk17'; if (Test-Path $zip) { Remove-Item $zip -Force }; if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }; curl.exe -L $url -o $zip; Expand-Archive -Path $zip -DestinationPath $dest -Force; $java=(Get-ChildItem $dest -Recurse -Filter java.exe | Select-Object -First 1 -ExpandProperty FullName); & $java -version; Split-Path (Split-Path $java -Parent) -Parent",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "rebuild api35 agp8",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Remove-Item .\\app-release.aab, .\\app-release-bundle.aab, .\\app-release-signed.apk -Force -ErrorAction SilentlyContinue; (Get-FileHash .\\twa-manifest.json -Algorithm SHA1).Hash.ToLowerInvariant() | Set-Content -NoNewline .\\manifest-checksum.txt; $env:BUBBLEWRAP_KEYSTORE_PASSWORD='aihorizon-local-build-only'; $env:BUBBLEWRAP_KEY_PASSWORD='aihorizon-local-build-only'; bubblewrap.cmd build; if (Test-Path .\\app-release-bundle.aab) { Copy-Item -Force .\\app-release-bundle.aab .\\app-release.aab }; Get-Item .\\app-release.aab, .\\app-release-bundle.aab -ErrorAction SilentlyContinue | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "verify api35 bundle metadata",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Select-String -Path .\\app\\build\\intermediates\\bundle_manifest\\release\\AndroidManifest.xml, .\\app\\build\\intermediates\\merged_manifest\\release\\out\\AndroidManifest.xml -Pattern 'versionCode|versionName|minSdkVersion|targetSdkVersion' | ForEach-Object { '{0}: {1}' -f $_.Path, $_.Line.Trim() }; Get-Item .\\app-release.aab | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "find bundletool",
+      "type": "shell",
+      "command": "Get-ChildItem 'C:\\Users\\bstra\\.bubblewrap','C:\\Users\\bstra\\AppData\\Roaming\\npm\\node_modules' -Recurse -Filter '*bundletool*.jar' -ErrorAction SilentlyContinue | Select-Object -First 20 -ExpandProperty FullName",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "inspect aab zip entries",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; tar -tf .\\app-release.aab | Select-String -Pattern 'manifest|BundleConfig|base' | Select-Object -First 80",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "list build manifest times",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Get-ChildItem .\\app\\build -Recurse -Filter AndroidManifest.xml | Select-Object FullName,Length,LastWriteTime | Sort-Object LastWriteTime -Descending | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "dump aab manifest aapt2",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; & 'C:\\Users\\bstra\\.bubblewrap\\android_sdk\\build-tools\\35.0.0\\aapt2.exe' dump xmltree .\\app-release.aab base/manifest/AndroidManifest.xml | Select-String -Pattern 'versionCode|versionName|minSdkVersion|targetSdkVersion'",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "extract dump aab manifest",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; if (Test-Path .\\aab-check) { Remove-Item .\\aab-check -Recurse -Force }; New-Item -ItemType Directory .\\aab-check | Out-Null; tar -xf .\\app-release.aab -C .\\aab-check base/manifest/AndroidManifest.xml; & 'C:\\Users\\bstra\\.bubblewrap\\android_sdk\\build-tools\\35.0.0\\aapt2.exe' dump xmltree --file .\\aab-check\\base\\manifest\\AndroidManifest.xml | Select-String -Pattern 'versionCode|versionName|minSdkVersion|targetSdkVersion'",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "show manifest paths full",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Get-ChildItem .\\app\\build -Recurse -Filter AndroidManifest.xml | Sort-Object LastWriteTime -Descending | ForEach-Object { '---'; $_.FullName; $_.LastWriteTime; Select-String -Path $_.FullName -Pattern 'versionCode|versionName|minSdkVersion|targetSdkVersion' | ForEach-Object { $_.Line.Trim() } }",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "dump aab manifest corrected",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; & 'C:\\Users\\bstra\\.bubblewrap\\android_sdk\\build-tools\\35.0.0\\aapt2.exe' dump xmltree --file base/manifest/AndroidManifest.xml .\\app-release.aab | Select-String -Pattern 'versionCode|versionName|minSdkVersion|targetSdkVersion'",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check androidbrowserhelper versions",
+      "type": "shell",
+      "command": "curl.exe -L https://dl.google.com/dl/android/maven2/com/google/androidbrowserhelper/androidbrowserhelper/maven-metadata.xml",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "rebuild abh272 vc4",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Remove-Item .\\app-release.aab, .\\app-release-bundle.aab, .\\app-release-signed.apk -Force -ErrorAction SilentlyContinue; (Get-FileHash .\\twa-manifest.json -Algorithm SHA1).Hash.ToLowerInvariant() | Set-Content -NoNewline .\\manifest-checksum.txt; $env:BUBBLEWRAP_KEYSTORE_PASSWORD='aihorizon-local-build-only'; $env:BUBBLEWRAP_KEY_PASSWORD='aihorizon-local-build-only'; bubblewrap.cmd build; if (Test-Path .\\app-release-bundle.aab) { Copy-Item -Force .\\app-release-bundle.aab .\\app-release.aab }; Get-Item .\\app-release.aab, .\\app-release-bundle.aab -ErrorAction SilentlyContinue | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check vc4 aab files",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Get-Item .\\app-release.aab, .\\app-release-bundle.aab -ErrorAction SilentlyContinue | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize; Select-String -Path .\\app\\build.gradle -Pattern 'androidbrowserhelper|versionCode|versionName|targetSdkVersion'",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "fetch abh 2.7.1 pom",
+      "type": "shell",
+      "command": "curl.exe -L https://dl.google.com/dl/android/maven2/com/google/androidbrowserhelper/androidbrowserhelper/2.7.1/androidbrowserhelper-2.7.1.pom",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "fetch abh 2.7.0 pom",
+      "type": "shell",
+      "command": "curl.exe -L https://dl.google.com/dl/android/maven2/com/google/androidbrowserhelper/androidbrowserhelper/2.7.0/androidbrowserhelper-2.7.0.pom",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "fetch abh 2.6.2 pom",
+      "type": "shell",
+      "command": "curl.exe -L https://dl.google.com/dl/android/maven2/com/google/androidbrowserhelper/androidbrowserhelper/2.6.2/androidbrowserhelper-2.6.2.pom",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "rebuild abh262 vc4",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Remove-Item .\\app-release.aab, .\\app-release-bundle.aab, .\\app-release-signed.apk -Force -ErrorAction SilentlyContinue; $env:BUBBLEWRAP_KEYSTORE_PASSWORD='aihorizon-local-build-only'; $env:BUBBLEWRAP_KEY_PASSWORD='aihorizon-local-build-only'; bubblewrap.cmd build; if (Test-Path .\\app-release-bundle.aab) { Copy-Item -Force .\\app-release-bundle.aab .\\app-release.aab }; Get-Item .\\app-release.aab, .\\app-release-bundle.aab -ErrorAction SilentlyContinue | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check abh262 artifacts",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Get-Item .\\app-release.aab, .\\app-release-bundle.aab -ErrorAction SilentlyContinue | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "install android api 36",
+      "type": "shell",
+      "command": "$env:JAVA_HOME='C:\\Users\\bstra\\.bubblewrap\\jdk17\\jdk-17.0.19+10'; $env:PATH=($env:JAVA_HOME + '\\bin;' + $env:PATH); & 'C:\\Users\\bstra\\.bubblewrap\\android_sdk\\tools\\bin\\sdkmanager.bat' --sdk_root='C:\\Users\\bstra\\.bubblewrap\\android_sdk' 'platforms;android-36'",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "confirm api36 platform",
+      "type": "shell",
+      "command": "Get-ChildItem 'C:\\Users\\bstra\\.bubblewrap\\android_sdk\\platforms' -Directory | Select-Object -ExpandProperty Name",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "rebuild compile36 abh262",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Remove-Item .\\app-release.aab, .\\app-release-bundle.aab, .\\app-release-signed.apk -Force -ErrorAction SilentlyContinue; $env:BUBBLEWRAP_KEYSTORE_PASSWORD='aihorizon-local-build-only'; $env:BUBBLEWRAP_KEY_PASSWORD='aihorizon-local-build-only'; bubblewrap.cmd build; if (Test-Path .\\app-release-bundle.aab) { Copy-Item -Force .\\app-release-bundle.aab .\\app-release.aab }; Get-Item .\\app-release.aab, .\\app-release-bundle.aab -ErrorAction SilentlyContinue | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check compile36 build result",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Get-Item .\\app-release.aab, .\\app-release-bundle.aab, .\\app-release-signed.apk -ErrorAction SilentlyContinue | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize; Get-ChildItem .\\app\\build\\intermediates -Recurse -Filter AndroidManifest.xml -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 5 | ForEach-Object { '---'; $_.FullName; Select-String -Path $_.FullName -Pattern 'versionCode|versionName|minSdkVersion|targetSdkVersion' | ForEach-Object { $_.Line.Trim() } }",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "direct gradle bundleRelease",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; $env:JAVA_HOME='C:\\Users\\bstra\\.bubblewrap\\jdk17\\jdk-17.0.19+10'; $env:PATH=($env:JAVA_HOME + '\\bin;' + $env:PATH); .\\gradlew.bat bundleRelease --stacktrace",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "check outputs after direct gradle",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Get-ChildItem .\\app\\build\\outputs -Recurse -File -ErrorAction SilentlyContinue | Select-Object FullName,Length,LastWriteTime | Sort-Object LastWriteTime -Descending | Select-Object -First 20 | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "final rebuild vc4 compile36",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Remove-Item .\\app-release.aab, .\\app-release-bundle.aab, .\\app-release-signed.apk -Force -ErrorAction SilentlyContinue; $env:BUBBLEWRAP_KEYSTORE_PASSWORD='aihorizon-local-build-only'; $env:BUBBLEWRAP_KEY_PASSWORD='aihorizon-local-build-only'; bubblewrap.cmd build; if (Test-Path .\\app-release-bundle.aab) { Copy-Item -Force .\\app-release-bundle.aab .\\app-release.aab }; Get-Item .\\app-release.aab, .\\app-release-bundle.aab -ErrorAction SilentlyContinue | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "verify final vc4 metadata",
+      "type": "shell",
+      "command": "Set-Location c:\\temp\\ai-horizon-android-build; Get-ChildItem .\\app\\build\\intermediates -Recurse -Filter AndroidManifest.xml | Sort-Object LastWriteTime -Descending | Select-Object -First 4 | ForEach-Object { '---'; $_.FullName; Select-String -Path $_.FullName -Pattern 'versionCode|versionName|minSdkVersion|targetSdkVersion' | ForEach-Object { $_.Line.Trim() } }; Select-String -Path .\\app\\build.gradle, .\\build.gradle, .\\gradle\\wrapper\\gradle-wrapper.properties -Pattern 'androidbrowserhelper|compileSdkVersion|targetSdkVersion|versionCode|versionName|com.android.tools.build|distributionUrl'",
+      "isBackground": false,
+      "problemMatcher": []
     }
   ]
 }
