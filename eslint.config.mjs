@@ -58,6 +58,16 @@ export default [
       },
     },
   },
+  {
+    files: ["**/*.cjs"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "commonjs",
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
   // Lambda functions: enable Node.js environment
   {
     files: ["server/lambda/**/*.js"],
