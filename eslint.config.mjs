@@ -65,6 +65,8 @@ export default [
       sourceType: "commonjs",
       globals: {
         ...globals.node,
+        console: "readonly",
+        process: "readonly",
       },
     },
   },
