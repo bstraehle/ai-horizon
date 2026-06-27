@@ -116,7 +116,7 @@ export class AIAnalysisAdapter {
 
       if (bonusAsteroidsKilled < BONUS_ASTEROID_COUNT) {
         bullets.push(
-          "🪨💎 Destroy all " +
+          "💎🪨 Destroy all " +
             BONUS_ASTEROID_COUNT +
             " bonus asteroids. You destroyed " +
             bonusAsteroidsKilled +
@@ -126,7 +126,7 @@ export class AIAnalysisAdapter {
         );
       } else {
         bullets.push(
-          "🪨💎 Great job, you destroyed all " + BONUS_ASTEROID_COUNT + " bonus asteroids."
+          "💎🪨 Great job, you destroyed all " + BONUS_ASTEROID_COUNT + " bonus asteroids."
         );
       }
     }
@@ -137,7 +137,7 @@ export class AIAnalysisAdapter {
 
       if (bonusStarsCollectedAccuracy < 1) {
         bullets.push(
-          "⭐💎 Collect more bonus stars. Your accuracy is " +
+          "💎⭐ Collect more bonus stars. Your accuracy is " +
             (bonusStarsCollectedAccuracy * 100).toFixed(0) +
             "% (" +
             bonusStarsCollected +
@@ -147,7 +147,7 @@ export class AIAnalysisAdapter {
         );
       } else {
         bullets.push(
-          "⭐💎 Great job, you collected all bonus stars (" +
+          "💎⭐ Great job, you collected all bonus stars (" +
             bonusStarsCollected +
             " of " +
             bonusStarsEncountered +
@@ -164,7 +164,7 @@ export class AIAnalysisAdapter {
 
       if (hardenedAsteroidsKilledAccuracy < 1) {
         bullets.push(
-          "🪨🛡️ Destroy more hardened asteroids. Your accuracy is " +
+          "🛡️🪨 Destroy more hardened asteroids. Your accuracy is " +
             (hardenedAsteroidsKilledAccuracy * 100).toFixed(0) +
             "% (" +
             hardenedAsteroidsKilled +
@@ -174,7 +174,7 @@ export class AIAnalysisAdapter {
         );
       } else {
         bullets.push(
-          "🪨🛡️ Great job, you destroyed all hardened asteroids (" +
+          "🛡️🪨 Great job, you destroyed all hardened asteroids (" +
             hardenedAsteroidsKilled +
             " of " +
             hardenedAsteroidsEncountered +
@@ -189,7 +189,7 @@ export class AIAnalysisAdapter {
 
       if (shotsFiredAccuracy < 1) {
         bullets.push(
-          "🔫🎯 Increase shots fired accuracy for end of run bonus (0-100%). Your accuracy is " +
+          "🎯 Increase shots fired accuracy for end of run bonus (0-100%). Your accuracy is " +
             (shotsFiredAccuracy * 100).toFixed(0) +
             "% (" +
             shotsFiredOnTarget +
@@ -199,7 +199,7 @@ export class AIAnalysisAdapter {
         );
       } else {
         bullets.push(
-          "🔫🎯 Great job, your shots fired accuracy for end of run bonus is 100% (" +
+          "🎯 Great job, your shots fired accuracy for end of run bonus is 100% (" +
             shotsFiredOnTarget +
             " of " +
             shotsFired +
