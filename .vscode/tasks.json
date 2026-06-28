@@ -33,6 +33,13 @@
       "group": "build"
     },
     {
+      "label": "serve web app",
+      "type": "shell",
+      "command": "npm run serve",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
       "label": "check bubblewrap",
       "type": "shell",
       "command": "bubblewrap --version",
