@@ -526,6 +526,13 @@ body.about-body,
   padding-left: 1.2em;
   text-align: left;
 }
+.about-content ul.instructions .action-link {
+  display: inline;
+  font-weight: inherit;
+  margin-top: 0;
+  padding: 0;
+  text-decoration: underline;
+}
 .about-content p.about-back {
   margin: 8px auto 0;
   max-width: 720px;

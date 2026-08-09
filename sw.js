@@ -2,7 +2,7 @@
  * Provides offline-first caching for core assets and a network-first strategy for API calls.
  * Increment CACHE_VERSION to force an update after deploys that change cached assets.
  */
-const CACHE_VERSION = "v1.0.402";
+const CACHE_VERSION = "v1.0.403";
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
@@ -160,45 +160,22 @@ function fetchWithTimeout(request, { timeoutMs = 900 } = {}) {
 }
 
 /**
- * Cache-first strategy with background update for navigation requests.
+ * Network-first strategy with offline fallback for navigation requests.
  *
- * Provides fast offline page loads by serving cached HTML immediately while
- * updating the cache in the background. Falls back to app shell (/index.html)
- * if both cache and network are unavailable.
+ * Prioritizes fresh HTML so deploys become visible immediately, while still
+ * falling back to cached pages and the app shell when offline.
  *
  * Behavior:
- *  - If cached: returns cached response, triggers background update via event.waitUntil.
- *  - If not cached: attempts network fetch with timeout, caches successful response.
- *  - On failure: falls back to cached /index.html or returns 503 Offline response.
+ *  - Attempts a timed network fetch first and caches successful responses.
+ *  - On failure: falls back to the cached page for that request.
+ *  - If the page was never cached: falls back to cached /index.html or returns 503.
  *
  * @param {Request} request The navigation request to handle.
- * @param {FetchEvent} [event] The fetch event for background update scheduling.
  * @returns {Promise<Response>} The cached, fresh, or fallback response.
  * @private
  */
-async function navigationCacheFirst(request, event) {
+async function navigationNetworkFirst(request) {
   const cache = await caches.open(STATIC_CACHE);
-  const cached = await cache.match(request, { ignoreSearch: true });
-  if (cached) {
-    // Update in the background when possible, but don't block the response
-    if (event) {
-      event.waitUntil(
-        (async () => {
-          try {
-            const fresh = await fetchWithTimeout(request);
-            if (fresh && fresh.ok) {
-              await cache.put(request, fresh.clone());
-            }
-          } catch (_) {
-            // likely offline/timeout; keep cached version
-          }
-        })()
-      );
-    }
-    return cached;
-  }
-
-  // No cached version yet: try a quick network fetch, then fall back to app shell
   try {
     const fresh = await fetchWithTimeout(request);
     if (fresh && fresh.ok) {
@@ -206,6 +183,8 @@ async function navigationCacheFirst(request, event) {
     }
     return fresh;
   } catch (_) {
+    const cached = await cache.match(request, { ignoreSearch: true });
+    if (cached) return cached;
     return (await cache.match("/index.html")) || new Response("Offline", { status: 503 });
   }
 }
@@ -285,7 +264,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    event.respondWith(navigationCacheFirst(request, event));
+    event.respondWith(navigationNetworkFirst(request));
     return;
   }
 

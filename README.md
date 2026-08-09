@@ -1,95 +1,10 @@
 ## Architecture Overview
 
-```mermaid
-flowchart LR
-    subgraph Client ["Client Experience"]
-        direction TB
-        HTML["index.html"]
-        JS["game.js\nesbuild bundle"]
-        CSS["style.css"]
-        SW["Service Worker\nsw.js"]
-        PWA["PWA Register"]
-        Canvas["Game Canvas"]
+![AI Horizon system architecture](docs/architecture.svg)
 
-        HTML --> JS
-        HTML --> CSS
-        HTML --> Canvas
-        PWA --> SW
-    end
-
-    subgraph GameFeatures ["Gameplay Systems"]
-        direction TB
-        HighScore["High Score"]
-        Score["Score Tracking"]
-        Timer["Timer\n1:00 finale"]
-        GameOver["Game Over"]
-        Initials["Player Initials Entry"]
-        Leaderboard["Leaderboard System"]
-
-        Score --> HighScore
-        Timer --> GameOver
-        GameOver --> Initials
-        Initials --> Leaderboard
-    end
-
-    subgraph AWS ["AWS Backend us-west-2"]
-        direction TB
-        APIGW["API Gateway"]
-        Cognito["Cognito Identity"]
-        LeaderboardLambda["Lambda\nleaderboard.js"]
-        AnalysisLambda["Lambda\nanalysis.js"]
-        Bedrock["Amazon Bedrock"]
-        DynamoDB[("DynamoDB\nLeaderboard table")]
-
-        APIGW --> LeaderboardLambda
-        APIGW --> AnalysisLambda
-        LeaderboardLambda --> DynamoDB
-        AnalysisLambda --> Bedrock
-        Cognito --> APIGW
-    end
-
-    subgraph BuildTools ["Build and Verification"]
-        direction TB
-        Husky["Husky\ngit hooks"]
-        ESLint["ESLint + Prettier"]
-        TypeScript["TypeScript\ntype checking"]
-        Vitest["Vitest\ntesting"]
-        ESBuild["esbuild\nbundler"]
-
-        Husky --> ESLint
-        ESLint --> TypeScript
-        TypeScript --> Vitest
-        Vitest --> ESBuild
-    end
-
-    Canvas --> GameFeatures
-    JS -->|"HTTPS REST API"| APIGW
-    JS -->|"Auth"| Cognito
-    HighScore -->|"Fetch Scores"| APIGW
-    Leaderboard -->|"Fetch Scores"| APIGW
-    GameOver -->|"Game Analysis"| APIGW
-    Initials -->|"Persist Initials"| APIGW
-
-    classDef client fill:#fff4cc,stroke:#9d6f00,stroke-width:2px,color:#4a3200;
-    classDef game fill:#d8efe4,stroke:#2d6a4f,stroke-width:2px,color:#173226;
-    classDef backend fill:#dcecff,stroke:#275b8c,stroke-width:2px,color:#17314d;
-    classDef data fill:#ffe0d6,stroke:#a14b2e,stroke-width:2px,color:#4b2014;
-    classDef tooling fill:#eadcff,stroke:#6f4ca3,stroke-width:2px,color:#31174f;
-
-    class HTML,JS,CSS,SW,PWA,Canvas client;
-    class HighScore,Score,Timer,GameOver,Initials,Leaderboard game;
-    class APIGW,Cognito,LeaderboardLambda,AnalysisLambda,Bedrock backend;
-    class DynamoDB data;
-    class Husky,ESLint,TypeScript,Vitest,ESBuild tooling;
-
-    style Client fill:#fffaf0,stroke:#9d6f00,stroke-width:2px,color:#4a3200
-    style GameFeatures fill:#eefaf3,stroke:#2d6a4f,stroke-width:2px,color:#173226
-    style AWS fill:#eff6ff,stroke:#275b8c,stroke-width:2px,color:#17314d
-    style BuildTools fill:#f4efff,stroke:#6f4ca3,stroke-width:2px,color:#31174f
-
-    linkStyle 8,9,10,11 stroke:#1f4b99,stroke-width:3px,color:#1f4b99
-    linkStyle 12,13,14,15 stroke:#2d6a4f,stroke-width:3px,color:#2d6a4f
-```
+Edit the source in [Draw.io](docs/architecture.drawio). AWS services use Draw.io's current
+`aws4` architecture library, which is the library linked by the AWS Architecture Center. The
+rendered diagram uses the official Q3 2026 AWS Architecture Icons released July 31, 2026.
 
 ## AI HORIZON
 

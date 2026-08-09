@@ -1,4 +1,4 @@
-import { fromCognitoIdentityPool } from "@aws-sdk/credential-providers";
+import { fromCognitoIdentityPool } from "@aws-sdk/credential-provider-cognito-identity";
 import { SignatureV4MultiRegion } from "@aws-sdk/signature-v4-multi-region";
 import { Sha256 } from "@aws-crypto/sha256-js";
 
