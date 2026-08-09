@@ -90,4 +90,52 @@ describe("PerformanceMonitor", () => {
 
     expect(monitor.level).toBe(0);
   });
+
+  it("de-escalates level after sustained recovered frame times", () => {
+    const events = [];
+    const monitor = new PerformanceMonitor({
+      levels: [{ thresholdMs: 10, sampleWindow: 4, cooldownFrames: 0 }],
+      recoveryThresholdFactor: 0.9,
+      recoveryCooldownFrames: 0,
+      onLevelChange: (level, meta) => events.push({ level, meta }),
+    });
+
+    for (let i = 0; i < 4; i++) {
+      monitor.sample(12, { active: true });
+    }
+    expect(monitor.level).toBe(1);
+
+    for (let i = 0; i < 4; i++) {
+      monitor.sample(7, { active: true });
+    }
+
+    expect(monitor.level).toBe(0);
+    expect(events.map((e) => e.level)).toEqual([1, 0]);
+  });
+
+  it("continues sampling at max level and recovers from it", () => {
+    const monitor = new PerformanceMonitor({
+      levels: [
+        { thresholdMs: 10, sampleWindow: 3, cooldownFrames: 0 },
+        { thresholdMs: 8, sampleWindow: 3, cooldownFrames: 0 },
+      ],
+      recoveryThresholdFactor: 0.95,
+      recoveryCooldownFrames: 0,
+    });
+
+    for (let i = 0; i < 3; i++) {
+      monitor.sample(12, { active: true });
+    }
+    expect(monitor.level).toBe(1);
+
+    for (let i = 0; i < 3; i++) {
+      monitor.sample(9, { active: true });
+    }
+    expect(monitor.level).toBe(2);
+
+    for (let i = 0; i < 3; i++) {
+      monitor.sample(7, { active: true });
+    }
+    expect(monitor.level).toBe(1);
+  });
 });

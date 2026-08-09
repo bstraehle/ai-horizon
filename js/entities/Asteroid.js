@@ -104,6 +104,9 @@ export class Asteroid {
     /** @private */ this._damageLineAngles = new Float32Array(8);
     /** @private */ this._damageLineLens = new Float32Array(8);
     /** @private */ this._damageLineCount = 0;
+    /** @private */ this._surfaceSprite = null;
+    /** @private */ this._surfaceCacheSignature = "";
+    /** @private */ this._surfaceDirty = true;
   }
 
   /**
@@ -122,7 +125,11 @@ export class Asteroid {
       const rt = cfg.REVEAL_TIME;
       for (let i = 0; i < this._craters.length; i++) {
         const cr = this._craters[i];
-        if (cr.grow !== undefined && cr.grow < 1) cr.grow = Math.min(1, cr.grow + dtSec / rt);
+        if (cr.grow !== undefined && cr.grow < 1) {
+          const prev = cr.grow;
+          cr.grow = Math.min(1, cr.grow + dtSec / rt);
+          if (cr.grow !== prev) this._surfaceDirty = true;
+        }
       }
     }
   }
@@ -148,6 +155,77 @@ export class Asteroid {
     const centerY = this.y + this.height / 2;
     const radius = this.width / 2;
     const palette = this._palette || CONFIG.COLORS.ASTEROID;
+    const surfaceSprite = this._getSurfaceSprite(palette);
+    if (surfaceSprite) {
+      ctx.drawImage(surfaceSprite.canvas, this.x - surfaceSprite.padX, this.y - surfaceSprite.padY);
+    } else {
+      this._drawBodyAndCraters(ctx, centerX, centerY, radius, palette);
+    }
+    if (this.isHardened && this._hits > 0) {
+      ctx.save();
+      const maxHitsForSeverity2 = Math.max(
+        1,
+        this._effectiveMaxHits || CONFIG.ASTEROID.HARDENED_HITS || 10
+      );
+      const severity = Math.min(1, this._hits / maxHitsForSeverity2);
+      const lines = 1 + Math.floor(severity * 4);
+      let damageColor;
+      if (palette && palette.NAME === "ICE") damageColor = "rgba(255,255,255,0.85)";
+      else if (palette && palette.SHIELD) damageColor = palette.SHIELD;
+      else if (palette && palette.RING) damageColor = palette.RING;
+      else if (palette && palette.OUTLINE) damageColor = palette.OUTLINE;
+      else damageColor = "rgba(255,255,255,0.6)";
+      if (palette && palette.NAME === "ICE") {
+        ctx.strokeStyle = damageColor;
+        ctx.lineWidth = 0.8 + severity * 1.2;
+        ctx.globalAlpha = 0.25 + 0.5 * severity;
+      } else {
+        ctx.strokeStyle = damageColor;
+        ctx.lineWidth = 1 + severity * 2;
+        ctx.globalAlpha = 0.4 + 0.6 * severity;
+      }
+      for (let i = 0; i < lines; i++) {
+        const angle =
+          i < this._damageLineCount ? this._damageLineAngles[i] : (i / lines) * Math.PI * 2;
+        const lenFactor =
+          i < this._damageLineCount
+            ? this._damageLineLens[i]
+            : 0.6 + (this._rng ? this._rng.nextFloat() : Math.random()) * 0.5;
+        const endFactor = Math.min(lenFactor + severity * 0.3, 0.95);
+        const sx = centerX + Math.cos(angle) * radius * 0.3;
+        const sy = centerY + Math.sin(angle) * radius * 0.3;
+        const ex = centerX + Math.cos(angle + 0.6) * radius * endFactor;
+        const ey = centerY + Math.sin(angle + 0.6) * radius * endFactor;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.quadraticCurveTo(centerX, centerY, ex, ey);
+        ctx.stroke();
+      }
+      if (severity > 0.7) {
+        ctx.lineWidth = 2 + severity * 3;
+        ctx.globalAlpha = 0.9;
+        const finalCrackColor = damageColor || "rgba(0,0,0,0.7)";
+        ctx.strokeStyle = finalCrackColor;
+        ctx.beginPath();
+        ctx.moveTo(centerX - radius * 0.4, centerY - radius * 0.2);
+        ctx.lineTo(centerX + radius * 0.1, centerY + radius * 0.5);
+        ctx.lineTo(centerX + radius * 0.4, centerY - radius * 0.1);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  /**
+   * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} ctx
+   * @param {number} centerX
+   * @param {number} centerY
+   * @param {number} radius
+   * @param {any} palette
+   * @private
+   */
+  _drawBodyAndCraters(ctx, centerX, centerY, radius, palette) {
     const asteroidGradient = ctx.createRadialGradient(
       centerX - radius * 0.3,
       centerY - radius * 0.3,
@@ -228,60 +306,78 @@ export class Asteroid {
     ctx.strokeStyle = palette.OUTLINE;
     ctx.lineWidth = this.isHardened ? 3 : 2;
     ctx.stroke();
-    if (this.isHardened && this._hits > 0) {
-      ctx.save();
-      const maxHitsForSeverity2 = Math.max(
-        1,
-        this._effectiveMaxHits || CONFIG.ASTEROID.HARDENED_HITS || 10
-      );
-      const severity = Math.min(1, this._hits / maxHitsForSeverity2);
-      const lines = 1 + Math.floor(severity * 4);
-      let damageColor;
-      if (palette && palette.NAME === "ICE") damageColor = "rgba(255,255,255,0.85)";
-      else if (palette && palette.SHIELD) damageColor = palette.SHIELD;
-      else if (palette && palette.RING) damageColor = palette.RING;
-      else if (palette && palette.OUTLINE) damageColor = palette.OUTLINE;
-      else damageColor = "rgba(255,255,255,0.6)";
-      if (palette && palette.NAME === "ICE") {
-        ctx.strokeStyle = damageColor;
-        ctx.lineWidth = 0.8 + severity * 1.2;
-        ctx.globalAlpha = 0.25 + 0.5 * severity;
-      } else {
-        ctx.strokeStyle = damageColor;
-        ctx.lineWidth = 1 + severity * 2;
-        ctx.globalAlpha = 0.4 + 0.6 * severity;
-      }
-      for (let i = 0; i < lines; i++) {
-        const angle =
-          i < this._damageLineCount ? this._damageLineAngles[i] : (i / lines) * Math.PI * 2;
-        const lenFactor =
-          i < this._damageLineCount
-            ? this._damageLineLens[i]
-            : 0.6 + (this._rng ? this._rng.nextFloat() : Math.random()) * 0.5;
-        const endFactor = Math.min(lenFactor + severity * 0.3, 0.95);
-        const sx = centerX + Math.cos(angle) * radius * 0.3;
-        const sy = centerY + Math.sin(angle) * radius * 0.3;
-        const ex = centerX + Math.cos(angle + 0.6) * radius * endFactor;
-        const ey = centerY + Math.sin(angle + 0.6) * radius * endFactor;
-        ctx.beginPath();
-        ctx.moveTo(sx, sy);
-        ctx.quadraticCurveTo(centerX, centerY, ex, ey);
-        ctx.stroke();
-      }
-      if (severity > 0.7) {
-        ctx.lineWidth = 2 + severity * 3;
-        ctx.globalAlpha = 0.9;
-        const finalCrackColor = damageColor || "rgba(0,0,0,0.7)";
-        ctx.strokeStyle = finalCrackColor;
-        ctx.beginPath();
-        ctx.moveTo(centerX - radius * 0.4, centerY - radius * 0.2);
-        ctx.lineTo(centerX + radius * 0.1, centerY + radius * 0.5);
-        ctx.lineTo(centerX + radius * 0.4, centerY - radius * 0.1);
-        ctx.stroke();
-      }
-      ctx.restore();
+  }
+
+  /**
+   * @param {any} palette
+   * @returns {{ canvas: OffscreenCanvas | HTMLCanvasElement, padX: number, padY: number } | null}
+   * @private
+   */
+  _getSurfaceSprite(palette) {
+    const maxHits = Math.max(1, this._effectiveMaxHits || CONFIG.ASTEROID.HARDENED_HITS || 10);
+    const severity = this.isHardened && this._hits > 0 ? Math.min(1, this._hits / maxHits) : 0;
+    const severityBucket = Math.round(severity * 24);
+    const growBucket = this._computeGrowBucket();
+    const paletteKey = this._getPaletteCacheKey(palette);
+    const signature = `${this.width.toFixed(2)}x${this.height.toFixed(2)}|${paletteKey}|${severityBucket}|${growBucket}|${this._craters.length}|${this.isHardened ? 1 : 0}`;
+    if (!this._surfaceDirty && this._surfaceSprite && signature === this._surfaceCacheSignature) {
+      return this._surfaceSprite;
     }
-    ctx.restore();
+
+    const padX = 4;
+    const padY = 4;
+    const canvasWidth = Math.ceil(this.width + padX * 2);
+    const canvasHeight = Math.ceil(this.height + padY * 2);
+    let canvas;
+    if (typeof OffscreenCanvas === "function") {
+      canvas = new OffscreenCanvas(canvasWidth, canvasHeight);
+    } else {
+      const elem = typeof document !== "undefined" ? document.createElement("canvas") : null;
+      if (!elem) return null;
+      elem.width = canvasWidth;
+      elem.height = canvasHeight;
+      canvas = elem;
+    }
+    const offCtx = canvas.getContext("2d");
+    if (!offCtx) return null;
+    offCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+    this._drawBodyAndCraters(
+      offCtx,
+      padX + this.width / 2,
+      padY + this.height / 2,
+      this.width / 2,
+      palette
+    );
+
+    this._surfaceSprite = { canvas, padX, padY };
+    this._surfaceCacheSignature = signature;
+    this._surfaceDirty = false;
+    return this._surfaceSprite;
+  }
+
+  /** @returns {number} @private */
+  _computeGrowBucket() {
+    if (!this._craters.length) return 100;
+    let weighted = 0;
+    for (let i = 0; i < this._craters.length; i++) {
+      const c = this._craters[i];
+      const grow = c && typeof c.grow === "number" ? Math.max(0, Math.min(1, c.grow)) : 1;
+      weighted += grow;
+    }
+    return Math.round((weighted / this._craters.length) * 100);
+  }
+
+  /** @param {any} palette @returns {string} @private */
+  _getPaletteCacheKey(palette) {
+    const p = palette || {};
+    return [
+      p.NAME || "",
+      p.GRAD_IN || "",
+      p.GRAD_MID || "",
+      p.GRAD_OUT || "",
+      p.CRATER || "",
+      p.OUTLINE || "",
+    ].join("|");
   }
 
   /**
@@ -321,6 +417,9 @@ export class Asteroid {
     this._hits = 0;
     this._effectiveMaxHits = CONFIG.ASTEROID.HARDENED_HITS || 10;
     this._damageLineCount = 0;
+    this._surfaceDirty = true;
+    this._surfaceCacheSignature = "";
+    this._surfaceSprite = null;
     const radius = this.width / 2;
     const rand =
       rng && typeof rng.nextFloat === "function" ? rng : { nextFloat: Math.random.bind(Math) };
@@ -391,6 +490,7 @@ export class Asteroid {
   onBulletHit(game) {
     if (!this.isHardened) return true;
     this._hits = (this._hits || 0) + 1;
+    this._surfaceDirty = true;
     try {
       const baseMax = CONFIG.ASTEROID.HARDENED_HITS || 10;
       let eff = baseMax;
@@ -442,6 +542,7 @@ export class Asteroid {
               if (CONFIG.ASTEROID.CRATER_EMBOSS.REVEAL_TIME > 0) next.grow = 0;
               this._craters.push(next);
               newCraters.push(next);
+              this._surfaceDirty = true;
             }
           }
         }

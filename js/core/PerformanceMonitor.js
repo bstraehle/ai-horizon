@@ -17,6 +17,8 @@ export class PerformanceMonitor {
    *   levels?: PerfLevelConfig[],
    *   sampleWindow?: number,
    *   cooldownFrames?: number,
+   *   recoveryThresholdFactor?: number,
+   *   recoveryCooldownFrames?: number,
    *   onLevelChange?: (level:number, meta:{averageFrameMs:number, thresholdMs:number, windowSize:number})=>void,
    * }} [opts]
    */
@@ -28,6 +30,20 @@ export class PerformanceMonitor {
     this._levels = configLevels.map((lvl) => ({ ...lvl }));
     this._sampleWindow = opts.sampleWindow || perf.SAMPLE_WINDOW || 90;
     this._defaultCooldown = opts.cooldownFrames || perf.COOLDOWN_FRAMES || 180;
+    const configuredRecoveryFactor =
+      typeof opts.recoveryThresholdFactor === "number"
+        ? opts.recoveryThresholdFactor
+        : perf.RECOVERY_THRESHOLD_FACTOR;
+    this._recoveryThresholdFactor = Number.isFinite(configuredRecoveryFactor)
+      ? Math.max(0.5, Math.min(0.99, configuredRecoveryFactor))
+      : 0.85;
+    const configuredRecoveryCooldown =
+      typeof opts.recoveryCooldownFrames === "number"
+        ? opts.recoveryCooldownFrames
+        : perf.RECOVERY_COOLDOWN_FRAMES;
+    this._recoveryCooldownFrames = Number.isFinite(configuredRecoveryCooldown)
+      ? Math.max(0, Math.round(configuredRecoveryCooldown))
+      : this._defaultCooldown;
     this._onLevelChange = typeof opts.onLevelChange === "function" ? opts.onLevelChange : () => {};
 
     // Ring buffer state (allocated lazily when window size known) replaces dynamic array.
@@ -70,12 +86,13 @@ export class PerformanceMonitor {
       return;
     }
 
-    const targetIndex = this._level;
-    if (!Array.isArray(this._levels) || targetIndex >= this._levels.length) {
+    if (!Array.isArray(this._levels) || this._levels.length === 0) {
       return;
     }
+    const maxLevel = this._levels.length;
+    const configIndex = Math.max(0, Math.min(this._level, maxLevel - 1));
 
-    const config = this._levels[targetIndex];
+    const config = this._levels[configIndex];
     const windowSize = config.sampleWindow || this._sampleWindow;
     const cooldownFrames =
       typeof config.cooldownFrames === "number" ? config.cooldownFrames : this._defaultCooldown;
@@ -102,7 +119,7 @@ export class PerformanceMonitor {
     }
 
     const avg = this._sum / this._count;
-    if (avg > config.thresholdMs) {
+    if (this._level < maxLevel && avg > config.thresholdMs) {
       this._level += 1;
       // Reset buffer stats but keep allocation for reuse.
       this._w = 0;
@@ -117,6 +134,29 @@ export class PerformanceMonitor {
         });
       } catch (_e) {
         /* swallow listener errors */
+      }
+      return;
+    }
+
+    if (this._level > 0) {
+      const recoveryConfigIndex = Math.max(0, Math.min(this._level - 1, maxLevel - 1));
+      const recoveryConfig = this._levels[recoveryConfigIndex];
+      const recoveryThreshold = recoveryConfig.thresholdMs * this._recoveryThresholdFactor;
+      if (avg < recoveryThreshold) {
+        this._level -= 1;
+        this._w = 0;
+        this._count = 0;
+        this._sum = 0;
+        this._cooldown = this._recoveryCooldownFrames;
+        try {
+          this._onLevelChange(this._level, {
+            averageFrameMs: avg,
+            thresholdMs: recoveryThreshold,
+            windowSize,
+          });
+        } catch (_e) {
+          /* swallow listener errors */
+        }
       }
     }
   }

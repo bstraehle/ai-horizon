@@ -167,8 +167,17 @@ class AIHorizon {
     this._uiTouchGuardTimeout = null;
 
     this._isMobile = this.isMobile();
+    const perfDefaults = CONFIG.PERFORMANCE || {};
+    const perfLevels = Array.isArray(perfDefaults.LEVELS) ? perfDefaults.LEVELS : [];
+    const desktopInitial = Number.isFinite(perfDefaults.INITIAL_LEVEL_DESKTOP)
+      ? Math.max(0, Math.round(perfDefaults.INITIAL_LEVEL_DESKTOP))
+      : 0;
+    const mobileInitial = Number.isFinite(perfDefaults.INITIAL_LEVEL_MOBILE)
+      ? Math.max(0, Math.round(perfDefaults.INITIAL_LEVEL_MOBILE))
+      : 1;
+    const initialPerfLevel = this._isMobile ? mobileInitial : desktopInitial;
     this._isLowPowerMode = false;
-    this._performanceLevel = 0;
+    this._performanceLevel = Math.min(perfLevels.length, initialPerfLevel);
     this._starfieldScale = 1;
     this._spawnRateScale = 1;
     this._particleBudget = Number.POSITIVE_INFINITY;
@@ -386,11 +395,7 @@ class AIHorizon {
       stepMs: CONFIG.TIME.STEP_MS,
       maxSubSteps: CONFIG.TIME.MAX_SUB_STEPS,
       onMetrics: (m) => {
-        try {
-          this.performanceMonitor.sample(m.frameDt, { active: this.state.isRunning() });
-        } catch (_e) {
-          /* ignore */
-        }
+        this._frameMetrics = m;
       },
     });
     AIHorizon._instance = this;
