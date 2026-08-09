@@ -34,7 +34,7 @@ export class LeaderboardRepository {
   constructor(opts = {}) {
     this.key = opts.key || "aiHorizonLeaderboard";
     this.endpoint = opts.endpoint || "";
-    this.maxEntries = typeof opts.maxEntries === "number" ? opts.maxEntries : 10;
+    this.maxEntries = typeof opts.maxEntries === "number" ? opts.maxEntries : 25;
     this._storageAdapter = opts.storageAdapter || new LocalStorageAdapter();
     this._remoteAdapter = opts.remoteAdapter || new RemoteStorageAdapter({});
     /** @type {number|undefined} */
