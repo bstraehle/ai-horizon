@@ -5,6 +5,17 @@ const client = new DynamoDBClient({ region: "us-west-2" });
 const docClient = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = "ai-horizon-leaderboard";
+const MAX_LEADERBOARD_ENTRIES = 25;
+
+/**
+ * Normalize leaderboard payloads so persisted data never exceeds the supported top-N size.
+ * @param {any} value
+ * @returns {any[]}
+ */
+function normalizeLeaderboardPayload(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, MAX_LEADERBOARD_ENTRIES);
+}
 
 /**
  * Lambda handler
@@ -103,6 +114,10 @@ async function getItem(id) {
     throw new Error(`Item with id ${id} not found`);
   }
 
+  if (Array.isArray(result.Item.scores)) {
+    result.Item.scores = normalizeLeaderboardPayload(result.Item.scores);
+  }
+
   // ensure version property exists for clients implementing optimistic concurrency
   if (typeof result.Item.version !== "number") result.Item.version = 0;
   return result.Item;
@@ -119,6 +134,10 @@ async function updateItem(id, updateData) {
   delete updateData.id;
   const nowIso = new Date().toISOString();
   updateData.updatedAt = nowIso;
+
+  if (Array.isArray(updateData.scores)) {
+    updateData.scores = normalizeLeaderboardPayload(updateData.scores);
+  }
 
   // Optimistic concurrency: expect caller to send 'version'. If absent, treat as unconditional create of version (0 -> 1).
   const providedVersion = typeof updateData.version === "number" ? updateData.version : undefined;
