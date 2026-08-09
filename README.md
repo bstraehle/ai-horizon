@@ -1,5 +1,7 @@
 # AI Horizon
 
+![AI Horizon system architecture](docs/architecture.svg)
+
 AI Horizon is a fast, responsive HTML5 Canvas space shooter built with vanilla JavaScript and ES modules. It combines arcade action, particle-heavy visuals, deterministic seeded runs, and a local/remote leaderboard.
 
 ## Quick start
@@ -49,12 +51,6 @@ For the best experience:
 - try different seeds with `?seed=...` to explore different runs
 
 For remote leaderboard support, the app should be served over HTTPS in production.
-
-## 18. Windows specific tips
-
-- PowerShell execution policy errors with Husky scripts: run `Set-ExecutionPolicy -Scope LocalMachine RemoteSigned` (or Bypass at session scope) if hooks fail to execute.
-- Use `py -m http.server` instead of `python` if only launcher installed.
-- Terminal rendering slow in some emulators? Use Windows Terminal or VS Code integrated terminal for best ANSI performance.
 
 ---
 

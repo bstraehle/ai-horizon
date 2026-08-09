@@ -52,6 +52,7 @@ import { EventHandlers } from "./systems/EventHandlers.js";
 import { PerformanceMonitor } from "./core/PerformanceMonitor.js";
 import { applyPerformanceProfile } from "./ui/PerformanceProfiles.js";
 import { warmUpPools } from "./ui/PoolWarmup.js";
+import { detectMobilePlatform } from "./utils/mobilePlatform.js";
 import { updateGame } from "./systems/GameUpdate.js";
 import { drawGame, drawFrame } from "./systems/GameRender.js";
 import { initBackgroundLifecycle, drawBackgroundLifecycle } from "./systems/BackgroundLifecycle.js";
@@ -166,7 +167,9 @@ class AIHorizon {
     this._uiTouchGuardActive = false;
     this._uiTouchGuardTimeout = null;
 
-    this._isMobile = this.isMobile();
+    const mobileInfo = detectMobilePlatform();
+    this._isMobile = mobileInfo.isMobile;
+    this._isAndroid = mobileInfo.isAndroid;
     const perfDefaults = CONFIG.PERFORMANCE || {};
     const perfLevels = Array.isArray(perfDefaults.LEVELS) ? perfDefaults.LEVELS : [];
     const desktopInitial = Number.isFinite(perfDefaults.INITIAL_LEVEL_DESKTOP)
@@ -459,18 +462,7 @@ class AIHorizon {
    * @returns {boolean} True if mobile device detected; false otherwise.
    */
   isMobile() {
-    const uaData = /** @type {any} */ (navigator).userAgentData;
-    if (uaData && typeof uaData.mobile === "boolean") {
-      return uaData.mobile;
-    }
-
-    const hasTouch = (navigator.maxTouchPoints || 0) > 0;
-    const supportsMQ = typeof window.matchMedia === "function";
-    const coarse = supportsMQ && window.matchMedia("(any-pointer: coarse)").matches;
-    const noHover = supportsMQ && window.matchMedia("(any-hover: none)").matches;
-    if (hasTouch && (coarse || noHover)) return true;
-
-    return /Mobi|Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    return detectMobilePlatform().isMobile;
   }
 
   /**
