@@ -297,7 +297,7 @@ self.addEventListener("message", (event) => {
           await Promise.all(
             targets.map(async (url) => {
               try {
-                const fresh = await fetch(url + "?v=" + Date.now(), { cache: "no-cache" });
+                const fresh = await fetch(url, { cache: "reload" });
                 if (fresh && fresh.ok) {
                   await cache.put(url, fresh.clone());
                 }

@@ -17,6 +17,30 @@
 (() => {
   if (!("serviceWorker" in navigator)) return;
 
+  /**
+   * Ensure SW script is directly reachable on this origin.
+   * Browsers reject SW registration if the script URL redirects.
+   *
+   * @returns {Promise<boolean>} True when registration is safe to attempt.
+   */
+  async function canRegisterServiceWorker() {
+    try {
+      const response = await fetch("/sw.js", {
+        method: "HEAD",
+        cache: "no-store",
+        redirect: "manual",
+      });
+
+      // A manual redirect response indicates registration will fail.
+      if (response.type === "opaqueredirect") return false;
+      if (response.status >= 300 && response.status < 400) return false;
+
+      return response.ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
   // Create (or reuse) a Trusted Types policy for SW script URLs if Trusted Types are enforced.
   let swUrl = "/sw.js";
   try {
@@ -34,7 +58,15 @@
     console.warn("[PWA] Trusted Types policy issue; using plain string", err);
   }
 
-  window.addEventListener("load", () => {
+  window.addEventListener("load", async () => {
+    const registrationAllowed = await canRegisterServiceWorker();
+    if (!registrationAllowed) {
+      console.warn(
+        "[PWA] Skipping service worker registration because /sw.js is unreachable or redirects."
+      );
+      return;
+    }
+
     navigator.serviceWorker
       .register(swUrl)
       .then((reg) => {
