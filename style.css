@@ -24,16 +24,21 @@
   --btn-radius: 999px;
   --color-bg: #111;
   --color-border: #333;
-  --color-btn-focus-outline: #b20000;
-  --color-btn-gradient-end: #555;
-  --color-btn-gradient-hover-end: #777;
-  --color-btn-gradient-hover-start: #555;
-  --color-btn-gradient-start: #333;
+  --color-btn-focus-outline: #ffb84d;
+  --color-btn-gradient-end: #6f4d1f;
+  --color-btn-gradient-hover-end: #a86b24;
+  --color-btn-gradient-hover-start: #8a5b1f;
+  --color-btn-gradient-start: #43311b;
   --color-connection-online: var(--color-text);
   --color-connection-offline: var(--color-text);
+  --color-panel-accent: rgba(255, 184, 77, 0.18);
+  --color-panel-border: rgba(255, 255, 255, 0.12);
+  --color-panel-highlight: rgba(255, 255, 255, 0.08);
+  --color-surface: rgba(8, 8, 9, 0.78);
+  --color-surface-strong: rgba(6, 6, 7, 0.94);
   --color-text: #fff;
   --color-text-secondary: #ddd;
-  --color-title-shadow: #ddd;
+  --color-title-shadow: rgba(255, 255, 255, 0.18);
   --page-vertical: var(--space-6);
   --radius-1: 4px;
   --radius-2: 12px;
@@ -46,6 +51,7 @@
   --space-6: 24px;
   --space-7: 28px;
   --space-8: 40px;
+  --ui-max-width: min(44rem, calc(100vw - 2 * var(--space-5)));
   --leaderboard-rows-desktop: 3;
   --leaderboard-rows-mobile: 3;
   --leaderboard-row-gap: var(--space-2);
@@ -64,8 +70,17 @@
   margin: 0;
   padding: 0;
 }
+html {
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 42%),
+    radial-gradient(circle at 20% 20%, rgba(255, 184, 77, 0.12), transparent 24%),
+    linear-gradient(180deg, #020203 0%, #0a0a0b 52%, #010101 100%);
+}
 body {
-  background-color: var(--color-bg);
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.05), transparent 42%),
+    radial-gradient(circle at 20% 20%, rgba(255, 184, 77, 0.1), transparent 24%),
+    linear-gradient(180deg, #020203 0%, #0a0a0b 52%, #010101 100%);
   color: var(--color-text);
   font-family:
     system-ui,
@@ -76,6 +91,40 @@ body {
     sans-serif;
   overflow: hidden;
   user-select: none;
+  position: relative;
+}
+body::before,
+body::after {
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: 0;
+}
+body::before {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.025) 0,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px,
+      transparent 6px
+    );
+  opacity: 0.3;
+}
+body::after {
+  background:
+    radial-gradient(circle at 50% 15%, rgba(255, 255, 255, 0.12), transparent 18%),
+    radial-gradient(circle at 15% 85%, rgba(255, 255, 255, 0.05), transparent 20%),
+    radial-gradient(circle at 80% 30%, rgba(255, 184, 77, 0.07), transparent 20%);
+  mix-blend-mode: screen;
+  opacity: 0.8;
+}
+.game-container,
+.game-over-screen {
+  position: relative;
+  z-index: 1;
 }
 /* 3. Canvas & Layout Containers -------------------------- */
 #gameCanvas {
@@ -98,6 +147,7 @@ body {
 /* 4. Game HUD -------------------------------------------- */
 .game-header {
   backface-visibility: hidden;
+  background: linear-gradient(180deg, rgba(2, 5, 10, 0.82), rgba(2, 5, 10, 0));
   left: 0;
   padding: var(--space-2) var(--space-5);
   padding-top: max(var(--page-vertical), env(safe-area-inset-top));
@@ -111,20 +161,28 @@ body {
   align-items: center;
   display: flex;
   font-size: 1rem;
-  font-weight: bold;
+  gap: var(--space-3);
+  font-weight: 700;
   justify-content: space-between;
   position: relative;
   width: 100%;
   z-index: 20;
 }
 .score {
-  background-color: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)),
+    var(--color-surface);
+  border: 1px solid var(--color-panel-border);
+  border-radius: 999px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.28);
   color: var(--color-text);
   display: inline-block;
-  padding: var(--space-1) var(--space-2);
+  letter-spacing: 0.05em;
+  padding: 6px 12px;
   position: relative;
+  text-transform: uppercase;
 }
 @keyframes timer-flash {
   0% {
@@ -168,12 +226,17 @@ body {
 }
 .game-info {
   backface-visibility: hidden;
-  background: var(--color-bg);
+  background:
+    linear-gradient(180deg, rgba(4, 4, 5, 0.68), rgba(4, 4, 5, 0.94)), var(--color-surface-strong);
+  border-top: 1px solid var(--color-panel-border);
+  box-shadow: 0 -24px 64px rgba(0, 0, 0, 0.42);
   bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
   left: 0;
-  padding: var(--space-5);
-  padding-bottom: var(--space-5) !important;
-  padding-top: var(--space-6) !important;
+  padding: var(--space-6) var(--space-5);
   position: fixed;
   right: 0;
   transform: translateZ(0);
@@ -181,9 +244,13 @@ body {
 }
 .game-info h1 {
   font-size: clamp(1.5rem, 3vw + 1rem, 2.5rem);
-  margin-bottom: var(--space-6);
+  letter-spacing: 0.18em;
+  margin-bottom: 0;
   text-align: center;
-  text-shadow: 0 0 20px var(--color-title-shadow);
+  text-transform: uppercase;
+  text-shadow:
+    0 0 18px var(--color-title-shadow),
+    0 0 36px rgba(255, 255, 255, 0.08);
 }
 .instructions {
   font-size: clamp(1rem, 1.2vw + 0.8rem, 1.25rem);
@@ -274,28 +341,43 @@ body {
   }
 }
 .game-over-content {
-  background: var(--color-bg);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-3);
-  padding: var(--space-5);
-  padding-top: var(--space-6) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+    var(--color-surface-strong);
+  border: 1px solid var(--color-panel-border);
+  border-radius: calc(var(--radius-3) + 4px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 24px 80px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 184, 77, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  max-width: var(--ui-max-width);
+  padding: clamp(var(--space-5), 4vw, var(--space-8));
   text-align: center;
 }
 .game-over-content h2 {
   color: var(--color-text);
   font-size: clamp(1.5rem, 3vw + 1rem, 2.5rem);
-  margin-bottom: var(--space-6);
-  text-shadow: 0 0 20px var(--color-title-shadow);
+  letter-spacing: 0.16em;
+  margin-bottom: 0;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 18px var(--color-title-shadow),
+    0 0 30px rgba(255, 255, 255, 0.08);
 }
 .game-over-content p {
   color: var(--color-text-secondary);
   font-size: clamp(1.1rem, 1.2vw + 0.9rem, 1.5rem);
-  margin-bottom: var(--space-6);
+  margin-bottom: 0;
 }
 /* 6. Forms / Initials Entry & Actions -------------------- */
 .action-button {
-  background: var(--btn-bg);
-  border: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0)), var(--btn-bg);
+  border: 1px solid rgba(255, 214, 153, 0.22);
   border-radius: var(--btn-radius);
   color: var(--color-text);
   cursor: pointer;
@@ -306,8 +388,14 @@ body {
   min-height: 44px;
   min-width: 200px;
   padding: var(--space-3) var(--space-6);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 10px 20px rgba(0, 0, 0, 0.3);
   transition:
     background 0.2s ease,
+    box-shadow 0.2s ease,
     outline-color 0.2s ease,
     transform 0.1s ease;
 }
@@ -322,33 +410,49 @@ body {
 }
 .action-button:focus-visible {
   outline: 3px solid var(--color-btn-focus-outline);
-  outline-offset: -3px;
+  outline-offset: 2px;
 }
 .action-button:hover {
   background: var(--btn-bg-hover);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 14px 28px rgba(0, 0, 0, 0.36);
 }
 .action-group {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  margin-top: 0;
+  padding-block: 0;
   text-align: center;
 }
+.action-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+}
 .action-link {
-  color: var(--color-text-secondary);
-  display: inline-block;
-  font-weight: 600;
-  margin-top: var(--space-4);
+  color: rgba(231, 231, 231, 0.82);
+  display: inline-flex;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   padding: var(--space-2) var(--space-3);
   text-decoration: none;
+  text-transform: uppercase;
 }
 .action-link:focus-visible {
   outline: 3px solid var(--color-btn-focus-outline);
-  outline-offset: -3px;
+  outline-offset: 2px;
 }
 .action-link:hover {
-  color: var(--color-text);
+  color: #fff;
 }
 .js-force-focus {
   outline: 3px solid var(--color-btn-focus-outline) !important;
-  outline-offset: -3px !important;
+  outline-offset: 2px !important;
 }
 .initials-entry {
   align-items: center;
@@ -360,7 +464,7 @@ body {
 }
 .post-game-message {
   color: var(--color-text-secondary);
-  margin-bottom: var(--space-5);
+  margin-bottom: 0;
   text-align: center;
 }
 .post-game-message p {
@@ -373,23 +477,24 @@ body {
   text-align: left;
 }
 .initials-entry .initials-input {
-  background: rgba(255, 255, 255, 0.01);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-1);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   color: var(--color-text);
   font-weight: 700;
   letter-spacing: 0.06em;
   margin-bottom: var(--space-5);
   max-width: 12rem;
-  padding: 6px 8px;
+  padding: 10px 12px;
   text-align: center;
   text-transform: uppercase;
   width: 8ch;
 }
 .initials-entry .initials-input:focus {
-  border-color: var(--color-border);
+  border-color: rgba(255, 184, 77, 0.5);
   outline: 3px solid var(--color-btn-focus-outline);
-  outline-offset: -3px;
+  outline-offset: 2px;
 }
 .initials-entry .initials-label {
   display: block;
@@ -423,7 +528,7 @@ body {
 /* 7. Leaderboard ----------------------------------------- */
 .leaderboard {
   color: var(--color-text-secondary);
-  margin-bottom: var(--space-5);
+  margin-bottom: 0;
   overscroll-behavior: contain;
   text-align: center;
   touch-action: none;
@@ -431,8 +536,10 @@ body {
 .leaderboard h3 {
   color: var(--color-text);
   font-size: 1rem;
+  letter-spacing: 0.08em;
   margin-bottom: var(--space-2);
-  text-shadow: 0 0 8px var(--color-title-shadow);
+  text-transform: uppercase;
+  text-shadow: 0 0 10px var(--color-title-shadow);
 }
 #leaderboardList {
   -webkit-overflow-scrolling: touch;
@@ -451,13 +558,17 @@ body {
   touch-action: pan-y;
 }
 #leaderboardList li {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)),
+    rgba(11, 16, 25, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   color: var(--color-text);
   display: block;
   font-size: 0.95rem;
   font-weight: 600;
+  letter-spacing: 0.03em;
   line-height: var(--leaderboard-line-height);
   margin-bottom: var(--space-2);
   padding: var(--space-2) var(--space-3);
@@ -468,8 +579,10 @@ body {
   margin-bottom: 0;
 }
 #leaderboardList li:first-child {
-  border-color: var(--color-border);
-  box-shadow: none;
+  border-color: rgba(255, 184, 77, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 24px rgba(255, 184, 77, 0.08);
 }
 /* 8. About Page ------------------------------------------ */
 .about-page {
@@ -534,14 +647,21 @@ body.about-body,
   text-decoration: underline;
 }
 .about-content p.about-back {
-  margin: 8px auto 0;
+  display: flex;
+  justify-content: center;
+  gap: var(--space-4);
+  margin: var(--space-2) auto 0;
   max-width: 720px;
-  padding-left: 0;
+  padding: var(--space-2) 0;
   text-align: center;
 }
 .about-content p.about-back .action-link {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  line-height: 1;
   margin-top: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
 }
 /* 10. Media Queries (responsive/adaptive) ---------------- */
 @media (max-width: 480px) {
@@ -556,6 +676,11 @@ body.about-body,
   }
   .score {
     padding: 6px 10px;
+  }
+  .score-display {
+    gap: var(--space-2);
+    justify-content: center;
+    flex-wrap: wrap;
   }
   #leaderboardList {
     max-height: calc(
