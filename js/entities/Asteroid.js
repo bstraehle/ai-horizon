@@ -385,7 +385,10 @@ export class Asteroid {
     const centerX = SURFACE_PAD + this.width / 2;
     const centerY = SURFACE_PAD + this.height / 2;
     const radius = this.width / 2;
-    off.clearRect(0, 0, width, height);
+    // Clear the whole retained canvas, not just the used region: drawImage samples texels just
+    // outside the source rect, so stale pixels from a previous larger bake would bleed in as a
+    // dark edge along the bottom/right of the sprite.
+    off.clearRect(0, 0, sprite.canvas.width, sprite.canvas.height);
     off.save();
     this._drawBody(off, centerX, centerY, radius, palette);
     this._drawCraters(off, centerX, centerY, palette, false);

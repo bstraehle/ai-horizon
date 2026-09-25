@@ -23,7 +23,8 @@
     "ci:verify": "npm run lint:ci && npm test --silent",
     "ci:local": "npm run lint:ci && npm run format:check && npm run typecheck && npm test",
     "prepare": "husky || echo 'husky skipped'",
-    "perf:bench": "node --experimental-websocket scripts/perf-bench.cjs"
+    "perf:bench": "node --experimental-websocket scripts/perf-bench.cjs",
+    "shots": "node --experimental-websocket scripts/screenshot.cjs"
   },
   "vitest": {
     "setupFiles": "./tests/setup.js"
