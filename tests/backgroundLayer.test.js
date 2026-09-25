@@ -92,9 +92,9 @@ describe("BackgroundLayer", () => {
     expect(canvas.height).toBe(300);
     expect(layer.renders).toBe(1);
     expect(main.calls.drawImage).toBe(1);
-    // Gradient + nebula were drawn into the layer, not the main context.
+    // Gradient + vignette + nebula were drawn into the layer, not the main context.
     expect(main.calls.fillRect).toBe(0);
-    expect(canvas.ctx.calls.fillRect).toBe(1);
+    expect(canvas.ctx.calls.fillRect).toBe(2);
   });
 
   it("re-renders only on the configured cadence while compositing every frame", () => {
@@ -164,7 +164,7 @@ describe("BackgroundLayer without offscreen canvas support", () => {
         background: { nebulaConfigs: makeConfigs(), starField: {} },
       })
     );
-    expect(ctx.calls.fillRect).toBe(1);
+    expect(ctx.calls.fillRect).toBe(2); // gradient + vignette
     expect(spy).toHaveBeenCalledWith(ctx, expect.any(Array));
     spy.mockRestore();
   });

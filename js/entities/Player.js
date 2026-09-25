@@ -1,7 +1,12 @@
 import { clamp, CONFIG, PI2 } from "../constants.js";
+import { prefersReducedMotion } from "../utils/motion.js";
 /** @typedef {{ [code:string]: boolean }} KeyMap */
 /** @typedef {{ x:number, y:number }} Point */
 /** @typedef {{ width:number, height:number }} ViewSize */
+
+/** Maximum visual bank (rad) at full lateral speed and how quickly the bank follows velocity. */
+const MAX_BANK = 0.42;
+const BANK_RESPONSE = 9;
 
 /**
  * Player – user-controlled ship (movement + drawing only; side-effects externalized).
@@ -10,15 +15,20 @@ import { clamp, CONFIG, PI2 } from "../constants.js";
  *  - Reconcile keyboard vs mouse steering (keyboard dominance to avoid jitter).
  *  - Clamp position to dynamic view bounds each frame.
  *  - Provide bounding box for collision queries.
- *  - Draw an emoji-inspired rocket (single path operations) for minimal overdraw.
+ *  - Draw a delta-wing fighter (lit vector: shaded hull, cyan canopy, twin engine glow) from a
+ *    cached sprite; the sprite is drawn slightly larger than the hitbox (forgiving collisions).
  *
  * Input Precedence:
  *  - If any movement key pressed (arrows / WASD) => keyboard path, ignore mouse.
  *  - Else, smooth-lerp center toward mouse (CONFIG.PLAYER.MOUSE_LERP factor per second).
  *
+ * Banking:
+ *  - `_bank` (render-only) eases toward the lateral velocity fraction each update; `draw` leans
+ *    the sprite (slight rotation + horizontal squash). Disabled under prefers-reduced-motion.
+ *
  * Performance Notes:
  *  - Update: O(1) arithmetic + clamp; no allocations.
- *  - Draw: single complex path + a few simple shapes; no gradients inside loops.
+ *  - Draw: one drawImage (plus a save/transform/restore while banking).
  *
  * Separation of Concerns:
  *  - Engine flame particles handled by EngineTrail / external systems.
@@ -45,6 +55,8 @@ export class Player {
     this._maxX = Infinity;
     /** @private */
     this._maxY = Infinity;
+    /** @private Eased lateral lean in [-1, 1] (render-only). */
+    this._bank = 0;
   }
 
   /**
@@ -93,17 +105,13 @@ export class Player {
     if (dtSec > 0) {
       this.vx = (this.x - prevX) / dtSec;
       this.vy = (this.y - prevY) / dtSec;
+      const target = this.speed > 0 ? clamp(this.vx / this.speed, -1, 1) : 0;
+      this._bank += (target - this._bank) * Math.min(1, dtSec * BANK_RESPONSE);
     }
   }
 
   /**
-   * Draw rocket layers (body, fins, cockpit, gun, flame).
-   * Layer Order:
-   *  1. Body (grad + outline)
-   *  2. Fins (mirrored red shapes)
-   *  3. Cockpit window (blue gradient circle)
-   *  4. Gun/nozzle rectangle
-   *  5. Engine flame triangle w/ radial gradient
+   * Draw the ship (cached sprite; direct vector fallback), leaning into lateral motion.
    * @param {CanvasRenderingContext2D} ctx 2D context.
    * @param {number} [extrapolateSec=0] Seconds past the last simulated state; the last step's
    *  velocity is projected forward (clamped to the playable bounds) for smooth motion.
@@ -115,12 +123,25 @@ export class Player {
       x = clamp(x + this.vx * extrapolateSec, 0, this._maxX);
       y = clamp(y + this.vy * extrapolateSec, 0, this._maxY);
     }
+    const bank = prefersReducedMotion() ? 0 : this._bank;
     const sprite = Player._getSprite(this.width, this.height);
-    if (sprite) {
-      ctx.drawImage(sprite.canvas, x - sprite.padX, y - sprite.padY);
+    if (Math.abs(bank) < 0.02) {
+      if (sprite) ctx.drawImage(sprite.canvas, x - sprite.padX, y - sprite.padY);
+      else Player._drawShip(ctx, this.width, this.height, x, y);
       return;
     }
-    Player._drawShip(ctx, this.width, this.height, x, y);
+    const cx = x + this.width / 2;
+    const cy = y + this.height / 2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(bank * MAX_BANK * 0.55);
+    ctx.scale(1 - 0.28 * Math.abs(bank), 1);
+    if (sprite) {
+      ctx.drawImage(sprite.canvas, -this.width / 2 - sprite.padX, -this.height / 2 - sprite.padY);
+    } else {
+      Player._drawShip(ctx, this.width, this.height, -this.width / 2, -this.height / 2);
+    }
+    ctx.restore();
   }
 
   /**
@@ -140,96 +161,125 @@ export class Player {
    * @param {number} originY
    */
   static _drawShip(ctx, width, height, originX, originY) {
-    ctx.save();
+    const P = CONFIG.COLORS.PLAYER;
+    // Design unit: the hitbox size, drawn ~15% larger so the ship reads clearly while collisions
+    // stay forgiving (the visual extends past the box, never the other way round).
+    const u = Math.min(width, height) * 1.15;
     const cx = originX + width / 2;
-    const topY = originY;
-    const bodyW = Math.max(8, width * 0.6);
-    const bodyH = Math.max(12, height * 0.9);
-    const bodyX = cx - bodyW / 2;
-    const bodyY = topY + (height - bodyH) / 2;
+    const top = originY - u * 0.14; // nose pokes slightly above the hitbox
+    const bottom = originY + height + u * 0.1;
+    const midY = originY + height * 0.58;
+    ctx.save();
+    ctx.lineJoin = "round";
 
-    const bodyGrad = ctx.createLinearGradient(bodyX, bodyY, bodyX, bodyY + bodyH);
-    bodyGrad.addColorStop(0, "#ffffff");
-    bodyGrad.addColorStop(0.6, "#f0f0f0");
-    bodyGrad.addColorStop(1, "#d9d9d9");
+    // Engine glow (behind everything, additive).
+    const podY = bottom - u * 0.02;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const side of [-1, 1]) {
+      const px = cx + side * u * 0.26;
+      const g = ctx.createRadialGradient(px, podY, 0, px, podY, u * 0.42);
+      g.addColorStop(0, "rgba(255,255,255,1)");
+      g.addColorStop(0.3, P.ENGINE);
+      g.addColorStop(1, "rgba(79,242,255,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(px, podY + u * 0.08, u * 0.42, 0, PI2);
+      ctx.fill();
+    }
+    ctx.restore();
 
-    ctx.beginPath();
-    ctx.moveTo(cx, bodyY);
-    ctx.quadraticCurveTo(
-      bodyX + bodyW * 1.05,
-      bodyY + bodyH * 0.2,
-      bodyX + bodyW * 0.9,
-      bodyY + bodyH * 0.5
-    );
-    ctx.quadraticCurveTo(bodyX + bodyW * 1.05, bodyY + bodyH * 0.8, cx, bodyY + bodyH);
-    ctx.quadraticCurveTo(
-      bodyX - bodyW * 0.05,
-      bodyY + bodyH * 0.8,
-      bodyX + bodyW * 0.1,
-      bodyY + bodyH * 0.5
-    );
-    ctx.quadraticCurveTo(bodyX - bodyW * 0.05, bodyY + bodyH * 0.2, cx, bodyY);
-    ctx.closePath();
-    ctx.fillStyle = bodyGrad;
+    // Wings: swept delta, dark with a lit leading edge and a cyan energy rim.
+    const traceWings = () => {
+      ctx.beginPath();
+      ctx.moveTo(cx, originY + height * 0.3);
+      ctx.lineTo(cx + u * 0.74, originY + height * 0.92);
+      ctx.lineTo(cx + u * 0.52, bottom - u * 0.1);
+      ctx.lineTo(cx + u * 0.2, originY + height * 0.86);
+      ctx.lineTo(cx - u * 0.2, originY + height * 0.86);
+      ctx.lineTo(cx - u * 0.52, bottom - u * 0.1);
+      ctx.lineTo(cx - u * 0.74, originY + height * 0.92);
+      ctx.closePath();
+    };
+    traceWings();
+    const wingGrad = ctx.createLinearGradient(cx, originY + height * 0.3, cx, bottom);
+    wingGrad.addColorStop(0, P.WING_EDGE);
+    wingGrad.addColorStop(0.3, P.WING);
+    wingGrad.addColorStop(1, "#1a2134");
+    ctx.fillStyle = wingGrad;
     ctx.fill();
-
-    ctx.strokeStyle = CONFIG.COLORS.PLAYER.OUTLINE || "#999";
-    ctx.lineWidth = CONFIG.PLAYER.DRAW.OUTLINE_WIDTH || 2;
+    ctx.strokeStyle = P.OUTLINE;
+    ctx.lineWidth = 1;
     ctx.stroke();
-
-    const finW = bodyW * 0.6;
-    ctx.fillStyle = "#d94141";
-    ctx.beginPath();
-    ctx.moveTo(bodyX + bodyW * 0.12, bodyY + bodyH * 0.55);
-    ctx.lineTo(bodyX - finW * 0.2, bodyY + bodyH * 0.75);
-    ctx.lineTo(bodyX + bodyW * 0.18, bodyY + bodyH * 0.78);
-    ctx.closePath();
-    ctx.fill();
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = "rgba(79,242,255,0.7)";
+    ctx.shadowColor = P.ENGINE;
+    ctx.shadowBlur = 5;
+    ctx.lineWidth = 1;
+    traceWings();
     ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(bodyX + bodyW * 0.88, bodyY + bodyH * 0.55);
-    ctx.lineTo(bodyX + bodyW + finW * 0.2, bodyY + bodyH * 0.75);
-    ctx.lineTo(bodyX + bodyW * 0.82, bodyY + bodyH * 0.78);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    ctx.restore();
 
-    const winR = Math.max(3, Math.min(width, height) * 0.16);
-    const winY = bodyY + bodyH * 0.32;
-    const winGrad = ctx.createLinearGradient(cx - winR, winY - winR, cx + winR, winY + winR);
-    winGrad.addColorStop(0, "#8fd8ff");
-    winGrad.addColorStop(1, "#3aa0ff");
-    ctx.fillStyle = winGrad;
+    // Engine pods at the wing roots.
+    ctx.fillStyle = "#1b2233";
+    for (const side of [-1, 1]) {
+      const px = cx + side * u * 0.26;
+      ctx.beginPath();
+      ctx.moveTo(px - u * 0.09, originY + height * 0.72);
+      ctx.lineTo(px + u * 0.09, originY + height * 0.72);
+      ctx.lineTo(px + u * 0.08, bottom - u * 0.04);
+      ctx.lineTo(px - u * 0.08, bottom - u * 0.04);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = P.ENGINE;
+      ctx.fillRect(px - u * 0.06, bottom - u * 0.08, u * 0.12, u * 0.05);
+      ctx.fillStyle = "#1b2233";
+    }
+
+    // Fuselage: slim shaded hull from nose to tail.
+    const halfW = u * 0.19;
     ctx.beginPath();
-    ctx.arc(cx, winY, winR, 0, PI2);
+    ctx.moveTo(cx, top);
+    ctx.quadraticCurveTo(cx + halfW * 1.1, midY - u * 0.25, cx + halfW, midY + u * 0.15);
+    ctx.quadraticCurveTo(cx + halfW * 0.9, bottom - u * 0.2, cx + halfW * 0.55, bottom - u * 0.12);
+    ctx.lineTo(cx - halfW * 0.55, bottom - u * 0.12);
+    ctx.quadraticCurveTo(cx - halfW * 0.9, bottom - u * 0.2, cx - halfW, midY + u * 0.15);
+    ctx.quadraticCurveTo(cx - halfW * 1.1, midY - u * 0.25, cx, top);
+    ctx.closePath();
+    const hull = ctx.createLinearGradient(cx - halfW, 0, cx + halfW, 0);
+    hull.addColorStop(0, P.HULL_BOTTOM);
+    hull.addColorStop(0.42, P.HULL_TOP);
+    hull.addColorStop(0.6, P.HULL_MID);
+    hull.addColorStop(1, P.HULL_BOTTOM);
+    ctx.fillStyle = hull;
     ctx.fill();
-    ctx.strokeStyle = "rgba(0,0,0,0.12)";
+    ctx.strokeStyle = P.OUTLINE;
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    ctx.fillStyle = CONFIG.COLORS.PLAYER.GUN || "#b20000";
-    ctx.fillRect(
-      cx - (CONFIG.PLAYER.DRAW.GUN_WIDTH || 3) / 2,
-      bodyY + bodyH * 0.75,
-      CONFIG.PLAYER.DRAW.GUN_WIDTH || 3,
-      CONFIG.PLAYER.DRAW.GUN_HEIGHT || 8
-    );
-
-    const flameY = bodyY + bodyH + 2;
-    const flameH = Math.max(8, height * 0.25);
-    ctx.save();
-    const flameGrad = ctx.createRadialGradient(cx, flameY, 2, cx, flameY + flameH, flameH);
-    flameGrad.addColorStop(0, "rgba(255,220,80,0.95)");
-    flameGrad.addColorStop(0.5, "rgba(255,120,40,0.85)");
-    flameGrad.addColorStop(1, "rgba(255,60,20,0)");
-    ctx.fillStyle = flameGrad;
+    // Canopy: teardrop with a deep-to-bright cyan gradient and a specular streak.
+    const canopyY = originY + height * 0.36;
+    const canopyH = u * 0.2;
+    const canopyW = u * 0.09;
+    const canopy = ctx.createLinearGradient(cx, canopyY - canopyH, cx, canopyY + canopyH);
+    canopy.addColorStop(0, "#eafcff");
+    canopy.addColorStop(0.35, P.COCKPIT);
+    canopy.addColorStop(1, P.COCKPIT_DEEP);
+    ctx.fillStyle = canopy;
     ctx.beginPath();
-    ctx.moveTo(cx - bodyW * 0.25, bodyY + bodyH);
-    ctx.lineTo(cx, bodyY + bodyH + flameH);
-    ctx.lineTo(cx + bodyW * 0.25, bodyY + bodyH);
+    ctx.moveTo(cx, canopyY - canopyH);
+    ctx.quadraticCurveTo(cx + canopyW * 1.4, canopyY, cx, canopyY + canopyH);
+    ctx.quadraticCurveTo(cx - canopyW * 1.4, canopyY, cx, canopyY - canopyH);
     ctx.closePath();
     ctx.fill();
-    ctx.restore();
+    ctx.strokeStyle = "rgba(4, 16, 24, 0.5)";
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Nose gun tip.
+    ctx.fillStyle = P.GUN;
+    ctx.fillRect(cx - u * 0.03, top - u * 0.02, u * 0.06, u * 0.16);
 
     ctx.restore();
   }
@@ -249,11 +299,12 @@ export class Player {
     const cached = Player._spriteCache.get(key);
     if (cached) return cached;
 
-    const padX = 4;
-    const padY = 4;
-    const flameH = Math.max(8, height * 0.25);
+    // Wings and engine glow extend past the hitbox; pad the sprite generously.
+    const u = Math.min(width, height);
+    const padX = Math.ceil(u * 0.4 + 4);
+    const padY = Math.ceil(u * 0.2 + 4);
     const canvasWidth = Math.ceil(width + padX * 2);
-    const canvasHeight = Math.ceil(height + flameH + padY * 2 + 2);
+    const canvasHeight = Math.ceil(height + padY * 2 + u * 0.45);
     let canvas;
     if (typeof OffscreenCanvas === "function") {
       canvas = new OffscreenCanvas(canvasWidth, canvasHeight);

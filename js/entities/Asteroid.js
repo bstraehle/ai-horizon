@@ -1,31 +1,53 @@
 import { CONFIG, PI2 } from "../constants.js";
+import { SpriteCache } from "../utils/SpriteCache.js";
 
 /** @typedef {{dx:number,dy:number,r:number,grow?:number,_puffed?:boolean}} Crater */
 /** @typedef {{ canvas: OffscreenCanvas | HTMLCanvasElement, ctx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D, padX: number, padY: number, width: number, height: number }} SurfaceSprite */
+/** @typedef {{ canvas: OffscreenCanvas | HTMLCanvasElement, half: number }} GlowSprite */
 
-/** Transparent padding (px) around the baked body so outlines / cracks are not clipped. */
-const SURFACE_PAD = 4;
+/** Transparent padding (px) around the baked body so rim light, glow and cracks are not clipped. */
+const SURFACE_PAD = 16;
+/** Vertex count of the irregular rock silhouette. */
+const SHAPE_VERTS = 12;
+/** Key light direction (unit vector, from the upper-left). */
+const LIGHT_X = -0.62;
+const LIGHT_Y = -0.78;
+/** Spin rates (rad/s, magnitude) for rocks and planets. */
+const ROCK_SPIN = 0.9;
+const PLANET_SPIN = 0.22;
+/** Hit flash decay (units/s). */
+const HIT_FLASH_DECAY = 6;
 
 /**
- * Asteroid / Planet entity.
- * Visual polish includes:
- *  - Embossed crater shading with highlight + inner shadow
+ * Asteroid / Planet entity ("lit vector" renderer).
+ *
+ * Regular asteroids are irregular rocks: a per-instance silhouette (SHAPE_VERTS radius factors),
+ * a body gradient lit from the upper-left, dented craters, a rim light on the lit edge and a slow
+ * spin. Hardened planets are shaded spheres: atmosphere glow, latitude bands, a terminator on the
+ * dark side, a specular highlight, and glowing cracks that widen with damage. Bonus planets add a
+ * pulsing outer glow. Bullet hits flash the body briefly.
+ *
+ * Visual polish carried over:
  *  - Progressive crater activation & shading darkening as hits accumulate
  *  - Reveal animation (craters grow in with easing)
- *  - Dust puff particle burst on new crater activation (tuned for visibility)
- *    Puff parameters can be adjusted in CONFIG.ASTEROID.CRATER_EMBOSS (PUFF_*)
+ *  - Dust puff particle burst on new crater activation (CONFIG.ASTEROID.CRATER_EMBOSS PUFF_*)
  *
  * Rendering / Performance:
  *  - The body, fully-grown craters and damage cracks are baked into a per-instance offscreen
  *    surface that is re-rendered only when `_surfaceDirty` is set (spawn/reset, bullet hit, crater
- *    finishing its reveal). The per-frame cost is a single `drawImage`.
+ *    finishing its reveal). The per-frame cost is one rotated `drawImage` (plus one additive
+ *    blit while a hit flash is active, and one shared glow blit for bonus planets).
  *  - Craters still revealing (grow < 1) are drawn live on top of the surface, so the animation is
  *    smooth without re-baking every frame.
  *  - The offscreen canvas is retained across object-pool cycles and only reallocated when a larger
  *    asteroid needs it (grow-only), eliminating canvas allocation on spawn after warm-up.
- *  - Drawing never consumes the RNG; render is side-effect free with respect to determinism.
+ *  - Spin, flash and pulse are advanced in `update` (deterministic); drawing never consumes the
+ *    RNG and never mutates simulation state.
  */
 export class Asteroid {
+  /** Transparent padding (px) around the baked body. */
+  static SURFACE_PAD = SURFACE_PAD;
+
   /**
    * Construct a new asteroid / planet entity (or reset template when pooled).
    *
@@ -124,6 +146,43 @@ export class Asteroid {
     this._surfaceSprite = null;
     /** @private True when the baked surface no longer matches entity state. */
     this._surfaceDirty = true;
+    /** @private Silhouette radius factors (rocks only). */
+    this._shape = new Float32Array(SHAPE_VERTS);
+    /** @private Render rotation (rad) and spin rate (rad/s). */
+    this._angle = 0;
+    this._spin = 0;
+    /** @private Hit flash intensity [0,1] and bonus glow pulse phase / clock. */
+    this._hitFlash = 0;
+    this._pulse = 0;
+    this._pulseT = 0;
+    this._initVisualState(rand);
+  }
+
+  /**
+   * Roll the visual-only randomness (silhouette, initial rotation, spin, pulse phase). Called last
+   * in constructor/reset so the gameplay-relevant RNG draws keep their order.
+   * @param {{ nextFloat:()=>number }} rand
+   * @private
+   */
+  _initVisualState(rand) {
+    if (!this.isHardened) {
+      const s = this._shape;
+      for (let i = 0; i < SHAPE_VERTS; i++) s[i] = 0.72 + rand.nextFloat() * 0.28;
+      // One light smoothing pass keeps the outline craggy without needle-like spikes.
+      const first = s[0];
+      let prev = s[SHAPE_VERTS - 1];
+      for (let i = 0; i < SHAPE_VERTS; i++) {
+        const cur = s[i];
+        const next = i + 1 < SHAPE_VERTS ? s[i + 1] : first;
+        s[i] = (prev + cur * 3 + next) / 5;
+        prev = cur;
+      }
+    }
+    this._angle = rand.nextFloat() * PI2;
+    this._spin = (rand.nextFloat() - 0.5) * 2 * (this.isHardened ? PLANET_SPIN : ROCK_SPIN);
+    this._pulse = rand.nextFloat() * PI2;
+    this._pulseT = 0;
+    this._hitFlash = 0;
   }
 
   /**
@@ -137,6 +196,12 @@ export class Asteroid {
    */
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
     this.y += this.speed * dtSec;
+    let angle = this._angle + this._spin * dtSec;
+    if (angle > PI2) angle -= PI2;
+    else if (angle < 0) angle += PI2;
+    this._angle = angle;
+    if (this._hitFlash > 0) this._hitFlash = Math.max(0, this._hitFlash - dtSec * HIT_FLASH_DECAY);
+    if (this.isBonus) this._pulseT += dtSec;
     if (this._growing <= 0) return;
     const cfg = CONFIG.ASTEROID.CRATER_EMBOSS;
     const rt = cfg && cfg.REVEAL_TIME > 0 ? cfg.REVEAL_TIME : 0;
@@ -152,112 +217,279 @@ export class Asteroid {
   }
 
   /**
-   * Render asteroid / planet: blit the baked surface (body, settled craters, damage cracks), then
-   * draw any craters still revealing on top. Falls back to direct drawing when no offscreen canvas
-   * can be created (non-browser environments).
+   * Render asteroid / planet: blit the baked surface (body, settled craters, damage cracks) rotated
+   * by the current spin, add the hit flash and any craters still revealing, then the bonus pulse.
+   * Falls back to direct drawing when no offscreen canvas can be created (non-browser environments).
    *
    * @param {CanvasRenderingContext2D} ctx Target 2D context (state restored before return).
-   * @param {number} [extrapolateSec=0] Seconds past the last simulated state; vertical motion is
-   *  projected forward by `speed * extrapolateSec` for smooth output between fixed steps.
+   * @param {number} [extrapolateSec=0] Seconds past the last simulated state; vertical motion and
+   *  spin are projected forward for smooth output between fixed steps.
    */
   draw(ctx, extrapolateSec = 0) {
-    const y = extrapolateSec > 0 ? this.y + this.speed * extrapolateSec : this.y;
+    const t = extrapolateSec > 0 ? extrapolateSec : 0;
+    const y = this.y + this.speed * t;
     const centerX = this.x + this.width / 2;
     const centerY = y + this.height / 2;
     const radius = this.width / 2;
     const palette = this._palette || CONFIG.COLORS.ASTEROID;
+    const angle = this._angle + this._spin * t;
     const sprite = this._getSurfaceSprite(palette);
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    if (angle !== 0) ctx.rotate(angle);
     if (sprite) {
+      const hw = sprite.width / 2;
+      const hh = sprite.height / 2;
       ctx.drawImage(
         sprite.canvas,
         0,
         0,
         sprite.width,
         sprite.height,
-        this.x - sprite.padX,
-        y - sprite.padY,
+        -hw,
+        -hh,
         sprite.width,
         sprite.height
       );
-      if (this._growing > 0) {
-        ctx.save();
-        this._drawCraters(ctx, centerX, centerY, palette, true);
-        ctx.restore();
+      if (this._hitFlash > 0) {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = this._hitFlash * 0.75;
+        ctx.drawImage(
+          sprite.canvas,
+          0,
+          0,
+          sprite.width,
+          sprite.height,
+          -hw,
+          -hh,
+          sprite.width,
+          sprite.height
+        );
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
       }
-      return;
+      if (this._growing > 0) this._drawCraters(ctx, 0, 0, palette, true);
+    } else {
+      this._paintSurface(ctx, 0, 0, radius, palette);
     }
-    ctx.save();
-    this._drawBody(ctx, centerX, centerY, radius, palette);
-    this._drawCraters(ctx, centerX, centerY, palette, false);
-    this._drawOutline(ctx, palette);
-    if (this.isHardened && this._hits > 0) this._drawDamage(ctx, centerX, centerY, radius, palette);
     ctx.restore();
+    if (this.isBonus && palette.GLOW) this._drawPulse(ctx, centerX, centerY, radius, palette);
   }
 
   /**
-   * Fill the body radial gradient.
+   * Paint the complete body (rock or planet, settled craters, damage) centred on (cx, cy).
+   * Shared by the bake and the no-canvas fallback.
    * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} ctx
-   * @param {number} centerX
-   * @param {number} centerY
+   * @param {number} cx
+   * @param {number} cy
    * @param {number} radius
    * @param {any} palette
    * @private
    */
-  _drawBody(ctx, centerX, centerY, radius, palette) {
-    const asteroidGradient = ctx.createRadialGradient(
-      centerX - radius * 0.3,
-      centerY - radius * 0.3,
-      0,
-      centerX,
-      centerY,
-      radius
-    );
-    asteroidGradient.addColorStop(0, palette.GRAD_IN);
-    asteroidGradient.addColorStop(0.6, palette.GRAD_MID);
-    asteroidGradient.addColorStop(1, palette.GRAD_OUT);
-    ctx.fillStyle = asteroidGradient;
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, radius, 0, PI2);
-    ctx.fill();
+  _paintSurface(ctx, cx, cy, radius, palette) {
+    if (this.isHardened) this._paintPlanet(ctx, cx, cy, radius, palette);
+    else this._paintRock(ctx, cx, cy, radius, palette);
   }
 
   /**
-   * Stroke the current path with the palette outline (thicker for hardened planets).
+   * Trace the irregular rock silhouette as a closed smooth path (quadratic curves through the
+   * midpoints of the SHAPE_VERTS-gon).
    * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} ctx
+   * @param {number} cx
+   * @param {number} cy
+   * @param {number} radius
+   * @private
+   */
+  _traceRock(ctx, cx, cy, radius) {
+    const s = this._shape;
+    const n = SHAPE_VERTS;
+    const step = PI2 / n;
+    ctx.beginPath();
+    let vx = cx + Math.cos(0) * radius * s[0];
+    let vy = cy + Math.sin(0) * radius * s[0];
+    let nx = cx + Math.cos(step) * radius * s[1];
+    let ny = cy + Math.sin(step) * radius * s[1];
+    const startX = (vx + nx) / 2;
+    const startY = (vy + ny) / 2;
+    ctx.moveTo(startX, startY);
+    for (let i = 1; i <= n; i++) {
+      vx = nx;
+      vy = ny;
+      const j = (i + 1) % n;
+      nx = cx + Math.cos(j * step) * radius * s[j];
+      ny = cy + Math.sin(j * step) * radius * s[j];
+      ctx.quadraticCurveTo(vx, vy, (vx + nx) / 2, (vy + ny) / 2);
+    }
+    ctx.closePath();
+  }
+
+  /**
+   * Irregular rock: lit body gradient, dented craters, rim light on the lit edge, soft outline.
+   * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} ctx
+   * @param {number} cx
+   * @param {number} cy
+   * @param {number} radius
    * @param {any} palette
    * @private
    */
-  _drawOutline(ctx, palette) {
-    ctx.strokeStyle = palette.OUTLINE;
-    ctx.lineWidth = this.isHardened ? 3 : 2;
+  _paintRock(ctx, cx, cy, radius, palette) {
+    this._traceRock(ctx, cx, cy, radius);
+    const body = ctx.createRadialGradient(
+      cx + LIGHT_X * radius * 0.45,
+      cy + LIGHT_Y * radius * 0.45,
+      radius * 0.1,
+      cx,
+      cy,
+      radius * 1.05
+    );
+    body.addColorStop(0, palette.GRAD_IN);
+    body.addColorStop(0.55, palette.GRAD_MID);
+    body.addColorStop(1, palette.GRAD_OUT);
+    ctx.fillStyle = body;
+    ctx.fill();
+    // Rocks get smaller, shallower craters than planets so they read as texture, not holes.
+    this._drawCraters(ctx, cx, cy, palette, false, 0.62, 0.55);
+    // Rim light: bright on the lit edge fading to a faint shadow line on the far side.
+    this._traceRock(ctx, cx, cy, radius);
+    const rim = ctx.createLinearGradient(
+      cx + LIGHT_X * radius,
+      cy + LIGHT_Y * radius,
+      cx - LIGHT_X * radius,
+      cy - LIGHT_Y * radius
+    );
+    rim.addColorStop(0, palette.RIM || "rgba(255,255,255,0.8)");
+    rim.addColorStop(0.55, "rgba(255,255,255,0)");
+    rim.addColorStop(1, "rgba(0,0,0,0.35)");
+    ctx.strokeStyle = rim;
+    ctx.lineWidth = Math.max(1.2, radius * 0.07);
     ctx.stroke();
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = palette.OUTLINE;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 
   /**
-   * Draw embossed craters. `onlyGrowing` selects the live reveal overlay (craters with grow < 1);
+   * Shaded planet: atmosphere glow, lit sphere gradient, latitude bands, subtle craters, dark-side
+   * terminator, specular highlight, outline and damage cracks.
+   * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} ctx
+   * @param {number} cx
+   * @param {number} cy
+   * @param {number} radius
+   * @param {any} palette
+   * @private
+   */
+  _paintPlanet(ctx, cx, cy, radius, palette) {
+    const glowColor = palette.GLOW || palette.RING || "rgba(255,255,255,0.25)";
+    ctx.save();
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = Math.min(14, radius * 0.4);
+    ctx.fillStyle = glowColor;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius * 1.02, 0, PI2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, PI2);
+    ctx.clip();
+    const body = ctx.createRadialGradient(
+      cx + LIGHT_X * radius * 0.5,
+      cy + LIGHT_Y * radius * 0.5,
+      radius * 0.1,
+      cx,
+      cy,
+      radius * 1.1
+    );
+    body.addColorStop(0, palette.GRAD_IN);
+    body.addColorStop(0.5, palette.GRAD_MID);
+    body.addColorStop(1, palette.GRAD_OUT);
+    ctx.fillStyle = body;
+    ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+    // Latitude bands (alternating light / dark, slightly tilted).
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(-0.25);
+    for (let i = -2; i <= 2; i++) {
+      ctx.save();
+      ctx.translate(0, i * radius * 0.36);
+      ctx.scale(1, 0.16);
+      ctx.fillStyle = i % 2 === 0 ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.14)";
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 1.15, 0, PI2);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+    ctx.globalAlpha = 0.6;
+    this._drawCraters(ctx, cx, cy, palette, false);
+    ctx.globalAlpha = 1;
+    // Terminator: darken the side facing away from the light.
+    const shade = ctx.createRadialGradient(
+      cx - LIGHT_X * radius * 0.55,
+      cy - LIGHT_Y * radius * 0.5,
+      radius * 0.2,
+      cx - LIGHT_X * radius * 0.35,
+      cy - LIGHT_Y * radius * 0.3,
+      radius * 1.35
+    );
+    shade.addColorStop(0, "rgba(0,0,0,0.62)");
+    shade.addColorStop(0.5, "rgba(0,0,0,0.18)");
+    shade.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = shade;
+    ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+    ctx.restore();
+
+    // Specular highlight on the lit shoulder.
+    const specX = cx + LIGHT_X * radius * 0.5;
+    const specY = cy + LIGHT_Y * radius * 0.5;
+    const spec = ctx.createRadialGradient(specX, specY, 0, specX, specY, radius * 0.45);
+    spec.addColorStop(0, "rgba(255,255,255,0.28)");
+    spec.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = spec;
+    ctx.beginPath();
+    ctx.arc(specX, specY, radius * 0.45, 0, PI2);
+    ctx.fill();
+
+    ctx.strokeStyle = palette.OUTLINE;
+    ctx.globalAlpha = 0.7;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, PI2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    if (this._hits > 0) this._drawDamage(ctx, cx, cy, radius, palette);
+  }
+
+  /**
+   * Draw dented craters. `onlyGrowing` selects the live reveal overlay (craters with grow < 1);
    * otherwise only settled craters are drawn (baked surface / fallback path).
    * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} ctx
    * @param {number} centerX
    * @param {number} centerY
    * @param {any} palette
    * @param {boolean} onlyGrowing
+   * @param {number} [scale=1] Crater radius multiplier (rocks use smaller craters).
+   * @param {number} [depth=1] Shadow strength multiplier (rocks use shallower craters).
    * @private
    */
-  _drawCraters(ctx, centerX, centerY, palette, onlyGrowing) {
+  _drawCraters(ctx, centerX, centerY, palette, onlyGrowing, scale = 1, depth = 1) {
     if (!this._craters.length) return;
     const cfg = CONFIG.ASTEROID.CRATER_EMBOSS;
-    const light = cfg.LIGHT_DIR || { x: -0.7, y: -0.7 };
-    const lightAngle = Math.atan2(light.y, light.x);
-    const arcSpan = Math.PI * 0.55;
-    const hlStart = lightAngle - arcSpan / 2;
-    const hlEnd = lightAngle + arcSpan / 2;
-    const shStart = lightAngle + Math.PI - arcSpan / 2;
-    const shEnd = lightAngle + Math.PI + arcSpan / 2;
+    const lightAngle = Math.atan2(LIGHT_Y, LIGHT_X);
+    const arcSpan = Math.PI * 0.6;
+    // Inner wall facing the light is in shadow; the far wall catches the light (a dent, not a bump).
+    const shStart = lightAngle - arcSpan / 2;
+    const shEnd = lightAngle + arcSpan / 2;
+    const hlStart = lightAngle + Math.PI - arcSpan / 2;
+    const hlEnd = lightAngle + Math.PI + arcSpan / 2;
     const severity = this._severity();
     const darkenScale = cfg.SHADOW_DARKEN_SCALE || 0;
     const fadeScale = cfg.HIGHLIGHT_FADE_SCALE || 0;
-    const midAlpha = (cfg.SHADOW_ALPHA_MID || 0.25) * (1 + darkenScale * severity);
-    const innerAlpha = (cfg.SHADOW_ALPHA_INNER || 0.45) * (1 + darkenScale * severity);
+    const midAlpha = (cfg.SHADOW_ALPHA_MID || 0.25) * (1 + darkenScale * severity) * depth;
+    const innerAlpha = (cfg.SHADOW_ALPHA_INNER || 0.45) * (1 + darkenScale * severity) * depth;
     const hlAlpha = (cfg.HIGHLIGHT_ALPHA || 0.35) * (1 - fadeScale * severity);
     for (let i = 0; i < this._craters.length; i++) {
       const c = this._craters[i];
@@ -266,23 +498,23 @@ export class Asteroid {
       if (grow < 1 && cfg.REVEAL_EASE === "outQuad") grow = 1 - (1 - grow) * (1 - grow);
       const cx = centerX + c.dx;
       const cy = centerY + c.dy;
-      const r = c.r * grow;
+      const r = c.r * grow * scale;
       ctx.fillStyle = palette.CRATER;
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, PI2);
       ctx.fill();
       try {
         const grad = ctx.createRadialGradient(
-          cx + light.x * -r * 0.35,
-          cy + light.y * -r * 0.35,
-          r * 0.15,
+          cx + LIGHT_X * r * 0.35,
+          cy + LIGHT_Y * r * 0.35,
+          r * 0.1,
           cx,
           cy,
           r
         );
-        grad.addColorStop(0, "rgba(0,0,0,0.0)");
-        grad.addColorStop(0.55, `rgba(0,0,0,${midAlpha})`);
-        grad.addColorStop(1, `rgba(0,0,0,${innerAlpha})`);
+        grad.addColorStop(0, `rgba(0,0,0,${innerAlpha})`);
+        grad.addColorStop(0.6, `rgba(0,0,0,${midAlpha})`);
+        grad.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, PI2);
@@ -291,21 +523,21 @@ export class Asteroid {
         /* ignore */
       }
       ctx.beginPath();
-      ctx.strokeStyle = `rgba(255,255,255,${hlAlpha})`;
-      ctx.lineWidth = Math.max(0.75, r * 0.25);
-      ctx.arc(cx, cy, r, hlStart, hlEnd);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.strokeStyle = "rgba(0,0,0,0.35)";
+      ctx.strokeStyle = `rgba(0,0,0,${0.4 * depth})`;
       ctx.lineWidth = Math.max(0.6, r * 0.22);
       ctx.arc(cx, cy, r, shStart, shEnd);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(255,255,255,${hlAlpha})`;
+      ctx.lineWidth = Math.max(0.75, r * 0.2);
+      ctx.arc(cx, cy, r, hlStart, hlEnd);
       ctx.stroke();
     }
   }
 
   /**
-   * Draw damage cracks for hardened planets (count / width / alpha scale with hit severity).
-   * Uses only geometry captured in `onBulletHit`; never consumes the RNG.
+   * Draw glowing damage cracks for hardened planets (count / width / alpha scale with hit
+   * severity). Uses only geometry captured in `onBulletHit`; never consumes the RNG.
    * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} ctx
    * @param {number} centerX
    * @param {number} centerY
@@ -316,21 +548,19 @@ export class Asteroid {
   _drawDamage(ctx, centerX, centerY, radius, palette) {
     const severity = this._severity();
     const lines = 1 + Math.floor(severity * 4);
-    let damageColor;
-    if (palette && palette.NAME === "ICE") damageColor = "rgba(255,255,255,0.85)";
-    else if (palette && palette.SHIELD) damageColor = palette.SHIELD;
-    else if (palette && palette.RING) damageColor = palette.RING;
-    else if (palette && palette.OUTLINE) damageColor = palette.OUTLINE;
-    else damageColor = "rgba(255,255,255,0.6)";
+    const isIce = palette && palette.NAME === "ICE";
+    const damageColor =
+      (isIce && "rgba(255,255,255,0.9)") ||
+      (palette && (palette.SHIELD || palette.RING || palette.OUTLINE)) ||
+      "rgba(255,255,255,0.6)";
     ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineCap = "round";
     ctx.strokeStyle = damageColor;
-    if (palette && palette.NAME === "ICE") {
-      ctx.lineWidth = 0.8 + severity * 1.2;
-      ctx.globalAlpha = 0.25 + 0.5 * severity;
-    } else {
-      ctx.lineWidth = 1 + severity * 2;
-      ctx.globalAlpha = 0.4 + 0.6 * severity;
-    }
+    ctx.shadowColor = damageColor;
+    ctx.shadowBlur = 3 + severity * 7;
+    ctx.lineWidth = (isIce ? 0.8 : 1) + severity * 2.2;
+    ctx.globalAlpha = (isIce ? 0.3 : 0.45) + 0.55 * severity;
     for (let i = 0; i < lines; i++) {
       const angle =
         i < this._damageLineCount ? this._damageLineAngles[i] : (i / lines) * Math.PI * 2;
@@ -347,8 +577,7 @@ export class Asteroid {
     }
     if (severity > 0.7) {
       ctx.lineWidth = 2 + severity * 3;
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = damageColor;
+      ctx.globalAlpha = 0.95;
       ctx.beginPath();
       ctx.moveTo(centerX - radius * 0.4, centerY - radius * 0.2);
       ctx.lineTo(centerX + radius * 0.1, centerY + radius * 0.5);
@@ -356,6 +585,66 @@ export class Asteroid {
       ctx.stroke();
     }
     ctx.restore();
+  }
+
+  /**
+   * Additive pulsing halo for bonus planets (shared glow sprite per size / colour).
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {number} cx
+   * @param {number} cy
+   * @param {number} radius
+   * @param {any} palette
+   * @private
+   */
+  _drawPulse(ctx, cx, cy, radius, palette) {
+    const glow = Asteroid._getGlowSprite(radius, palette.GLOW);
+    if (!glow) return;
+    const alpha = 0.4 + 0.35 * Math.sin(this._pulseT * 4.5 + this._pulse);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(glow.canvas, cx - glow.half, cy - glow.half);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  /**
+   * Shared blurred halo ring for a (quantized) radius and colour.
+   * @param {number} radius
+   * @param {string} color
+   * @returns {GlowSprite | null}
+   * @private
+   */
+  static _getGlowSprite(radius, color) {
+    if (!(radius > 0)) return null;
+    if (!Asteroid._glowCache) Asteroid._glowCache = new SpriteCache(48);
+    const q = Math.max(4, Math.round(radius / 4) * 4);
+    const key = `${q}|${color}`;
+    const cached = Asteroid._glowCache.get(key);
+    if (cached) return cached;
+    const blur = Math.max(6, q * 0.45);
+    const half = Math.ceil(q * 1.15 + blur + 4);
+    const size = half * 2;
+    /** @type {OffscreenCanvas | HTMLCanvasElement} */
+    let canvas;
+    if (typeof OffscreenCanvas === "function") canvas = new OffscreenCanvas(size, size);
+    else {
+      const elem = typeof document !== "undefined" ? document.createElement("canvas") : null;
+      if (!elem) return null;
+      elem.width = size;
+      elem.height = size;
+      canvas = elem;
+    }
+    const off = /** @type {any} */ (canvas.getContext("2d"));
+    if (!off) return null;
+    off.strokeStyle = color;
+    off.shadowColor = color;
+    off.shadowBlur = blur;
+    off.lineWidth = Math.max(2, q * 0.14);
+    off.beginPath();
+    off.arc(half, half, q * 1.04, 0, PI2);
+    off.stroke();
+    off.stroke();
+    return Asteroid._glowCache.set(key, { canvas, half });
   }
 
   /**
@@ -390,10 +679,7 @@ export class Asteroid {
     // dark edge along the bottom/right of the sprite.
     off.clearRect(0, 0, sprite.canvas.width, sprite.canvas.height);
     off.save();
-    this._drawBody(off, centerX, centerY, radius, palette);
-    this._drawCraters(off, centerX, centerY, palette, false);
-    this._drawOutline(off, palette);
-    if (this.isHardened && this._hits > 0) this._drawDamage(off, centerX, centerY, radius, palette);
+    this._paintSurface(off, centerX, centerY, radius, palette);
     off.restore();
     sprite.width = width;
     sprite.height = height;
@@ -526,6 +812,7 @@ export class Asteroid {
         ? this._palette.SPEED_FACTOR
         : null;
     this.speed = speedFactor ? speed * speedFactor : speed;
+    this._initVisualState(rand);
   }
 
   /**
@@ -543,6 +830,7 @@ export class Asteroid {
     if (!this.isHardened) return true;
     this._hits = (this._hits || 0) + 1;
     this._surfaceDirty = true;
+    this._hitFlash = 1;
     try {
       const baseMax = CONFIG.ASTEROID.HARDENED_HITS || 10;
       let eff = baseMax;
@@ -658,3 +946,6 @@ export class Asteroid {
     }
   }
 }
+
+/** @type {SpriteCache<GlowSprite> | undefined} */
+Asteroid._glowCache = undefined;

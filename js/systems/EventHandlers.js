@@ -2,6 +2,7 @@ import { CONFIG } from "../constants.js";
 import { ScoringManager } from "../managers/ScoringManager.js";
 import { BackgroundManager } from "../managers/BackgroundManager.js";
 import { UIManager } from "../managers/UIManager.js";
+import { triggerShake } from "./ScreenShake.js";
 
 /**
  * EventHandlers – centralized wiring of EventBus driven gameplay side‑effects.
@@ -17,6 +18,8 @@ import { UIManager } from "../managers/UIManager.js";
  * - bulletHitAsteroid: Awards score (different value for hardened asteroids), spawns an
  *   explosion entity and optionally a score popup.
  * - playerHitAsteroid: Triggers the game over sequence exactly once per emission chain.
+ * - Planet kills and the player's death also request a short screen shake (render-only, skipped
+ *   under prefers-reduced-motion; see systems/ScreenShake.js).
  * - collectedStar (score path): Awards score (bonus for red stars) and shows a popup for red stars.
  * - collectedStar (particle path): Emits a deterministic radial particle burst whose velocity
  *   magnitudes incorporate RNG variance for visual variety while keeping angle distribution stable.
@@ -113,8 +116,9 @@ export const EventHandlers = {
           }
         }
         game.createExplosion(asteroid.x + asteroid.width / 2, asteroid.y + asteroid.height / 2);
+        if (asteroid && asteroid.isHardened) triggerShake(game, asteroid.isBonus ? 7 : 5, 0.32);
         if (asteroid && asteroid.isHardened && typeof game.createScorePopup === "function") {
-          const baseColor = CONFIG.COLORS.SCORE.DANGER_RED;
+          const baseColor = CONFIG.COLORS.SCORE.POPUP;
           const opts = {
             color: baseColor,
             fontSize: 20,
@@ -122,7 +126,7 @@ export const EventHandlers = {
             glow: true,
             glowColor: baseColor,
             glowBlur: 12,
-            stroke: "rgba(0,0,0,0.85)",
+            stroke: CONFIG.COLORS.SCORE.POPUP_STROKE,
             maxLife: 1.2,
           };
           game.createScorePopup(
@@ -151,6 +155,7 @@ export const EventHandlers = {
             /** @param {number} min @param {number} max @returns {number} */
             game.createExplosion(cx, cy);
           }
+          triggerShake(game, 12, 0.5);
         } catch {
           /* ignore explosion side-effects */
         }
@@ -190,7 +195,7 @@ export const EventHandlers = {
         }
         game.updateScore();
         if (star && star.isRed && typeof game.createScorePopup === "function") {
-          const baseColor = CONFIG.COLORS.SCORE.DANGER_RED;
+          const baseColor = CONFIG.COLORS.SCORE.POPUP;
           const opts = {
             color: baseColor,
             fontSize: 20,
@@ -198,7 +203,7 @@ export const EventHandlers = {
             glow: true,
             glowColor: baseColor,
             glowBlur: 12,
-            stroke: "rgba(0,0,0,0.85)",
+            stroke: CONFIG.COLORS.SCORE.POPUP_STROKE,
             maxLife: 1.2,
           };
           game.createScorePopup(

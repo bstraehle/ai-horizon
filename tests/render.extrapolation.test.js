@@ -11,8 +11,8 @@ import { CONFIG } from "../js/constants.js";
 
 /** Recording 2D context: captures drawImage destinations and direct-draw rects. */
 function makeCtx() {
-  /** @type {{ drawImage: any[][], fillRect: any[][], arcs: any[][] }} */
-  const calls = { drawImage: [], fillRect: [], arcs: [] };
+  /** @type {{ drawImage: any[][], fillRect: any[][], arcs: any[][], translate: any[][] }} */
+  const calls = { drawImage: [], fillRect: [], arcs: [], translate: [] };
   const ctx = {
     calls,
     globalAlpha: 1,
@@ -36,8 +36,12 @@ function makeCtx() {
     ellipse(/** @type {any[]} */ ...args) {
       calls.arcs.push(args);
     },
-    translate() {},
+    translate(/** @type {any[]} */ ...args) {
+      calls.translate.push(args);
+    },
     scale() {},
+    rotate() {},
+    clip() {},
     createLinearGradient: () => ({ addColorStop() {} }),
     createRadialGradient: () => ({ addColorStop() {} }),
     save() {},
@@ -77,8 +81,9 @@ describe("entity draw extrapolation (render-only, simulation state untouched)", 
     const a = new Asteroid(10, 100, 40, 40, 200, { nextFloat: () => 0.5 }, false);
     const actx = makeCtx();
     a.draw(/** @type {any} */ (actx), T);
-    // Body arc center y = y + speed*t + height/2
-    expect(actx.calls.arcs[0][1]).toBeCloseTo(100 + a.speed * T + 20, 6);
+    // The body is drawn in a frame translated to its (extrapolated) centre: y + speed*t + height/2
+    expect(actx.calls.translate[0][0]).toBeCloseTo(10 + 20, 6);
+    expect(actx.calls.translate[0][1]).toBeCloseTo(100 + a.speed * T + 20, 6);
     expect(a.y).toBe(100);
   });
 
@@ -108,11 +113,13 @@ describe("entity draw extrapolation (render-only, simulation state untouched)", 
     expect(player.vx).toBeCloseTo(480, 6);
     const ctx = makeCtx();
     player.draw(/** @type {any} */ (ctx), 1 / 120);
-    // Fallback ship drawing: gun rect x is derived from cx; compare against un-extrapolated draw.
+    // Fallback ship drawing while banking: the ship is drawn in a frame translated to its
+    // (extrapolated) centre; compare against the un-extrapolated draw.
     const ctx0 = makeCtx();
     player.draw(/** @type {any} */ (ctx0), 0);
-    const dx = ctx.calls.fillRect[0][0] - ctx0.calls.fillRect[0][0];
-    expect(dx).toBeCloseTo(480 / 120, 6);
+    const shipX = (/** @type {any} */ c) =>
+      c.calls.translate.length ? c.calls.translate[0][0] : c.calls.fillRect[0][0];
+    expect(shipX(ctx) - shipX(ctx0)).toBeCloseTo(480 / 120, 6);
 
     // Push to the right edge; extrapolation must not draw beyond the bounds.
     player.x = view.width - player.width;
@@ -121,7 +128,7 @@ describe("entity draw extrapolation (render-only, simulation state untouched)", 
     player.draw(/** @type {any} */ (edge), 1);
     const edge0 = makeCtx();
     player.draw(/** @type {any} */ (edge0), 0);
-    expect(edge.calls.fillRect[0][0]).toBeCloseTo(edge0.calls.fillRect[0][0], 6);
+    expect(shipX(edge)).toBeCloseTo(shipX(edge0), 6);
   });
 
   it("with t = 0 every entity draws at its simulated position", () => {
@@ -155,7 +162,8 @@ describe("RenderManager.draw extrapolation and culling", () => {
     const game = makeGame();
     RenderManager.draw(game, 0.1);
     const dest = game.ctx.calls.drawImage[0];
-    expect(dest[6]).toBeCloseTo(300 - 480 * 0.1, 6);
+    // Atlas bolts use the 5-argument drawImage form: (sprite, x - pad, y - pad, w, h); pad = 0 here.
+    expect(dest[2]).toBeCloseTo(300 - 480 * 0.1, 6);
     expect(game.bullets[0].y).toBe(300);
   });
 

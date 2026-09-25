@@ -68,7 +68,7 @@ export const GameFactories = {
           CONFIG.EXPLOSION.PARTICLE_LIFE,
           CONFIG.EXPLOSION.PARTICLE_LIFE,
           size,
-          `hsl(0, 0%, ${gray}%)`
+          Particle.sparkColor(gray)
         )
       );
     }

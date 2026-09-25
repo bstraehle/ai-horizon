@@ -120,7 +120,22 @@ export class Particle {
   }
 
   /**
-   * Pre-render the sprites the game is expected to use (explosion grays, star burst colors, crater
+   * Map a quantized explosion level (see quantizeGray) to a warm spark colour: low levels are deep
+   * orange, high levels gold-white. Integer components keep the colour set bounded.
+   * @param {number} level Quantized lightness percentage within [GRAY_MIN, GRAY_MAX].
+   * @returns {string} CSS hsl() colour.
+   */
+  static sparkColor(level) {
+    const cfg = CONFIG.EXPLOSION;
+    const span = Math.max(1, cfg.PARTICLE_GRAY_MAX - cfg.PARTICLE_GRAY_MIN);
+    const t = Math.max(0, Math.min(1, (level - cfg.PARTICLE_GRAY_MIN) / span));
+    const hue = Math.round(14 + t * 32);
+    const light = Math.round(52 + t * 22);
+    return `hsl(${hue}, 100%, ${light}%)`;
+  }
+
+  /**
+   * Pre-render the sprites the game is expected to use (explosion sparks, star burst colors, crater
    * dust) across their quantized size ranges so the first explosions do not pay canvas creation.
    * @param {Array<{ colors: string[], sizeMin: number, sizeMax: number }>} [specs] Override palette specs.
    */
@@ -144,7 +159,7 @@ export class Particle {
     const ex = CONFIG.EXPLOSION;
     const grays = [];
     for (let g = ex.PARTICLE_GRAY_MIN; g <= ex.PARTICLE_GRAY_MAX; g += ex.PARTICLE_GRAY_STEP) {
-      grays.push(`hsl(0, 0%, ${g}%)`);
+      grays.push(Particle.sparkColor(g));
     }
     const st = CONFIG.STAR;
     const puff = CONFIG.ASTEROID.CRATER_EMBOSS;

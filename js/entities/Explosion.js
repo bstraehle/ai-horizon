@@ -134,10 +134,15 @@ export class Explosion {
     const cached = Explosion._spriteCache.get(key);
     if (cached) return cached;
 
-    const scale = 1 + (1 - alpha) * CONFIG.EXPLOSION.SCALE_GAIN;
+    // Frame layout: the fireball grows as alpha decays while a thin shockwave ring races ahead of
+    // it; the sprite is sized to the ring at this step so both stay inside the canvas.
+    const progress = 1 - alpha;
+    const scale = 1 + progress * CONFIG.EXPLOSION.SCALE_GAIN;
     const radius = (width / 2) * scale;
-    const pad = 4;
-    const size = Math.ceil(radius * 2 + pad * 2);
+    const ringRadius = (width / 2) * (1 + progress * (CONFIG.EXPLOSION.SCALE_GAIN + 0.8));
+    const pad = 6;
+    const outer = Math.max(radius, ringRadius);
+    const size = Math.ceil(outer * 2 + pad * 2);
     let canvas;
     if (typeof OffscreenCanvas === "function") {
       canvas = new OffscreenCanvas(size, size);
@@ -152,16 +157,30 @@ export class Explosion {
     if (!offCtx) return null;
     offCtx.clearRect(0, 0, size, size);
     const center = size / 2;
+    const C = CONFIG.COLORS.EXPLOSION;
+    // Fireball: white-hot core → gold → orange, fading with alpha.
     const gradient = offCtx.createRadialGradient(center, center, 0, center, center, radius);
-    gradient.addColorStop(0, `${CONFIG.COLORS.EXPLOSION.GRAD_IN}${alpha})`);
-    gradient.addColorStop(0.3, `${CONFIG.COLORS.EXPLOSION.GRAD_MID1}${alpha * 0.8})`);
-    gradient.addColorStop(0.7, `${CONFIG.COLORS.EXPLOSION.GRAD_MID2}${alpha * 0.6})`);
-    gradient.addColorStop(1, CONFIG.COLORS.EXPLOSION.GRAD_OUT);
+    gradient.addColorStop(0, `${C.GRAD_IN}${alpha})`);
+    gradient.addColorStop(0.25, `${C.GRAD_MID1}${alpha * 0.85})`);
+    gradient.addColorStop(0.65, `${C.GRAD_MID2}${alpha * 0.55})`);
+    gradient.addColorStop(1, C.GRAD_OUT);
     offCtx.fillStyle = gradient;
     offCtx.beginPath();
     offCtx.arc(center, center, radius, 0, PI2);
     offCtx.fill();
-    const sprite = { canvas, pad, radius };
+    // Shockwave ring: thin, bright early, thinning and fading as it expands.
+    if (progress > 0.05 && C.RING) {
+      const ringAlpha = Math.max(0, 0.9 * alpha);
+      offCtx.strokeStyle = `${C.RING}${ringAlpha})`;
+      offCtx.lineWidth = Math.max(1, (width / 2) * 0.16 * alpha + 0.5);
+      offCtx.shadowColor = `${C.RING}${ringAlpha})`;
+      offCtx.shadowBlur = 6;
+      offCtx.beginPath();
+      offCtx.arc(center, center, ringRadius, 0, PI2);
+      offCtx.stroke();
+      offCtx.shadowBlur = 0;
+    }
+    const sprite = { canvas, pad, radius: outer };
     Explosion._spriteCache.set(key, sprite);
     return sprite;
   }

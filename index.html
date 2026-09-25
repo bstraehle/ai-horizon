@@ -9,7 +9,7 @@
     />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="referrer" content="no-referrer" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#05070f" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content"
@@ -36,9 +36,16 @@
     <div class="game-container">
       <header class="game-header">
         <div class="score-display" aria-live="polite" aria-atomic="true">
-          <div id="highScoreBox" class="score">HI: <span id="highScore">0</span></div>
-          <div id="currentScoreBox" class="score">SC: <span id="currentScore">0</span></div>
-          <div id="timerBox" class="score">TM: <span id="timer">1:00</span></div>
+          <div id="highScoreBox" class="score">
+            <span class="score-label">Best</span><span id="highScore" class="score-value">0</span>
+          </div>
+          <div id="currentScoreBox" class="score">
+            <span class="score-label">Score</span
+            ><span id="currentScore" class="score-value">0</span>
+          </div>
+          <div id="timerBox" class="score">
+            <span class="score-label">Time</span><span id="timer" class="score-value">1:00</span>
+          </div>
         </div>
       </header>
 
@@ -46,6 +53,7 @@
 
       <section id="gameInfo" class="game-info" role="region" aria-labelledby="gameTitle">
         <h1 id="gameTitle">AI HORIZON</h1>
+        <p class="tagline">Collect stars. Blast asteroids. Beat the clock.</p>
         <div class="action-group" role="group" aria-label="Primary actions">
           <button
             id="startBtn"

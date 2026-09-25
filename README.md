@@ -24,6 +24,15 @@ For a production build, run `npm run build` and serve the generated `dist/` fold
 - Local and optional remote leaderboard support with conflict retry
 - PWA-friendly assets and mobile-friendly controls
 
+## Visual design
+
+The look is a "deep-space neon" system: a near-black indigo field with a soft vignette, cyan for everything that belongs to the player (ship, bolts, UI accent), warm gold for pickups, hot orange/red for danger, and violet/pink vs. cyan/teal nebulae that alternate between runs.
+
+- Colours live in one place: `CONFIG.COLORS` in `js/constants.js` for the canvas, mirrored by the CSS custom properties at the top of `style.css` for the HUD and screens. Change a token there rather than hard-coding a colour.
+- Entities are procedural "lit vector" art (irregular rocks with rim light, shaded planets with atmosphere and glowing cracks, a delta-wing ship with engine glow, glowing bolts and stars) rendered once into cached sprites; per-frame cost stays a `drawImage`.
+- Motion flourishes — ship banking, asteroid spin, pickup pulse, explosion shockwave, hit flash, brief screen shake on big impacts — are render-only (the fixed-step simulation and seeded runs are unaffected) and are switched off when the OS requests `prefers-reduced-motion`.
+- `npm run shots -- "<url>" --actions="wait 3000; shot name"` captures headless-Chrome screenshots for visual QA (see `scripts/screenshot.cjs` for the action syntax).
+
 ## Project structure
 
 - `js/` — game loop, entities, managers, systems, adapters, and constants

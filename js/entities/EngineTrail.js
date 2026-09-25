@@ -83,7 +83,7 @@ export class EngineTrail {
   }
 
   /**
-   * Draw engine trail particles as soft radial gradients in elongated ellipse shape.
+   * Draw engine trail particles as soft cyan radial gradients in elongated ellipse shape (additive pass).
    * Sprites come from the particle's per-size alpha table (integer index, no string keys).
    * @param {CanvasRenderingContext2D} ctx 2D context.
    * @param {number} [extrapolateSec=0] Seconds past the last simulated state (projects downward drift).
@@ -92,6 +92,8 @@ export class EngineTrail {
     const drift = extrapolateSec > 0 ? CONFIG.ENGINE_TRAIL.SPEED * extrapolateSec : 0;
     const steps = EngineTrail._ALPHA_STEPS;
     const particles = this.particles;
+    // Additive exhaust: overlapping puffs bloom into a bright plume.
+    ctx.globalCompositeOperation = "lighter";
     for (let i = 0; i < particles.length; i++) {
       const particle = particles[i];
       const denom = particle.maxLife || CONFIG.ENGINE_TRAIL.LIFE;
@@ -114,6 +116,7 @@ export class EngineTrail {
       EngineTrail._drawParticle(ctx, particle.x, y, particle.size, alpha);
     }
     ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
   }
 
   /**
@@ -144,9 +147,10 @@ export class EngineTrail {
     ctx.save();
     const r = size * CONFIG.ENGINE_TRAIL.DRAW_SIZE_MULT;
     const gradient = ctx.createRadialGradient(x, y - r * 0.25, 0, x, y + r * 0.75, r * 1.25);
-    gradient.addColorStop(0, `rgba(255,255,245,${0.98 * alpha})`);
-    gradient.addColorStop(0.35, `rgba(255,220,170,${0.85 * alpha})`);
-    gradient.addColorStop(1, "rgba(255,180,120,0)");
+    const C = CONFIG.COLORS.ENGINE_TRAIL;
+    gradient.addColorStop(0, `${C.CORE}${0.98 * alpha})`);
+    gradient.addColorStop(0.35, `${C.MID}${0.85 * alpha})`);
+    gradient.addColorStop(1, C.OUT);
     ctx.fillStyle = gradient;
     ctx.beginPath();
     if (typeof ctx.ellipse === "function") {

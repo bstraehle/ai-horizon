@@ -6,8 +6,8 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#05070f",
+  "theme_color": "#05070f",
   "categories": ["games", "arcade"],
   "icons": [
     {

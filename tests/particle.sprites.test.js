@@ -62,12 +62,12 @@ describe("GameFactories.createExplosion particle colors", () => {
     });
   }
 
-  it("uses only palette colors (integer gray levels)", () => {
+  it("uses only palette colors (bounded warm spark set)", () => {
     const game = makeGame();
     for (let i = 0; i < 20; i++) GameFactories.createExplosion(game, 100, 100);
     const colors = new Set(game.particles.map((/** @type {any} */ p) => p.color));
     expect(colors.size).toBeLessThanOrEqual(9);
-    for (const c of colors) expect(c).toMatch(/^hsl\(0, 0%, \d+%\)$/);
+    for (const c of colors) expect(c).toMatch(/^hsl\(\d+, 100%, \d+%\)$/);
   });
 
   it("consumes the RNG identically for identical seeds (deterministic kinematics)", () => {

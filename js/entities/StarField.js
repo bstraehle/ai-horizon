@@ -20,6 +20,7 @@ export class StarField {
    * @property {number} speed
    * @property {number} brightness
    * @property {number} twinkleOffset
+   * @property {number} [variant] Colour/shape variant index (see VARIANTS); derived lazily when absent
    * @property {{ canvas: OffscreenCanvas | HTMLCanvasElement, offset: number } | null} [_sprite] Render cache: sprite resolved for `_spriteSize`
    * @property {number} [_spriteSize] Render cache: size the cached sprite was resolved for
    */
@@ -228,10 +229,11 @@ export class StarField {
           ctx.globalAlpha = alpha;
           prevAlpha = alpha;
         }
+        if (star.variant === undefined) star.variant = StarField.variantFor(star);
         // Sprite resolved once per star (re-resolved only if its size changes, e.g. after resize).
         let sprite = star._sprite;
         if (sprite === undefined || star._spriteSize !== star.size) {
-          sprite = StarField._getSprite(star.size, blurMult);
+          sprite = StarField._getSprite(star.size, blurMult, star.variant);
           star._sprite = sprite;
           star._spriteSize = star.size;
         }
@@ -239,10 +241,13 @@ export class StarField {
           ctx.drawImage(sprite.canvas, star.x - sprite.offset, star.y - sprite.offset);
         } else {
           ctx.save();
-          ctx.fillStyle = CONFIG.COLORS.STAR.GRAD_IN;
-          ctx.shadowColor = CONFIG.COLORS.STAR.GRAD_IN;
+          const color = StarField.VARIANTS[star.variant] || StarField.VARIANTS[0];
+          ctx.fillStyle = color.color;
+          ctx.shadowColor = color.color;
           ctx.shadowBlur = star.size * blurMult;
-          ctx.fillRect(star.x, star.y, star.size, star.size);
+          ctx.beginPath();
+          ctx.arc(star.x, star.y, star.size / 2, 0, Math.PI * 2);
+          ctx.fill();
           ctx.restore();
         }
       }
@@ -323,25 +328,45 @@ export class StarField {
   }
 
   /**
-   * Retrieve or cache a pre-blurred star sprite for a given size bucket.
+   * Deterministic colour/shape variant for a star, hashed from its spawn position so no extra RNG
+   * draws are needed (keeps the seeded init sequence unchanged). Rare, large, bright stars become
+   * "hero" stars with a four-point sparkle.
+   * @param {StarData} star
+   * @returns {number} Index into VARIANTS.
+   */
+  static variantFor(star) {
+    const h = Math.abs(Math.sin(star.x * 12.9898 + star.y * 78.233) * 43758.5453) % 1;
+    if (star.size >= CONFIG.STARFIELD.SIZE_MIN + CONFIG.STARFIELD.SIZE_VAR * 0.9 && h > 0.6) {
+      return StarField.HERO_VARIANT;
+    }
+    if (h < 0.55) return 0;
+    if (h < 0.8) return 1;
+    return 2;
+  }
+
+  /**
+   * Retrieve or cache a pre-blurred star sprite for a given size bucket and variant.
    * The sprite embeds the glow (shadow blur) so per-frame drawing is a fast drawImage.
    * @param {number} size
    * @param {number} blurMult
+   * @param {number} [variant=0] Index into VARIANTS.
    * @returns {{ canvas: OffscreenCanvas | HTMLCanvasElement, offset: number } | null}
    * @private
    */
-  static _getSprite(size, blurMult) {
+  static _getSprite(size, blurMult, variant = 0) {
     if (!Number.isFinite(size) || size <= 0) return null;
-    if (!StarField._spriteCache) StarField._spriteCache = new SpriteCache(64);
+    if (!StarField._spriteCache) StarField._spriteCache = new SpriteCache(96);
     const qSize = StarField._quantizeSize(size);
-    const key = qSize.toFixed(2);
+    const def = StarField.VARIANTS[variant] || StarField.VARIANTS[0];
+    const key = `${qSize.toFixed(2)}|${variant}`;
     const cached = StarField._spriteCache.get(key);
     if (cached) return cached;
 
     const blur = qSize * blurMult;
-    const pad = Math.ceil(blur + 2);
+    const sparkle = def.sparkle ? qSize * 2.2 : 0;
+    const pad = Math.ceil(blur + sparkle + 2);
     const width = Math.ceil(qSize + pad * 2);
-    const height = Math.ceil(qSize + pad * 2);
+    const height = width;
     let canvas;
     if (typeof OffscreenCanvas === "function") canvas = new OffscreenCanvas(width, height);
     else {
@@ -353,16 +378,32 @@ export class StarField {
     }
     const off = canvas.getContext("2d");
     if (!off) return null;
+    const c = width / 2;
+    const r = qSize / 2;
     off.clearRect(0, 0, width, height);
     off.save();
-    off.fillStyle = CONFIG.COLORS.STAR.GRAD_IN;
-    off.shadowColor = CONFIG.COLORS.STAR.GRAD_IN;
+    off.fillStyle = def.color;
+    off.shadowColor = def.color;
     off.shadowOffsetX = 0;
     off.shadowOffsetY = 0;
     off.shadowBlur = blur;
-    off.fillRect(pad, pad, qSize, qSize);
+    off.beginPath();
+    off.arc(c, c, r, 0, Math.PI * 2);
+    off.fill();
+    if (def.sparkle) {
+      off.shadowBlur = blur * 0.5;
+      off.strokeStyle = def.color;
+      off.lineWidth = Math.max(0.6, r * 0.5);
+      off.globalAlpha = 0.85;
+      off.beginPath();
+      off.moveTo(c - sparkle, c);
+      off.lineTo(c + sparkle, c);
+      off.moveTo(c, c - sparkle);
+      off.lineTo(c, c + sparkle);
+      off.stroke();
+    }
     off.restore();
-    const sprite = { canvas, offset: pad };
+    const sprite = { canvas, offset: c };
     StarField._spriteCache.set(key, sprite);
     return sprite;
   }
@@ -382,3 +423,11 @@ export class StarField {
 /** @type {SpriteCache<{ canvas: OffscreenCanvas | HTMLCanvasElement, offset: number }> | undefined} */
 StarField._spriteCache = undefined;
 StarField._SIZE_STEP = 0.25;
+/** Star colour/shape variants; index 3 is the sparkling "hero" star. */
+StarField.VARIANTS = [
+  { color: CONFIG.COLORS.STARFIELD.WHITE, sparkle: false },
+  { color: CONFIG.COLORS.STARFIELD.BLUE, sparkle: false },
+  { color: CONFIG.COLORS.STARFIELD.WARM, sparkle: false },
+  { color: CONFIG.COLORS.STARFIELD.HERO, sparkle: true },
+];
+StarField.HERO_VARIANT = 3;

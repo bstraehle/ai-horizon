@@ -29,6 +29,15 @@ function makeCtx() {
     moveTo() {},
     lineTo() {},
     quadraticCurveTo() {},
+    closePath() {},
+    clip() {},
+    translate() {},
+    rotate() {},
+    scale() {},
+    fillRect() {},
+    createLinearGradient() {
+      return { addColorStop() {} };
+    },
     drawImage() {
       ctx.calls.drawImage++;
     },
@@ -140,11 +149,11 @@ describe("Asteroid baked surface", () => {
     expect(a._surfaceDirty).toBe(true);
     a.draw(/** @type {any} */ (main));
     expect(/** @type {any} */ (a._surfaceSprite).canvas).toBe(firstCanvas);
-    expect(/** @type {any} */ (a._surfaceSprite).width).toBe(30 + 8);
+    expect(/** @type {any} */ (a._surfaceSprite).width).toBe(30 + Asteroid.SURFACE_PAD * 2);
     a.reset(0, 0, 100, 100, 100, rng, true);
     a.draw(/** @type {any} */ (main));
     expect(/** @type {any} */ (a._surfaceSprite).canvas).not.toBe(firstCanvas);
-    expect(/** @type {any} */ (a._surfaceSprite).canvas.width).toBe(100 + 8);
+    expect(/** @type {any} */ (a._surfaceSprite).canvas.width).toBe(100 + Asteroid.SURFACE_PAD * 2);
     expect(MockOffscreenCanvas.created).toBe(2);
   });
 
