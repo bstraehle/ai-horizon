@@ -117,5 +117,26 @@ describe("bounds utilities", () => {
       expect(isOnscreen(obj, 0, 100)).toBe(true);
       expect(isOnscreen(obj, 100, 0)).toBe(true);
     });
+
+    it("falls back to getBounds() for objects without direct x/y fields", () => {
+      const inside = { getBounds: () => ({ x: 10, y: 10, width: 20, height: 20 }) };
+      const outside = { getBounds: () => ({ x: 500, y: 10, width: 20, height: 20 }) };
+      expect(isOnscreen(inside, 100, 100)).toBe(true);
+      expect(isOnscreen(outside, 100, 100)).toBe(false);
+    });
+
+    it("applies getRect defaulting rules on the direct-field path (height defaults to width)", () => {
+      // Square 20x20 at y=85 hangs 5px into the viewport; with height defaulting to width it is visible.
+      expect(isOnscreen({ x: 10, y: 85, width: 20 }, 100, 100)).toBe(true);
+      // Missing width and height → zero-size point at (10, 150) is off-screen.
+      expect(isOnscreen({ x: 10, y: 150 }, 100, 100)).toBe(false);
+    });
+
+    it("does not mutate the entity or expose intermediate rects", () => {
+      const obj = { x: -10, y: 10, width: 20, height: 20 };
+      const snapshot = { ...obj };
+      isOnscreen(obj, 100, 100, 5);
+      expect(obj).toEqual(snapshot);
+    });
   });
 });

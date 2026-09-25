@@ -1,6 +1,7 @@
 import { fromCognitoIdentityPool } from "@aws-sdk/credential-provider-cognito-identity";
 import { SignatureV4MultiRegion } from "@aws-sdk/signature-v4-multi-region";
 import { Sha256 } from "@aws-crypto/sha256-js";
+import { AWS_CONFIG } from "./awsConfig.js";
 
 /**
  * Lightweight AWS API Gateway client that uses Cognito Identity Pool credentials
@@ -9,6 +10,8 @@ import { Sha256 } from "@aws-crypto/sha256-js";
  * Notes:
  * - This module is ESM and runs in browser or Node 18+ where global fetch exists.
  * - Keep Node-specific types out to satisfy checkJs in tsconfig.
+ * - In the browser build this module (and the AWS SDK it pulls in) is a lazily loaded chunk;
+ *   import it through `SignedApi.js` rather than statically from game code.
  */
 class CognitoAPIClient {
   /**
@@ -19,11 +22,9 @@ class CognitoAPIClient {
    * @param {(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>} [opts.fetchImpl]
    */
   constructor(opts) {
-    /** @private */ this.identityPoolId =
-      opts?.identityPoolId ?? "us-west-2:3039071f-2d61-42c8-a869-af7594fa2c7d";
-    /** @private */ this.region = opts?.region ?? "us-west-2";
-    /** @private */ this.apiEndpoint =
-      opts?.apiEndpoint ?? "https://0p6x6bw6c2.execute-api.us-west-2.amazonaws.com/dev/leaderboard";
+    /** @private */ this.identityPoolId = opts?.identityPoolId ?? AWS_CONFIG.identityPoolId;
+    /** @private */ this.region = opts?.region ?? AWS_CONFIG.region;
+    /** @private */ this.apiEndpoint = opts?.apiEndpoint ?? AWS_CONFIG.apiEndpoint;
     /** @private */ this._fetch =
       opts?.fetchImpl ??
       (typeof fetch !== "undefined"

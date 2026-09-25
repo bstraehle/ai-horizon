@@ -1,15 +1,24 @@
 import { CONFIG } from "../constants.js";
 import { isOnscreen } from "../utils/bounds.js";
+
 /**
- * Safely derive numeric view dimensions for culling checks.
+ * Logical view width for culling (0 when unknown → treated as unbounded by isOnscreen).
  * @param {import('../types.js').SystemsGame} game
- * @returns {{ width:number, height:number }}
+ * @returns {number}
  */
-function getViewSize(game) {
-  const view = game && game.view ? game.view : /** @type {any} */ ({});
-  const width = typeof view.width === "number" && Number.isFinite(view.width) ? view.width : 0;
-  const height = typeof view.height === "number" && Number.isFinite(view.height) ? view.height : 0;
-  return { width, height };
+function viewWidth(game) {
+  const view = game && game.view;
+  return view && Number.isFinite(view.width) ? view.width : 0;
+}
+
+/**
+ * Logical view height for culling (0 when unknown → treated as unbounded by isOnscreen).
+ * @param {import('../types.js').SystemsGame} game
+ * @returns {number}
+ */
+function viewHeight(game) {
+  const view = game && game.view;
+  return view && Number.isFinite(view.height) ? view.height : 0;
 }
 
 /**
@@ -19,19 +28,22 @@ function getViewSize(game) {
  * ---------
  * Keep hot‑path update logic lean, allocation‑free, and trivially testable. Each function focuses
  * on a single collection type and performs: integration step, liveness/off‑screen culling, and
- * pool recycling. Shared invariants: reverse iteration for safe splicing; default timestep argument
- * to enable both fixed and variable timestep architectures.
+ * pool recycling. Shared invariants: stable in-place compaction (write index) for removals; default
+ * timestep argument to enable both fixed and variable timestep architectures.
  *
  * Determinism
  * -----------
  * Pure deterministic behavior assuming each entity's `update(dt)` is deterministic and the input
- * ordering of collections is stable. No RNG usage occurs inside these helpers.
+ * ordering of collections is stable. Compaction preserves relative order, so downstream systems
+ * (collision "first hit" resolution, draw order) see the same sequence they would with splicing.
+ * No RNG usage occurs inside these helpers.
  *
  * Performance
  * -----------
- * All loops are O(N) with N = collection length. Removals use `splice` which is O(N) worst‑case,
- * but amortized impact is minimal due to typically sparse removals per frame. No temporary arrays
- * are created; recycling returns objects to their respective pools immediately.
+ * All loops are O(N) with N = collection length, including removals: survivors are written back
+ * at a moving write index and the array is truncated once, instead of an O(N) `splice` per dead
+ * entity (which made heavy particle frames O(N·k)). No temporary arrays are created; recycling
+ * returns objects to their respective pools immediately.
  *
  * Failure Modes
  * -------------
@@ -45,25 +57,30 @@ function getViewSize(game) {
  * ---------------
  * Advance asteroid positions and recycle any that move past the bottom of the viewport.
  *
- * Inputs: game.asteroids (Array), game.view.height (number), asteroidPool
- * Mutations: In‑place per‑asteroid state (via asteroid.update) + potential removal & pool release.
- * Performance: O(A) where A = number of asteroids. At most one splice per off‑screen asteroid.
+ * Inputs: game.asteroids (Array), game.view (width/height), asteroidPool
+ * Mutations: In‑place per‑asteroid state (via asteroid.update) + compaction & pool release.
+ * Performance: O(A) where A = number of asteroids.
  * Determinism: Deterministic given asteroid.update is deterministic.
- * Side Effects: Returns asteroids to `asteroidPool` for reuse; no new allocations beyond splice.
+ * Side Effects: Returns asteroids to `asteroidPool` for reuse; no allocations.
  * Failure Modes: Missing update() on an asteroid throws; improper pool release could surface memory leaks externally.
  * @param {import('../types.js').SystemsGame} game
  * @param {number} [dtSec]
  */
 export function updateAsteroids(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
-  const { width: viewWidth, height: viewHeight } = getViewSize(game);
-  for (let i = game.asteroids.length - 1; i >= 0; i--) {
-    const asteroid = game.asteroids[i];
+  const vw = viewWidth(game);
+  const vh = viewHeight(game);
+  const arr = game.asteroids;
+  let w = 0;
+  for (let r = 0; r < arr.length; r++) {
+    const asteroid = arr[r];
     asteroid.update(dtSec);
-    if (!isOnscreen(asteroid, viewWidth, viewHeight)) {
-      const a = game.asteroids.splice(i, 1)[0];
-      game.asteroidPool.release(a);
+    if (!isOnscreen(asteroid, vw, vh)) {
+      game.asteroidPool.release(asteroid);
+      continue;
     }
+    arr[w++] = asteroid;
   }
+  if (w !== arr.length) arr.length = w;
 }
 
 /**
@@ -72,8 +89,8 @@ export function updateAsteroids(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
  * Integrate bullet positions and recycle bullets that leave the top of the viewport.
  *
  * Inputs: game.bullets (Array), bulletPool
- * Mutations: Bullet internal coords via bullet.update; array shrink via splice for spent bullets.
- * Performance: O(B). Each off‑screen bullet triggers one splice + pool release.
+ * Mutations: Bullet internal coords via bullet.update; compaction for spent bullets.
+ * Performance: O(B).
  * Determinism: Deterministic absent randomness in bullet.update.
  * Side Effects: Releases bullet objects back to pool.
  * Failure Modes: Missing update() or dimension data triggers upstream exception.
@@ -81,15 +98,20 @@ export function updateAsteroids(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
  * @param {number} [dtSec]
  */
 export function updateBullets(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
-  const { width: viewWidth, height: viewHeight } = getViewSize(game);
-  for (let i = game.bullets.length - 1; i >= 0; i--) {
-    const bullet = game.bullets[i];
+  const vw = viewWidth(game);
+  const vh = viewHeight(game);
+  const arr = game.bullets;
+  let w = 0;
+  for (let r = 0; r < arr.length; r++) {
+    const bullet = arr[r];
     bullet.update(dtSec);
-    if (!isOnscreen(bullet, viewWidth, viewHeight, 16)) {
-      game.bullets.splice(i, 1);
+    if (!isOnscreen(bullet, vw, vh, 16)) {
       game.bulletPool.release(bullet);
+      continue;
     }
+    arr[w++] = bullet;
   }
+  if (w !== arr.length) arr.length = w;
 }
 
 /**
@@ -131,7 +153,7 @@ export function updateEngineTrail(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
  * Progress explosion animations and recycle those whose lifetime has expired (life <= 0).
  *
  * Inputs: game.explosions (Array), explosionPool
- * Mutations: Explosion life/time state via explosion.update; array removals + pool release.
+ * Mutations: Explosion life/time state via explosion.update; compaction + pool release.
  * Performance: O(E) where E = number of explosions.
  * Determinism: Deterministic given explosion.update is deterministic.
  * Failure Modes: Missing life property or update() leads to exceptions.
@@ -139,15 +161,20 @@ export function updateEngineTrail(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
  * @param {number} [dtSec]
  */
 export function updateExplosions(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
-  const { width: viewWidth, height: viewHeight } = getViewSize(game);
-  for (let i = game.explosions.length - 1; i >= 0; i--) {
-    const explosion = game.explosions[i];
+  const vw = viewWidth(game);
+  const vh = viewHeight(game);
+  const arr = game.explosions;
+  let w = 0;
+  for (let r = 0; r < arr.length; r++) {
+    const explosion = arr[r];
     explosion.update(dtSec);
-    if (explosion.life <= 0 || !isOnscreen(explosion, viewWidth, viewHeight, 64)) {
-      const e = game.explosions.splice(i, 1)[0];
-      game.explosionPool.release(e);
+    if (explosion.life <= 0 || !isOnscreen(explosion, vw, vh, 64)) {
+      game.explosionPool.release(explosion);
+      continue;
     }
+    arr[w++] = explosion;
   }
+  if (w !== arr.length) arr.length = w;
 }
 
 /**
@@ -156,23 +183,28 @@ export function updateExplosions(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
  * Integrate generic particle physics (position, velocity, gravity) then recycle dead particles.
  *
  * Inputs: game.particles (Array), particlePool
- * Mutations: Particle internal kinematics + array shrink via splice for dead particles.
- * Performance: O(P) where P = particle count.
+ * Mutations: Particle internal kinematics + compaction for dead particles.
+ * Performance: O(P) where P = particle count, regardless of how many die this frame.
  * Determinism: Deterministic if particle.update is deterministic and no random forces applied.
  * Failure Modes: Absent life property or update() method raises exceptions upstream.
  * @param {import('../types.js').SystemsGame} game
  * @param {number} [dtSec]
  */
 export function updateParticles(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
-  const { width: viewWidth, height: viewHeight } = getViewSize(game);
-  for (let i = game.particles.length - 1; i >= 0; i--) {
-    const particle = game.particles[i];
+  const vw = viewWidth(game);
+  const vh = viewHeight(game);
+  const arr = game.particles;
+  let w = 0;
+  for (let r = 0; r < arr.length; r++) {
+    const particle = arr[r];
     particle.update(dtSec);
-    if (particle.life <= 0 || !isOnscreen(particle, viewWidth, viewHeight, 48)) {
-      game.particles.splice(i, 1);
+    if (particle.life <= 0 || !isOnscreen(particle, vw, vh, 48)) {
       game.particlePool.release(particle);
+      continue;
     }
+    arr[w++] = particle;
   }
+  if (w !== arr.length) arr.length = w;
 }
 
 /**
@@ -181,7 +213,7 @@ export function updateParticles(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
  * Move collectible stars downward and recycle stars that fall below the viewport.
  *
  * Inputs: game.stars (Array), view.height, starPool
- * Mutations: Star position via star.update; removal + pool release for off‑screen stars.
+ * Mutations: Star position via star.update; compaction + pool release for off‑screen stars.
  * Performance: O(S) where S = number of stars.
  * Determinism: Deterministic provided star.update is deterministic.
  * Failure Modes: Missing update() or dimension properties yields exceptions.
@@ -189,13 +221,18 @@ export function updateParticles(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
  * @param {number} [dtSec]
  */
 export function updateStars(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
-  const { width: viewWidth, height: viewHeight } = getViewSize(game);
-  for (let i = game.stars.length - 1; i >= 0; i--) {
-    const star = game.stars[i];
+  const vw = viewWidth(game);
+  const vh = viewHeight(game);
+  const arr = game.stars;
+  let w = 0;
+  for (let r = 0; r < arr.length; r++) {
+    const star = arr[r];
     star.update(dtSec);
-    if (!isOnscreen(star, viewWidth, viewHeight, 24)) {
-      const s = game.stars.splice(i, 1)[0];
-      game.starPool.release(s);
+    if (!isOnscreen(star, vw, vh, 24)) {
+      game.starPool.release(star);
+      continue;
     }
+    arr[w++] = star;
   }
+  if (w !== arr.length) arr.length = w;
 }

@@ -1,4 +1,5 @@
 import { CONFIG, PI2 } from "../constants.js";
+import { SpriteCache } from "../utils/SpriteCache.js";
 
 /**
  * Explosion – radial expanding energy effect.
@@ -9,6 +10,9 @@ import { CONFIG, PI2 } from "../constants.js";
  *  - Multi-stop radial gradient provides hot core -> cooler edge fade.
  *
  * Pool Friendly: purely numeric state; reset overwrites all fields.
+ *
+ * Rendering: frames are pre-rendered per quantized alpha step and looked up through a per-size
+ * table resolved at spawn (integer index per frame, no cache-key strings in `draw`).
  */
 export class Explosion {
   /**
@@ -27,6 +31,8 @@ export class Explosion {
     this.height = height;
     this.life = life;
     this.maxLife = maxLife;
+    /** @private @type {Array<ExplosionSprite|null|undefined>} */
+    this._sprites = Explosion._spriteTableFor(width, height);
   }
 
   /**
@@ -44,8 +50,15 @@ export class Explosion {
   draw(ctx) {
     const alphaRaw = this.maxLife > 0 ? this.life / this.maxLife : 0;
     const alpha = Math.max(0, Math.min(1, alphaRaw));
-    const quantAlpha = Explosion._quantizeAlpha(alpha);
-    const sprite = Explosion._getSprite(this.width, this.height, quantAlpha);
+    const steps = Explosion._SPRITE_STEPS;
+    const step = steps > 0 ? Math.round(alpha * steps) : 0;
+    const table =
+      this._sprites || (this._sprites = Explosion._spriteTableFor(this.width, this.height));
+    let sprite = table[step];
+    if (sprite === undefined) {
+      sprite = Explosion._getSprite(this.width, this.height, steps > 0 ? step / steps : alpha);
+      table[step] = sprite;
+    }
     const cx = this.x + this.width / 2;
     const cy = this.y + this.height / 2;
     if (sprite) {
@@ -85,20 +98,38 @@ export class Explosion {
     this.height = height;
     this.life = life;
     this.maxLife = maxLife;
+    this._sprites = Explosion._spriteTableFor(width, height);
+  }
+
+  /**
+   * Shared alpha-step-indexed sprite table for an explosion size (lazily filled by `draw`).
+   * @param {number} width
+   * @param {number} height
+   * @returns {Array<ExplosionSprite|null|undefined>}
+   * @private
+   */
+  static _spriteTableFor(width, height) {
+    const key = `${width}x${height}`;
+    let table = Explosion._spriteTables.get(key);
+    if (!table) {
+      table = new Array(Explosion._SPRITE_STEPS + 1).fill(undefined);
+      Explosion._spriteTables.set(key, table);
+    }
+    return table;
   }
 
   /**
    * @param {number} width
    * @param {number} height
    * @param {number} alpha
-   * @returns {{ canvas: OffscreenCanvas | HTMLCanvasElement, pad: number, radius: number } | null}
+   * @returns {ExplosionSprite | null}
    * @private
    */
   static _getSprite(width, height, alpha) {
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
       return null;
     }
-    if (!Explosion._spriteCache) Explosion._spriteCache = new Map();
+    if (!Explosion._spriteCache) Explosion._spriteCache = new SpriteCache(64);
     const key = `${width.toFixed(2)}x${height.toFixed(2)}@${alpha.toFixed(3)}`;
     const cached = Explosion._spriteCache.get(key);
     if (cached) return cached;
@@ -158,6 +189,11 @@ export class Explosion {
   }
 }
 
-/** @type {Map<string, { canvas: OffscreenCanvas | HTMLCanvasElement, pad: number, radius: number }> | undefined} */
+/** @typedef {{ canvas: OffscreenCanvas | HTMLCanvasElement, pad: number, radius: number }} ExplosionSprite */
+
+/** @type {SpriteCache<ExplosionSprite> | undefined} */
 Explosion._spriteCache = undefined;
+/** Alpha-step-indexed sprite tables keyed by "WxH" (see `_spriteTableFor`). */
+/** @type {Map<string, Array<ExplosionSprite|null|undefined>>} */
+Explosion._spriteTables = new Map();
 Explosion._SPRITE_STEPS = 12;

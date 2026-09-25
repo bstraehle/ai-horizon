@@ -52,9 +52,10 @@ import { EventHandlers } from "./systems/EventHandlers.js";
 import { PerformanceMonitor } from "./core/PerformanceMonitor.js";
 import { applyPerformanceProfile } from "./ui/PerformanceProfiles.js";
 import { warmUpPools } from "./ui/PoolWarmup.js";
+import { attachDevTools } from "./ui/DevTools.js";
 import { detectMobilePlatform } from "./utils/mobilePlatform.js";
 import { updateGame } from "./systems/GameUpdate.js";
-import { drawGame, drawFrame } from "./systems/GameRender.js";
+import { drawGame, drawFrame, samplePerformance } from "./systems/GameRender.js";
 import { initBackgroundLifecycle, drawBackgroundLifecycle } from "./systems/BackgroundLifecycle.js";
 import { softReinitForPlatformChange as platformSoftReinit } from "./systems/PlatformLifecycle.js";
 import {
@@ -201,6 +202,7 @@ class AIHorizon {
     this.starSpeed = CONFIG.SPEEDS.STAR;
 
     let seed = undefined;
+    let seedString = null;
     try {
       const url = new URL(window.location.href);
       const s = url.searchParams.get(CONFIG.RNG.SEED_PARAM);
@@ -208,6 +210,7 @@ class AIHorizon {
         const n = Number(s);
         seed = Number.isFinite(n) ? n : undefined;
         if (seed === undefined) {
+          seedString = s;
           this.rng = RNG.fromString(s);
         }
       }
@@ -215,6 +218,14 @@ class AIHorizon {
       /* intentionally empty */
     }
     this.rng = this.rng || new RNG(seed);
+    /**
+     * RNG for render-only randomness (starfield respawn jitter). Kept separate from `rng` so
+     * drawing never advances the simulation sequence; derived from the seed for reproducibility.
+     */
+    this.visualRng =
+      seedString !== null
+        ? RNG.fromString(`${seedString}#visual`)
+        : new RNG(seed === undefined ? undefined : (seed ^ 0x5bd1e995) >>> 0);
     this.fireLimiter = new RateLimiter(CONFIG.GAME.SHOT_COOLDOWN, () => this.timeMs);
 
     this.state = new GameStateMachine();
@@ -383,11 +394,14 @@ class AIHorizon {
       });
 
     this._frameMetrics = null;
+    /** Opt-in diagnostics (`?debug=perf`, `?autoplay=1`); null in normal sessions. */
+    this.devTools = attachDevTools(this);
     this.loop = new GameLoop({
       update: (dtMs, dtSec) => {
         this.timeMs += dtMs;
         this.timeSec += dtSec;
         this._lastDtSec = dtSec;
+        if (this.devTools) this.devTools.beforeUpdate();
         this.update(dtSec);
       },
       draw: (frameDtMs, metrics) => {
@@ -399,8 +413,11 @@ class AIHorizon {
       maxSubSteps: CONFIG.TIME.MAX_SUB_STEPS,
       onMetrics: (m) => {
         this._frameMetrics = m;
+        samplePerformance(this, m);
+        if (this.devTools) this.devTools.onMetrics(m);
       },
     });
+    if (this.devTools) this.devTools.autoStart();
     AIHorizon._instance = this;
   }
 
@@ -1113,6 +1130,7 @@ class AIHorizon {
       this.loop.stop();
       this._loopRunning = false;
     }
+    if (this.devTools) this.devTools.onGameOver();
   }
 
   /**

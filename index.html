@@ -24,7 +24,7 @@
     <link rel="apple-touch-icon" href="favicon.png?v=2" />
     <link rel="manifest" href="/manifest.webmanifest" crossorigin="anonymous" />
     <link rel="stylesheet" href="style.css" />
-    <link rel="preload" href="dist/bundle.js" as="script" />
+    <link rel="modulepreload" href="dist/bundle.js" />
   </head>
   <body>
     <noscript>
@@ -159,7 +159,7 @@
       </div>
     </div>
 
-    <script defer src="dist/bundle.js"></script>
+    <script type="module" src="dist/bundle.js"></script>
     <script defer src="pwa-register.js"></script>
   </body>
 </html>

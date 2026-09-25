@@ -5,7 +5,7 @@
 import { qualifiesForInitials, formatRow, formatRows } from "./leaderboard/LeaderboardFormatter.js";
 import { LeaderboardRepository } from "./leaderboard/LeaderboardRepository.js";
 import { RemoteStorageAdapter } from "../adapters/RemoteStorageAdapter.js";
-import { CognitoAPIClient } from "../adapters/Cognito.js";
+import { getApiEndpoint, loadSignedFetch } from "../adapters/SignedApi.js";
 
 /**
  * @typedef {Object} LeaderboardEntry
@@ -33,28 +33,28 @@ export class LeaderboardManager {
   /** @type {number} */
   static _lastRemoteSync = 0;
 
-  /** Internal repository factory (injects signed RemoteStorageAdapter outside tests). */
-  static _createRepository() {
+  /**
+   * Internal repository factory (injects signed RemoteStorageAdapter outside tests).
+   * Async because the signing client lives in a lazily loaded chunk (see adapters/SignedApi.js);
+   * the SDK is only fetched when a remote repository is actually requested.
+   * @returns {Promise<LeaderboardRepository>}
+   */
+  static async _createRepository() {
     const g = /** @type {any} */ (typeof globalThis !== "undefined" ? globalThis : {});
     const proc = g.process;
     const isTestEnv = !!(proc && proc.env && (proc.env.NODE_ENV === "test" || proc.env.VITEST));
 
-    // Build endpoint from Cognito client defaults (even in tests),
-    // but only attach a signed fetch in non-test environments.
-    let endpoint = "";
+    // Endpoint is static configuration (even in tests); a signed fetch is only attached in
+    // non-test environments when remote mode is on.
+    const endpoint = `${getApiEndpoint()}?id=${encodeURIComponent(LeaderboardManager.REMOTE_ID)}`;
     /** @type {RemoteStorageAdapter|undefined} */
     let remoteAdapter = undefined;
-
-    try {
-      const api = new CognitoAPIClient();
-      // Base endpoint (no query) + id param
-      endpoint = `${api.getApiEndpoint()}?id=${encodeURIComponent(LeaderboardManager.REMOTE_ID)}`;
-      if (!isTestEnv && LeaderboardManager.IS_REMOTE) {
-        remoteAdapter = new RemoteStorageAdapter({ fetchFn: api.buildSignedFetch() });
+    if (!isTestEnv && LeaderboardManager.IS_REMOTE) {
+      try {
+        remoteAdapter = new RemoteStorageAdapter({ fetchFn: await loadSignedFetch() });
+      } catch (_) {
+        remoteAdapter = undefined;
       }
-    } catch (_) {
-      endpoint = "";
-      remoteAdapter = undefined;
     }
 
     return new LeaderboardRepository({
@@ -135,8 +135,8 @@ export class LeaderboardManager {
     if (!remote && Array.isArray(LeaderboardManager._cacheEntries)) {
       return Promise.resolve(LeaderboardManager._cacheEntries.slice());
     }
-    const repo = LeaderboardManager._createRepository();
     const p = (async () => {
+      const repo = await LeaderboardManager._createRepository();
       const entries = remote ? await repo.loadRemote() : await repo.loadLocal();
       if (typeof repo._version === "number") LeaderboardManager._version = repo._version;
       LeaderboardManager._cacheEntries = entries.slice();
@@ -188,7 +188,7 @@ export class LeaderboardManager {
       }
       return cleaned;
     });
-    const repo = LeaderboardManager._createRepository();
+    const repo = await LeaderboardManager._createRepository();
     if (typeof LeaderboardManager._version === "number")
       repo._version = LeaderboardManager._version;
 

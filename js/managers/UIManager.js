@@ -6,6 +6,14 @@ import { LeaderboardManager } from "./LeaderboardManager.js";
 import { CONFIG } from "../constants.js";
 import { BackgroundManager } from "./BackgroundManager.js";
 import { FocusManager } from "./FocusManager.js";
+
+/**
+ * Last state written to a timer element by `setTimer` (called every simulation tick). Lets the
+ * hot path skip DOM mutations until the displayed second or finale styling actually changes.
+ * @type {WeakMap<HTMLElement, { seconds: number, active: boolean, palette: string }>}
+ */
+const TIMER_MEMO = new WeakMap();
+
 export class UIManager {
   static _preserveFocus = false;
   /** @type {(() => void)|null} */
@@ -560,25 +568,50 @@ export class UIManager {
       );
       if (container && container.classList) container.classList.remove("finale");
       if (timer && timer.classList) timer.classList.remove("finale");
+      if (timer) TIMER_MEMO.delete(timer);
     } catch (_) {
       /* non-critical UI affordance */
     }
   }
 
   /**
+   * Render the countdown and finale styling. Called every simulation tick, so DOM writes are
+   * skipped unless the whole second, finale state, or finale palette changed since the last call
+   * for this element (`clearFinaleTimer` resets that memory).
    * @param {HTMLElement|null} timerEl Timer display element.
    * @param {number} secondsRemaining Seconds (float) remaining; negative values clamped to 0.
    */
   static setTimer(timerEl, secondsRemaining) {
     if (!timerEl) return;
     const s = Math.max(0, Math.floor(secondsRemaining));
-    const mins = Math.floor(s / 60);
-    const secs = s % 60;
-    timerEl.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
+    const finaleWindow = (CONFIG && CONFIG.GAME && CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS) || 0;
+    const active = finaleWindow > 0 && secondsRemaining > 0 && secondsRemaining <= finaleWindow;
+    /** @type {"red"|"blue"} */
+    const palette =
+      active && typeof BackgroundManager?.getCurrentNebulaPalette === "function"
+        ? BackgroundManager.getCurrentNebulaPalette()
+        : "red";
+    let memo = TIMER_MEMO.get(timerEl);
+    if (memo && memo.seconds === s && memo.active === active && memo.palette === palette) return;
+    const textChanged = !memo || memo.seconds !== s;
+    const styleChanged = !memo || memo.active !== active || memo.palette !== palette;
+    if (!memo) {
+      memo = { seconds: s, active, palette };
+      TIMER_MEMO.set(timerEl, memo);
+    } else {
+      memo.seconds = s;
+      memo.active = active;
+      memo.palette = palette;
+    }
+
+    if (textChanged) {
+      const mins = Math.floor(s / 60);
+      const secs = s % 60;
+      timerEl.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
+    }
+    if (!styleChanged) return;
 
     try {
-      const finaleWindow = (CONFIG && CONFIG.GAME && CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS) || 0;
-      const active = finaleWindow > 0 && secondsRemaining > 0 && secondsRemaining <= finaleWindow;
       /** @type {HTMLElement|null} */
       const container = /** @type {HTMLElement|null} */ (
         (typeof document !== "undefined" && document.getElementById("timerBox")) ||
@@ -595,11 +628,6 @@ export class UIManager {
 
       if (active && (container || timerEl)) {
         const target = container || timerEl;
-        /** @type {"red"|"blue"} */
-        const palette =
-          typeof BackgroundManager?.getCurrentNebulaPalette === "function"
-            ? BackgroundManager.getCurrentNebulaPalette()
-            : "red";
         const baseHex =
           palette === "blue" ? CONFIG.COLORS.STAR_BLUE.BASE : CONFIG.COLORS.STAR_RED.BASE;
         const rgb = (function hexToRgb(hex) {

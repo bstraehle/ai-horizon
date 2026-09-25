@@ -46,6 +46,10 @@ export function getRect(obj) {
  * Determine whether the provided object is within the extended viewport rectangle.
  * Passing a positive margin keeps entities alive slightly outside the view to prevent
  * popping when entering/exiting the screen.
+ *
+ * Hot path (called for every entity in both update and render): objects exposing finite
+ * numeric `x`/`y` are read directly with the same width/height defaulting rules as `getRect`,
+ * without allocating. Only objects lacking those fields fall back to `getRect` / `getBounds()`.
  * @param {any} obj
  * @param {number} viewWidth
  * @param {number} viewHeight
@@ -53,12 +57,24 @@ export function getRect(obj) {
  * @returns {boolean}
  */
 export function isOnscreen(obj, viewWidth, viewHeight, margin = 0) {
-  const rect = getRect(obj);
-  if (!rect) return true;
+  if (!obj) return true;
+  let x = obj.x;
+  let y = obj.y;
+  let w;
+  let h;
+  if (Number.isFinite(x) && Number.isFinite(y)) {
+    w = Number.isFinite(obj.width) ? obj.width : 0;
+    h = Number.isFinite(obj.height) ? obj.height : w;
+  } else {
+    const rect = getRect(obj);
+    if (!rect) return true;
+    x = rect.x;
+    y = rect.y;
+    w = rect.width;
+    h = rect.height;
+  }
   const vw = Number.isFinite(viewWidth) && viewWidth > 0 ? viewWidth : Infinity;
   const vh = Number.isFinite(viewHeight) && viewHeight > 0 ? viewHeight : Infinity;
   const m = margin > 0 ? margin : 0;
-  const right = rect.x + rect.width;
-  const bottom = rect.y + rect.height;
-  return !(right < -m || rect.x > vw + m || bottom < -m || rect.y > vh + m);
+  return !(x + w < -m || x > vw + m || y + h < -m || y > vh + m);
 }

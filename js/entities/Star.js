@@ -1,5 +1,6 @@
 import { CONFIG } from "../constants.js";
 import { BackgroundManager } from "../managers/BackgroundManager.js";
+import { SpriteCache } from "../utils/SpriteCache.js";
 
 /**
  * Star – falling collectible / background glow with optional red variant.
@@ -39,14 +40,16 @@ export class Star {
   /**
    * Render star with radial gradient & optional pulse scale modulation.
    * @param {CanvasRenderingContext2D} ctx 2D context.
+   * @param {number} [extrapolateSec=0] Seconds past the last simulated state (projects downward motion).
    */
-  draw(ctx) {
+  draw(ctx, extrapolateSec = 0) {
+    const y = extrapolateSec > 0 ? this.y + this.speed * extrapolateSec : this.y;
     const sprite = Star._getSprite(this.width, this.height, this.isRed);
     if (sprite) {
-      ctx.drawImage(sprite.canvas, this.x - sprite.padX, this.y - sprite.padY);
+      ctx.drawImage(sprite.canvas, this.x - sprite.padX, y - sprite.padY);
       return;
     }
-    Star._drawStarDirect(ctx, this.x, this.y, this.width, this.height, this.isRed);
+    Star._drawStarDirect(ctx, this.x, y, this.width, this.height, this.isRed);
   }
 
   /**
@@ -152,7 +155,7 @@ export class Star {
       return null;
     }
     if (!Star._spriteCache) {
-      Star._spriteCache = new Map();
+      Star._spriteCache = new SpriteCache(64);
     }
     const key = `${isRed ? "r" : "n"}:${width.toFixed(2)}x${height.toFixed(2)}`;
     const cached = Star._spriteCache.get(key);
@@ -201,5 +204,5 @@ export class Star {
   }
 }
 
-/** @type {Map<string, { canvas: OffscreenCanvas | HTMLCanvasElement, padX: number, padY: number }> | undefined} */
+/** @type {SpriteCache<{ canvas: OffscreenCanvas | HTMLCanvasElement, padX: number, padY: number }> | undefined} */
 Star._spriteCache = undefined;

@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { AIAnalysisAdapter } from "../adapters/AIAnalysisAdapter.js";
 import { RemoteStorageAdapter } from "../adapters/RemoteStorageAdapter.js";
-import { CognitoAPIClient } from "../adapters/Cognito.js";
+import { getApiEndpoint, loadSignedFetch } from "../adapters/SignedApi.js";
 import { LeaderboardManager } from "./LeaderboardManager.js";
 import { FocusManager } from "./FocusManager.js";
 
@@ -19,9 +19,10 @@ export class AIAnalysisManager {
 
   /**
    * Create an AIAnalysisAdapter with appropriate remote configuration.
-   * @returns {AIAnalysisAdapter}
+   * Async because the signing client is a lazily loaded chunk (see adapters/SignedApi.js).
+   * @returns {Promise<AIAnalysisAdapter>}
    */
-  static _createAdapter() {
+  static async _createAdapter() {
     const g = /** @type {any} */ (typeof globalThis !== "undefined" ? globalThis : {});
     const proc = g.process;
     const isTestEnv = !!(proc && proc.env && (proc.env.NODE_ENV === "test" || proc.env.VITEST));
@@ -32,9 +33,8 @@ export class AIAnalysisManager {
 
     try {
       if (!isTestEnv && AIAnalysisManager.IS_REMOTE) {
-        const api = new CognitoAPIClient();
-        endpoint = api.getApiEndpoint();
-        remoteAdapter = new RemoteStorageAdapter({ fetchFn: api.buildSignedFetch() });
+        endpoint = getApiEndpoint();
+        remoteAdapter = new RemoteStorageAdapter({ fetchFn: await loadSignedFetch() });
       }
     } catch (_) {
       endpoint = "";
@@ -55,9 +55,9 @@ export class AIAnalysisManager {
    */
   static async analyze(stats) {
     if (AIAnalysisManager._pending) return AIAnalysisManager._pending;
-    const adapter = AIAnalysisManager._createAdapter();
     const p = (async () => {
       try {
+        const adapter = await AIAnalysisManager._createAdapter();
         const result = await adapter.analyze(stats);
         AIAnalysisManager._cache = result;
         return { ...result };

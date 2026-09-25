@@ -1,4 +1,5 @@
 import { CONFIG } from "../constants.js";
+import { SpriteCache } from "../utils/SpriteCache.js";
 
 /**
  * StarField – procedural background star layers (legacy single array or layered structure).
@@ -19,6 +20,8 @@ export class StarField {
    * @property {number} speed
    * @property {number} brightness
    * @property {number} twinkleOffset
+   * @property {{ canvas: OffscreenCanvas | HTMLCanvasElement, offset: number } | null} [_sprite] Render cache: sprite resolved for `_spriteSize`
+   * @property {number} [_spriteSize] Render cache: size the cached sprite was resolved for
    */
 
   /**
@@ -38,36 +41,14 @@ export class StarField {
    */
   static init(width, height, rng, isMobile = false, qualityScale = 1) {
     const rand = rng || { nextFloat: Math.random.bind(Math) };
-    const perf = CONFIG.PERFORMANCE || {};
-    const minScale = typeof perf.MIN_STARFIELD_SCALE === "number" ? perf.MIN_STARFIELD_SCALE : 0.35;
-    const clampScale = Math.max(
-      minScale,
-      Math.min(1, typeof qualityScale === "number" ? qualityScale : 1)
-    );
-    const baseTarget = isMobile
-      ? CONFIG.GAME.STARFIELD_COUNT_MOBILE || CONFIG.GAME.STARFIELD_COUNT
-      : CONFIG.GAME.STARFIELD_COUNT;
-    const baseCount = Math.max(1, Math.round(baseTarget * clampScale));
+    const baseCount = StarField.baseCount(isMobile, qualityScale);
 
-    /**
-     * @typedef {{ name?:string, countFactor?:number, sizeMult?:number, speedMult?:number, brightnessMult?:number, twinkleRate?:number, twinkleXFactor?:number }} LayerDef
-     */
     /** @type {LayerDef[] | null} */
     const layerDefs = Array.isArray(CONFIG.STARFIELD.LAYERS) ? CONFIG.STARFIELD.LAYERS : null;
-    const defaultTwinkleFactor = CONFIG.STARFIELD.TWINKLE_X_FACTOR;
     if (!layerDefs || layerDefs.length === 0) {
-      return Array.from({ length: baseCount }, () => {
-        const x = rand.nextFloat() * width;
-        return {
-          x,
-          y: rand.nextFloat() * height,
-          size: rand.nextFloat() * CONFIG.STARFIELD.SIZE_VAR + CONFIG.STARFIELD.SIZE_MIN,
-          speed: rand.nextFloat() * CONFIG.STARFIELD.SPEED_VAR + CONFIG.STARFIELD.SPEED_MIN,
-          brightness:
-            rand.nextFloat() * CONFIG.STARFIELD.BRIGHTNESS_VAR + CONFIG.STARFIELD.BRIGHTNESS_MIN,
-          twinkleOffset: x * defaultTwinkleFactor,
-        };
-      });
+      return Array.from({ length: baseCount }, () =>
+        StarField._makeStar(rand, width, height, null, CONFIG.STARFIELD.TWINKLE_X_FACTOR)
+      );
     }
 
     /** @typedef {{name:string, stars:StarData[], config:{twinkleRate:number, twinkleXFactor:number}}} LayerRuntime */
@@ -75,23 +56,9 @@ export class StarField {
     const layers = layerDefs.map((ld /** @type {LayerDef} */) => {
       const layerCount = Math.max(1, Math.round(baseCount * (ld.countFactor || 1)));
       const twinkleFactor = ld.twinkleXFactor || CONFIG.STARFIELD.TWINKLE_X_FACTOR;
-      const stars = Array.from({ length: layerCount }, () => {
-        const x = rand.nextFloat() * width;
-        return {
-          x,
-          y: rand.nextFloat() * height,
-          size:
-            (rand.nextFloat() * CONFIG.STARFIELD.SIZE_VAR + CONFIG.STARFIELD.SIZE_MIN) *
-            (ld.sizeMult || 1),
-          speed:
-            (rand.nextFloat() * CONFIG.STARFIELD.SPEED_VAR + CONFIG.STARFIELD.SPEED_MIN) *
-            (ld.speedMult || 1),
-          brightness:
-            (rand.nextFloat() * CONFIG.STARFIELD.BRIGHTNESS_VAR + CONFIG.STARFIELD.BRIGHTNESS_MIN) *
-            (ld.brightnessMult || 1),
-          twinkleOffset: x * twinkleFactor,
-        };
-      });
+      const stars = Array.from({ length: layerCount }, () =>
+        StarField._makeStar(rand, width, height, ld, twinkleFactor)
+      );
       return {
         name: ld.name || "layer",
         stars,
@@ -102,6 +69,110 @@ export class StarField {
       };
     });
     return { layers };
+  }
+
+  /**
+   * Total star budget for a platform / quality scale (before per-layer count factors).
+   * @param {boolean} [isMobile=false]
+   * @param {number} [qualityScale=1] Clamped to [CONFIG.PERFORMANCE.MIN_STARFIELD_SCALE, 1].
+   * @returns {number}
+   */
+  static baseCount(isMobile = false, qualityScale = 1) {
+    const perf = CONFIG.PERFORMANCE || {};
+    const minScale = typeof perf.MIN_STARFIELD_SCALE === "number" ? perf.MIN_STARFIELD_SCALE : 0.35;
+    const clampScale = Math.max(
+      minScale,
+      Math.min(1, typeof qualityScale === "number" ? qualityScale : 1)
+    );
+    const baseTarget = isMobile
+      ? CONFIG.GAME.STARFIELD_COUNT_MOBILE || CONFIG.GAME.STARFIELD_COUNT
+      : CONFIG.GAME.STARFIELD_COUNT;
+    return Math.max(1, Math.round(baseTarget * clampScale));
+  }
+
+  /**
+   * Adjust star counts in place to match a new quality scale (used by adaptive performance tiers).
+   * Surplus stars are dropped from the end of each layer and missing stars are appended at random
+   * positions; existing stars keep their state, so a tier change never visibly re-rolls the sky.
+   *
+   * @param {StarData[] | {layers:Array<{stars:StarData[],config:{twinkleRate:number,twinkleXFactor:number}}>}} starField Runtime structure from init() (mutated).
+   * @param {number} width Canvas width.
+   * @param {number} height Canvas height.
+   * @param {import('../types.js').RNGLike} [rng] RNG for appended stars (visual-only randomness).
+   * @param {boolean} [isMobile=false] Mobile flag (selects the base star budget).
+   * @param {number} [qualityScale=1] Quality scale (0-1].
+   * @returns {StarData[] | {layers:Array<{stars:StarData[],config:{twinkleRate:number,twinkleXFactor:number}}>}} The same structure, adjusted.
+   */
+  static setDensity(starField, width, height, rng, isMobile = false, qualityScale = 1) {
+    if (!starField) return starField;
+    const rand = rng || { nextFloat: Math.random.bind(Math) };
+    const baseCount = StarField.baseCount(isMobile, qualityScale);
+    if (Array.isArray(starField)) {
+      StarField._fitCount(starField, baseCount, () =>
+        StarField._makeStar(rand, width, height, null, CONFIG.STARFIELD.TWINKLE_X_FACTOR)
+      );
+      return starField;
+    }
+    const layered = /** @type {any} */ (starField);
+    /** @type {LayerDef[]} */
+    const layerDefs = Array.isArray(CONFIG.STARFIELD.LAYERS) ? CONFIG.STARFIELD.LAYERS : [];
+    if (Array.isArray(layered.layers)) {
+      for (let i = 0; i < layered.layers.length; i++) {
+        const layer = layered.layers[i];
+        const ld = layerDefs[i] || {};
+        const desired = Math.max(1, Math.round(baseCount * (ld.countFactor || 1)));
+        const twinkleFactor =
+          (layer.config && layer.config.twinkleXFactor) || CONFIG.STARFIELD.TWINKLE_X_FACTOR;
+        StarField._fitCount(layer.stars, desired, () =>
+          StarField._makeStar(rand, width, height, ld, twinkleFactor)
+        );
+      }
+    }
+    return starField;
+  }
+
+  /**
+   * @typedef {{ name?:string, countFactor?:number, sizeMult?:number, speedMult?:number, brightnessMult?:number, twinkleRate?:number, twinkleXFactor?:number }} LayerDef
+   */
+
+  /**
+   * Create one star; RNG draw order (x, y, size, speed, brightness) is part of the seeded contract.
+   * @param {{ nextFloat:()=>number }} rand
+   * @param {number} width
+   * @param {number} height
+   * @param {LayerDef|null} ld Layer definition for multipliers (null = legacy single layer).
+   * @param {number} twinkleFactor
+   * @returns {StarData}
+   * @private
+   */
+  static _makeStar(rand, width, height, ld, twinkleFactor) {
+    const x = rand.nextFloat() * width;
+    return {
+      x,
+      y: rand.nextFloat() * height,
+      size:
+        (rand.nextFloat() * CONFIG.STARFIELD.SIZE_VAR + CONFIG.STARFIELD.SIZE_MIN) *
+        ((ld && ld.sizeMult) || 1),
+      speed:
+        (rand.nextFloat() * CONFIG.STARFIELD.SPEED_VAR + CONFIG.STARFIELD.SPEED_MIN) *
+        ((ld && ld.speedMult) || 1),
+      brightness:
+        (rand.nextFloat() * CONFIG.STARFIELD.BRIGHTNESS_VAR + CONFIG.STARFIELD.BRIGHTNESS_MIN) *
+        ((ld && ld.brightnessMult) || 1),
+      twinkleOffset: x * twinkleFactor,
+    };
+  }
+
+  /**
+   * Truncate or extend an array in place to `desired` entries.
+   * @param {StarData[]} stars
+   * @param {number} desired
+   * @param {() => StarData} make
+   * @private
+   */
+  static _fitCount(stars, desired, make) {
+    if (stars.length > desired) stars.length = desired;
+    while (stars.length < desired) stars.push(make());
   }
 
   /**
@@ -157,7 +228,13 @@ export class StarField {
           ctx.globalAlpha = alpha;
           prevAlpha = alpha;
         }
-        const sprite = StarField._getSprite(star.size, blurMult);
+        // Sprite resolved once per star (re-resolved only if its size changes, e.g. after resize).
+        let sprite = star._sprite;
+        if (sprite === undefined || star._spriteSize !== star.size) {
+          sprite = StarField._getSprite(star.size, blurMult);
+          star._sprite = sprite;
+          star._spriteSize = star.size;
+        }
         if (sprite) {
           ctx.drawImage(sprite.canvas, star.x - sprite.offset, star.y - sprite.offset);
         } else {
@@ -255,7 +332,7 @@ export class StarField {
    */
   static _getSprite(size, blurMult) {
     if (!Number.isFinite(size) || size <= 0) return null;
-    if (!StarField._spriteCache) StarField._spriteCache = new Map();
+    if (!StarField._spriteCache) StarField._spriteCache = new SpriteCache(64);
     const qSize = StarField._quantizeSize(size);
     const key = qSize.toFixed(2);
     const cached = StarField._spriteCache.get(key);
@@ -302,6 +379,6 @@ export class StarField {
   }
 }
 
-/** @type {Map<string, { canvas: OffscreenCanvas | HTMLCanvasElement, offset: number }> | undefined} */
+/** @type {SpriteCache<{ canvas: OffscreenCanvas | HTMLCanvasElement, offset: number }> | undefined} */
 StarField._spriteCache = undefined;
 StarField._SIZE_STEP = 0.25;

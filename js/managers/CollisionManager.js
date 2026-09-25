@@ -8,6 +8,42 @@
 const ARR_POOL = [];
 const ARR_POOL_MAX = 256;
 
+/** Per-frame marker property names (avoid re-creating string literals in the hot loop). */
+const BULLET_FRAME_FLAG = "_cmDeadBulletFrame";
+const AST_FRAME_FLAG = "_cmDeadAsteroidFrame";
+
+/**
+ * Return a rect view of an entity without allocating when it already carries x/width fields.
+ * @param {any} obj
+ * @returns {Rect}
+ */
+function resolveRect(obj) {
+  if (obj && typeof obj.x === "number" && typeof obj.width === "number") return obj;
+  return obj && typeof obj.getBounds === "function" ? obj.getBounds() : obj;
+}
+
+/**
+ * Pack a grid cell coordinate into a single integer key.
+ * @param {number} cx
+ * @param {number} cy
+ * @returns {number}
+ */
+function cellKey(cx, cy) {
+  return ((cx & 0xffff) << 16) | (cy & 0xffff);
+}
+
+/**
+ * Record bullet hits on hardened planets for accuracy statistics.
+ * @param {{ hardenedAsteroidHitBullets?: number, bonusAsteroidHitBullets?: number }} game
+ * @param {{ isBonus?: boolean }} asteroid
+ */
+function markHardenedHit(game, asteroid) {
+  game.hardenedAsteroidHitBullets = (game.hardenedAsteroidHitBullets || 0) + 1;
+  if (asteroid.isBonus) {
+    game.bonusAsteroidHitBullets = (game.bonusAsteroidHitBullets || 0) + 1;
+  }
+}
+
 /**
  * @typedef {Object} BulletHitAsteroidPayload
  * @property {{ x:number,y:number,width:number,height:number, getBounds?:()=>Rect }} asteroid
@@ -80,30 +116,16 @@ export class CollisionManager {
     }
   }
   /**
-   * AABB overlap test; supports objects with getBounds().
+   * AABB overlap test (strict; touching edges do not overlap).
+   * Objects exposing numeric `x`/`width` are read in place without allocating; `getBounds()` is
+   * only consulted for objects that lack those fields.
    * @param {Rect | { getBounds: () => Rect }} rect1
    * @param {Rect | { getBounds: () => Rect }} rect2
    * @returns {boolean}
    */
   static intersects(rect1, rect2) {
-    /** @type {Rect} */
-    const a = /** @type {any} */ (
-      rect1 &&
-      typeof rect1 === "object" &&
-      "getBounds" in rect1 &&
-      typeof (/** @type {any} */ (rect1).getBounds) === "function"
-        ? /** @type {any} */ (/** @type {any} */ (rect1).getBounds())
-        : rect1
-    );
-    /** @type {Rect} */
-    const b = /** @type {any} */ (
-      rect2 &&
-      typeof rect2 === "object" &&
-      "getBounds" in rect2 &&
-      typeof (/** @type {any} */ (rect2).getBounds) === "function"
-        ? /** @type {any} */ (/** @type {any} */ (rect2).getBounds())
-        : rect2
-    );
+    const a = resolveRect(rect1);
+    const b = resolveRect(rect2);
     return (
       a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
     );
@@ -129,17 +151,6 @@ export class CollisionManager {
     const touched = /** @type {number[]} */ (this._touched);
     let touchedCount = 0;
     const cs = game.cellSize | 0;
-    /** @param {number} cx @param {number} cy @param {any} a */
-    const put = (cx, cy, a) => {
-      const key = ((cx & 0xffff) << 16) | (cy & 0xffff);
-      let bucket = grid[key];
-      if (!bucket) {
-        bucket = CollisionManager._getArr();
-        grid[key] = bucket;
-        touched[touchedCount++] = key;
-      }
-      bucket.push(a);
-    };
 
     for (let idx = 0; idx < game.asteroids.length; idx++) {
       const a = game.asteroids[idx];
@@ -148,7 +159,16 @@ export class CollisionManager {
       const maxCx = ((a.x + a.width) / cs) | 0;
       const maxCy = ((a.y + a.height) / cs) | 0;
       for (let cy = minCy; cy <= maxCy; cy++) {
-        for (let cx = minCx; cx <= maxCx; cx++) put(cx, cy, a);
+        for (let cx = minCx; cx <= maxCx; cx++) {
+          const key = cellKey(cx, cy);
+          let bucket = grid[key];
+          if (!bucket) {
+            bucket = CollisionManager._getArr();
+            grid[key] = bucket;
+            touched[touchedCount++] = key;
+          }
+          bucket.push(a);
+        }
       }
     }
 
@@ -163,13 +183,7 @@ export class CollisionManager {
     deadBullets.length = 0;
     deadAsteroids.length = 0;
 
-    const BULLET_FRAME_FLAG = "_cmDeadBulletFrame";
-    const AST_FRAME_FLAG = "_cmDeadAsteroidFrame";
-
-    /** @param {any} a @param {any} b */
-    const emitBulletHit = (a, b) => {
-      if (game.events) game.events.emit("bulletHitAsteroid", { asteroid: a, bullet: b });
-    };
+    const events = game.events;
     bulletLoop: for (let i = 0; i < game.bullets.length; i++) {
       const b = game.bullets[i];
       if (!b) continue;
@@ -179,8 +193,7 @@ export class CollisionManager {
       const maxCy = ((b.y + b.height) / cs) | 0;
       for (let cy = minCy; cy <= maxCy; cy++) {
         for (let cx = minCx; cx <= maxCx; cx++) {
-          const key = ((cx & 0xffff) << 16) | (cy & 0xffff);
-          const bucket = grid[key];
+          const bucket = grid[cellKey(cx, cy)];
           if (!bucket) continue;
           for (let k = 0; k < bucket.length; k++) {
             const a = bucket[k];
@@ -192,26 +205,16 @@ export class CollisionManager {
               }
               try {
                 if (a && a.isHardened) {
-                  const markHardenedHit = () => {
-                    try {
-                      game.hardenedAsteroidHitBullets = (game.hardenedAsteroidHitBullets || 0) + 1;
-                      if (a.isBonus) {
-                        game.bonusAsteroidHitBullets = (game.bonusAsteroidHitBullets || 0) + 1;
-                      }
-                    } catch {
-                      /* ignore stat update errors */
-                    }
-                  };
                   if (typeof a.onBulletHit === "function") {
-                    markHardenedHit();
+                    markHardenedHit(game, a);
                     const shouldDestroy = a.onBulletHit(game);
                     if (shouldDestroy && a[AST_FRAME_FLAG] !== frameId) {
                       a[AST_FRAME_FLAG] = frameId;
                       deadAsteroids.push(a);
-                      emitBulletHit(a, b);
+                      if (events) events.emit("bulletHitAsteroid", { asteroid: a, bullet: b });
                     }
                   } else if (typeof a.onShieldHit === "function") {
-                    markHardenedHit();
+                    markHardenedHit(game, a);
                     try {
                       a.onShieldHit();
                     } catch {
@@ -221,7 +224,7 @@ export class CollisionManager {
                 } else if (a && a[AST_FRAME_FLAG] !== frameId) {
                   a[AST_FRAME_FLAG] = frameId;
                   deadAsteroids.push(a);
-                  emitBulletHit(a, b);
+                  if (events) events.emit("bulletHitAsteroid", { asteroid: a, bullet: b });
                 }
               } catch {
                 /* ignore asteroid collision processing errors */

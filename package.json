@@ -8,10 +8,10 @@
   "sideEffects": false,
   "scripts": {
     "prebuild": "powershell -NoProfile -Command \"if (Test-Path dist) { Remove-Item dist -Recurse -Force }\"",
-    "build": "esbuild js/game.js --bundle --minify --sourcemap --target=es2018 --outfile=dist/bundle.js",
+    "build": "esbuild js/game.js --bundle --minify --sourcemap --target=es2018 --format=esm --splitting --outdir=dist --entry-names=bundle --chunk-names=chunks/[name]-[hash]",
     "postbuild": "powershell -NoProfile -Command \"New-Item -ItemType Directory -Force -Path dist > $null; Copy-Item -Force .\\favicon.png, .\\style.css, .\\manifest.webmanifest, .\\sw.js, .\\pwa-register.js, .\\about.html, .\\privacy.html .\\dist\\; (Get-Content .\\index.prod.html) -replace 'dist/bundle.js','bundle.js' | Set-Content .\\dist\\index.html\"",
-    "watch": "esbuild js/game.js --bundle --minify --sourcemap --target=es2018 --outfile=dist/bundle.js --watch",
-    "serve": "esbuild js/game.js --bundle --minify --sourcemap --target=es2018 --outfile=dist/bundle.js --serve=8000 --servedir=.",
+    "watch": "esbuild js/game.js --bundle --minify --sourcemap --target=es2018 --format=esm --splitting --outdir=dist --entry-names=bundle --chunk-names=chunks/[name]-[hash] --watch",
+    "serve": "esbuild js/game.js --bundle --minify --sourcemap --target=es2018 --format=esm --splitting --outdir=dist --entry-names=bundle --chunk-names=chunks/[name]-[hash] --serve=8000 --servedir=.",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:ci": "eslint . --max-warnings=0",
@@ -22,7 +22,8 @@
     "test:watch": "vitest",
     "ci:verify": "npm run lint:ci && npm test --silent",
     "ci:local": "npm run lint:ci && npm run format:check && npm run typecheck && npm test",
-    "prepare": "husky || echo 'husky skipped'"
+    "prepare": "husky || echo 'husky skipped'",
+    "perf:bench": "node --experimental-websocket scripts/perf-bench.cjs"
   },
   "vitest": {
     "setupFiles": "./tests/setup.js"

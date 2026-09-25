@@ -38,6 +38,13 @@ export class Player {
     this.width = width;
     this.height = height;
     this.speed = speed;
+    /** Velocity of the last simulated step (px/sec); render-only hint for extrapolation. */
+    this.vx = 0;
+    this.vy = 0;
+    /** @private Playable bounds captured from the last update (render-side clamp). */
+    this._maxX = Infinity;
+    /** @private */
+    this._maxY = Infinity;
   }
 
   /**
@@ -55,6 +62,8 @@ export class Player {
    * @param {number} [dtSec=CONFIG.TIME.DEFAULT_DT] Delta seconds.
    */
   update(input, mousePos, view, dtSec = CONFIG.TIME.DEFAULT_DT) {
+    const prevX = this.x;
+    const prevY = this.y;
     const keyboardPressed =
       input["ArrowLeft"] ||
       input["KeyA"] ||
@@ -77,8 +86,14 @@ export class Player {
       this.x += (targetX - this.x) * lerp;
       this.y += (targetY - this.y) * lerp;
     }
-    this.x = clamp(this.x, 0, view.width - this.width);
-    this.y = clamp(this.y, 0, view.height - this.height);
+    this._maxX = Math.max(0, view.width - this.width);
+    this._maxY = Math.max(0, view.height - this.height);
+    this.x = clamp(this.x, 0, this._maxX);
+    this.y = clamp(this.y, 0, this._maxY);
+    if (dtSec > 0) {
+      this.vx = (this.x - prevX) / dtSec;
+      this.vy = (this.y - prevY) / dtSec;
+    }
   }
 
   /**
@@ -90,14 +105,22 @@ export class Player {
    *  4. Gun/nozzle rectangle
    *  5. Engine flame triangle w/ radial gradient
    * @param {CanvasRenderingContext2D} ctx 2D context.
+   * @param {number} [extrapolateSec=0] Seconds past the last simulated state; the last step's
+   *  velocity is projected forward (clamped to the playable bounds) for smooth motion.
    */
-  draw(ctx) {
+  draw(ctx, extrapolateSec = 0) {
+    let x = this.x;
+    let y = this.y;
+    if (extrapolateSec > 0) {
+      x = clamp(x + this.vx * extrapolateSec, 0, this._maxX);
+      y = clamp(y + this.vy * extrapolateSec, 0, this._maxY);
+    }
     const sprite = Player._getSprite(this.width, this.height);
     if (sprite) {
-      ctx.drawImage(sprite.canvas, this.x - sprite.padX, this.y - sprite.padY);
+      ctx.drawImage(sprite.canvas, x - sprite.padX, y - sprite.padY);
       return;
     }
-    Player._drawShip(ctx, this.width, this.height, this.x, this.y);
+    Player._drawShip(ctx, this.width, this.height, x, y);
   }
 
   /**

@@ -1,12 +1,14 @@
 import { CONFIG } from "../constants.js";
-import { initBackgroundLifecycle } from "../systems/BackgroundLifecycle.js";
+import { adjustBackgroundQuality } from "../systems/BackgroundLifecycle.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
 /**
  * Apply a performance tier to the running game instance.
  *
  * Adjusts particle budgets, spawn rates, starfield density, DPR ceilings, engine trail cadence,
- * and low-power flag. Optionally reinitializes canvas sizing & background to reflect DPR changes.
+ * and low-power flag. Tier changes are applied in place so they are not visually disruptive
+ * mid-game: the canvas is only resized when the DPR ceiling actually changed, and the starfield
+ * is thinned/thickened rather than regenerated (nebula is left untouched).
  *
  * Level semantics:
  *  - level 0: baseline (no throttling, full quality)
@@ -14,14 +16,15 @@ import { initBackgroundLifecycle } from "../systems/BackgroundLifecycle.js";
  *
  * @param {AIHorizon} game Game instance to mutate.
  * @param {number} level 1-based performance level (0 = baseline).
- * @param {{ reinitialize?: boolean, force?: boolean, initial?: boolean, averageFrameMs?: number }} [meta]
- *  reinitialize: default true; resize & reinit background if not explicitly false.
+ * @param {{ reinitialize?: boolean, force?: boolean, initial?: boolean, averageFrameMs?: number, workMs?: number }} [meta]
+ *  reinitialize: default true; apply DPR / starfield changes to the live canvas & background if not explicitly false.
  *  force: ignore early-return when level unchanged.
  *  initial: treated like force but annotated for logging context.
- *  averageFrameMs: optional diagnostic used in log message.
+ *  averageFrameMs / workMs: optional diagnostics used in the log message.
  */
 export function applyPerformanceProfile(game, level, meta = {}) {
   const prevLevel = game._performanceLevel;
+  const prevDprOverride = game._dprOverride;
   const shouldForce = meta.force === true || meta.initial === true;
   if (!shouldForce && level === prevLevel) return;
 
@@ -60,13 +63,15 @@ export function applyPerformanceProfile(game, level, meta = {}) {
   }
 
   if (meta.reinitialize !== false) {
-    try {
-      game.resizeCanvas();
-    } catch {
-      /* ignore */
+    if (prevDprOverride !== game._dprOverride) {
+      try {
+        game.resizeCanvas();
+      } catch {
+        /* ignore */
+      }
     }
     try {
-      initBackgroundLifecycle(game, { preservePalette: true });
+      adjustBackgroundQuality(game);
     } catch {
       /* ignore */
     }
@@ -74,7 +79,8 @@ export function applyPerformanceProfile(game, level, meta = {}) {
 
   if (level !== prevLevel && typeof console !== "undefined" && console.info) {
     const avg = typeof meta.averageFrameMs === "number" ? meta.averageFrameMs.toFixed(1) : null;
-    const suffix = avg ? ` (avg ${avg}ms)` : "";
+    const work = typeof meta.workMs === "number" ? meta.workMs.toFixed(1) : null;
+    const suffix = avg ? ` (avg frame ${avg}ms${work ? `, work ${work}ms` : ""})` : "";
     console.info(`[Performance] Adjusted to level ${level}${suffix}`);
   }
 }

@@ -1,10 +1,12 @@
 import { CONFIG } from "../constants.js";
 import { BackgroundManager } from "./BackgroundManager.js";
+import { ScorePopup } from "../entities/ScorePopup.js";
 import { isOnscreen } from "../utils/bounds.js";
 
 /**
  * @typedef {Object} RenderGameContext
  * @property {CanvasRenderingContext2D} ctx
+ * @property {{ width?:number, height?:number, dpr?:number }} [view] Logical (CSS pixel) viewport used for culling; dpr for crisp text sprites
  * @property {{ drawBackground?:()=>void }} [__bg]
  * @property {any[]} asteroids
  * @property {any[]} bullets
@@ -16,12 +18,21 @@ import { isOnscreen } from "../utils/bounds.js";
  * @property {any} sprites
  * @property {number} timeSec
  * @property {number} [_lastDtSec]
- * @property {{text:string,x:number,y:number,life:number,maxLife:number,fontSize?:number,fontWeight?:string,glow?:boolean,glowColor?:string,glowBlur?:number,color?:string,stroke?:string}[]} [scorePopups]
+ * @property {number} [_frameDtSec] Real frame delta (seconds) for render-side animations
+ * @property {import('../entities/ScorePopup.js').ScorePopupData[]} [scorePopups]
  * @property {()=>void} [drawBackground]
  */
 /**
  * RenderManager – stateless helpers enforcing deterministic back→front draw order.
  * Layer order: background, asteroids, bullets, collectible stars, explosions, particles, player, engine trail, score popups.
+ *
+ * Extrapolation: every entity pass accepts `extrapolateSec` (seconds past the last simulated
+ * state, from GameLoop alpha). Linear motion is projected forward by that amount at draw time
+ * only; simulation state is never touched, so seeded runs stay deterministic while 120 Hz+
+ * displays receive smooth per-frame motion.
+ *
+ * Culling uses the logical viewport (`game.view`, CSS pixels) because entity coordinates live in
+ * that space; the canvas backing store is scaled by DPR and would over-estimate the visible area.
  */
 export class RenderManager {
   /**
@@ -30,12 +41,13 @@ export class RenderManager {
    * @param {any[]} asteroids
    * @param {number} viewWidth
    * @param {number} viewHeight
+   * @param {number} [extrapolateSec=0]
    */
-  static drawAsteroids(ctx, asteroids, viewWidth, viewHeight) {
+  static drawAsteroids(ctx, asteroids, viewWidth, viewHeight, extrapolateSec = 0) {
     for (let i = 0; i < asteroids.length; i++) {
       const asteroid = asteroids[i];
       if (!isOnscreen(asteroid, viewWidth, viewHeight, 32)) continue;
-      asteroid.draw(ctx);
+      asteroid.draw(ctx, extrapolateSec);
     }
   }
 
@@ -46,8 +58,9 @@ export class RenderManager {
    * @param {any} sprites
    * @param {number} viewWidth
    * @param {number} viewHeight
+   * @param {number} [extrapolateSec=0]
    */
-  static drawBullets(ctx, bullets, sprites, viewWidth, viewHeight) {
+  static drawBullets(ctx, bullets, sprites, viewWidth, viewHeight, extrapolateSec = 0) {
     const sprNormal = sprites && sprites.bullet;
     const sprUpgraded = sprites && /** @type {any} */ (sprites).bulletUpgraded;
     const trail = (sprites && sprites.bulletTrail) || CONFIG.BULLET.TRAIL;
@@ -60,13 +73,14 @@ export class RenderManager {
           /** @type {any} */ (b).style === "upgraded" && sprUpgraded ? sprUpgraded : sprNormal;
         const sw = useUp.width;
         const sh = useUp.height;
-        ctx.drawImage(useUp, 0, 0, sw, sh, b.x, b.y, b.width, dh);
+        const y = extrapolateSec > 0 ? b.y - b.speed * extrapolateSec : b.y;
+        ctx.drawImage(useUp, 0, 0, sw, sh, b.x, y, b.width, dh);
       }
     } else {
       for (let i = 0; i < bullets.length; i++) {
         const bullet = bullets[i];
         if (!isOnscreen(bullet, viewWidth, viewHeight, trail || 8)) continue;
-        bullet.draw(ctx);
+        bullet.draw(ctx, extrapolateSec);
       }
     }
   }
@@ -76,7 +90,7 @@ export class RenderManager {
    * @param {CanvasRenderingContext2D} ctx
    * @param {any[]} stars
    * @param {any} sprites
-   * @param {number} [timeSec=0]
+   * @param {number} [extrapolateSec=0]
    * @param {number} [viewWidth=Infinity]
    * @param {number} [viewHeight=Infinity]
    */
@@ -84,7 +98,7 @@ export class RenderManager {
     ctx,
     stars,
     sprites,
-    timeSec = 0,
+    extrapolateSec = 0,
     viewWidth = Infinity,
     viewHeight = Infinity
   ) {
@@ -98,22 +112,30 @@ export class RenderManager {
         const s = /** @type {any} */ (stars[i]);
         if (!isOnscreen(s, viewWidth, viewHeight, base || 0)) continue;
         const baseSize = Math.max(1, Math.min(s.width, s.height));
-        let dw = baseSize,
-          dh = baseSize;
         const cx = s.x + s.width / 2;
-        const cy = s.y + s.height / 2;
+        const cy = s.y + s.height / 2 + (extrapolateSec > 0 ? s.speed * extrapolateSec : 0);
         let spr = starSpr;
         if (s.isRed) {
           if (palette === "blue" && starBlueSpr) spr = starBlueSpr;
           else if (starRedSpr) spr = starRedSpr;
         }
-        ctx.drawImage(spr, 0, 0, base, base, cx - dw / 2, cy - dh / 2, dw, dh);
+        ctx.drawImage(
+          spr,
+          0,
+          0,
+          base,
+          base,
+          cx - baseSize / 2,
+          cy - baseSize / 2,
+          baseSize,
+          baseSize
+        );
       }
     } else {
       for (let i = 0; i < stars.length; i++) {
         const star = stars[i];
         if (!isOnscreen(star, viewWidth, viewHeight, 24)) continue;
-        star.draw(ctx, timeSec);
+        star.draw(ctx, extrapolateSec);
       }
     }
   }
@@ -138,89 +160,56 @@ export class RenderManager {
    * @param {any[]} particles
    * @param {number} viewWidth
    * @param {number} viewHeight
+   * @param {number} [extrapolateSec=0]
    */
-  static drawParticles(ctx, particles, viewWidth, viewHeight) {
+  static drawParticles(ctx, particles, viewWidth, viewHeight, extrapolateSec = 0) {
     for (let i = 0; i < particles.length; i++) {
       const particle = particles[i];
       if (!isOnscreen(particle, viewWidth, viewHeight, 16)) continue;
-      particle.draw(ctx);
+      particle.draw(ctx, extrapolateSec);
     }
     ctx.globalAlpha = 1;
   }
 
   /**
    * Composite full frame in fixed order (background→asteroids→bullets→stars→explosions→particles→player→trail→score popups).
-   * Removes expired score popups in-place.
+   * Score popups are advanced, culled and drawn by ScorePopup.drawAll (pre-rendered text sprites).
    * @param {RenderGameContext} game
+   * @param {number} [extrapolateSec=0] Seconds past the last simulated state to project linear motion.
    */
-  static draw(game) {
+  static draw(game, extrapolateSec = 0) {
     if (typeof game.drawBackground === "function") {
       game.drawBackground();
     }
-    const canvas =
-      game.ctx && game.ctx.canvas
-        ? game.ctx.canvas
-        : /** @type {{ width?:number, height?:number }} */ ({});
-    const viewWidth = typeof canvas.width === "number" ? canvas.width : Infinity;
-    const viewHeight = typeof canvas.height === "number" ? canvas.height : Infinity;
+    const view = game.view;
+    const viewWidth =
+      view && typeof view.width === "number" && view.width > 0 ? view.width : Infinity;
+    const viewHeight =
+      view && typeof view.height === "number" && view.height > 0 ? view.height : Infinity;
+    const t = extrapolateSec > 0 ? extrapolateSec : 0;
 
-    RenderManager.drawAsteroids(game.ctx, game.asteroids, viewWidth, viewHeight);
-    RenderManager.drawBullets(game.ctx, game.bullets, game.sprites, viewWidth, viewHeight);
+    RenderManager.drawAsteroids(game.ctx, game.asteroids, viewWidth, viewHeight, t);
+    RenderManager.drawBullets(game.ctx, game.bullets, game.sprites, viewWidth, viewHeight, t);
     RenderManager.drawCollectibleStars(
       game.ctx,
       game.stars,
       game.sprites,
-      game.timeSec,
+      t,
       viewWidth,
       viewHeight
     );
     RenderManager.drawExplosions(game.ctx, game.explosions, viewWidth, viewHeight);
-    RenderManager.drawParticles(game.ctx, game.particles, viewWidth, viewHeight);
+    RenderManager.drawParticles(game.ctx, game.particles, viewWidth, viewHeight, t);
     if (game.player && typeof game.player.draw === "function") {
-      game.player.draw(game.ctx);
+      game.player.draw(game.ctx, t);
     }
     if (game.engineTrail && typeof game.engineTrail.draw === "function") {
-      game.engineTrail.draw(game.ctx);
+      game.engineTrail.draw(game.ctx, t);
     }
     if (game.scorePopups && game.scorePopups.length > 0) {
-      const arr = game.scorePopups;
-      const ctx = game.ctx;
-      const dtSec = game._lastDtSec || 1 / 60;
-      let w = 0;
-      for (let r = 0, n = arr.length; r < n; r++) {
-        const p = arr[r];
-        p.life += dtSec;
-        if (p.life >= p.maxLife) {
-          continue;
-        }
-        if (!isOnscreen(p, viewWidth, viewHeight, 48)) {
-          arr[w++] = p;
-          continue;
-        }
-        const t = p.life / p.maxLife;
-        ctx.save();
-        const fontSize = p.fontSize || 18;
-        const fontWeight = p.fontWeight || "700";
-        ctx.font = `${fontWeight} ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        const rise = -20 * t;
-        ctx.globalAlpha = 1 - t;
-        if (p.glow) {
-          ctx.shadowColor = p.glowColor || p.color || "#fff";
-          ctx.shadowBlur = p.glowBlur || 12;
-        }
-        if (p.stroke) {
-          ctx.strokeStyle = p.stroke;
-          ctx.lineWidth = Math.max(1, (fontSize / 14) | (0 + 1));
-          ctx.strokeText(p.text, p.x, p.y + rise);
-        }
-        ctx.fillStyle = p.color || "#fff";
-        ctx.fillText(p.text, p.x, p.y + rise);
-        ctx.restore();
-        arr[w++] = p;
-      }
-      if (w !== arr.length) arr.length = w;
+      const dtSec = game._frameDtSec || game._lastDtSec || 1 / 60;
+      const dpr = view && typeof view.dpr === "number" && view.dpr > 0 ? view.dpr : 1;
+      ScorePopup.drawAll(game.ctx, game.scorePopups, dtSec, viewWidth, viewHeight, dpr);
     }
   }
 }

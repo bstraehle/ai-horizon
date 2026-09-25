@@ -4,6 +4,7 @@ import { Star } from "../entities/Star.js";
 import { Explosion } from "../entities/Explosion.js";
 import { EngineTrail } from "../entities/EngineTrail.js";
 import { Nebula } from "../entities/Nebula.js";
+import { Particle } from "../entities/Particle.js";
 
 /**
  * SpriteManager – pre-renders bullet + trail and star variants to offscreen canvases (performance cache).
@@ -176,6 +177,7 @@ export class SpriteManager {
     if (typeof Explosion.preloadSprites === "function") Explosion.preloadSprites();
     if (typeof EngineTrail.preloadSprites === "function") EngineTrail.preloadSprites();
     if (typeof Nebula.preloadSprites === "function") Nebula.preloadSprites();
+    if (typeof Particle.preloadSprites === "function") Particle.preloadSprites();
 
     return atlas;
   }

@@ -1,9 +1,15 @@
 // @ts-nocheck
 import { CONFIG } from "../constants.js";
 import { BackgroundManager } from "../managers/BackgroundManager.js";
-import { getGameContext } from "../core/GameContext.js";
+import { getGameContext, fillGameContext } from "../core/GameContext.js";
 import { RNG } from "../utils/RNG.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
+
+/**
+ * Per-game reusable draw snapshot so the per-frame background draw allocates nothing.
+ * @type {WeakMap<object, import('../core/GameContext.js').GameContext & { suppressNebula?: boolean }>}
+ */
+const DRAW_CONTEXTS = new WeakMap();
 
 /**
  * Initialize background layers (nebula configs + starfield) using current game context.
@@ -37,6 +43,9 @@ export function initBackgroundLifecycle(game, options = {}) {
   const ctx = getGameContext(game);
   ctx.starfieldScale = game._starfieldScale;
   ctx.isLowPower = game._isLowPowerMode;
+  // Layout generation is part of the seeded run (it happens at deterministic points); only the
+  // per-frame draw path uses the visual RNG.
+  ctx.rng = game.rng;
   if (options.preservePalette === true) {
     ctx.preservePalette = true;
   }
@@ -63,19 +72,44 @@ export function initBackgroundLifecycle(game, options = {}) {
 }
 
 /**
+ * Apply the current performance tier to the existing background without regenerating it.
+ *
+ * Adjusts starfield density in place (append/truncate) using the visual RNG, so a tier change
+ * mid-game neither re-rolls the sky nor touches the simulation RNG. No-op before the background
+ * exists (startGame initialises it with the tier already applied).
+ *
+ * @param {AIHorizon} game Game instance whose `starField` should reflect `_starfieldScale`.
+ */
+export function adjustBackgroundQuality(game) {
+  if (!game || !game.starField || !game.view) return;
+  BackgroundManager.setStarfieldDensity({
+    view: game.view,
+    isMobile: !!game._isMobile,
+    starfieldScale: game._starfieldScale,
+    rng: game.visualRng || game.rng,
+    background: { starField: game.starField },
+  });
+}
+
+/**
  * Draw only the background layers (nebula and starfield) for the current frame.
  *
- * Builds a GameContext snapshot and delegates to BackgroundManager.draw for actual rendering.
- * Supports optional nebula suppression for performance or visual effect purposes.
+ * Refreshes a per-game GameContext snapshot in place (no per-frame allocation) and delegates to
+ * BackgroundManager.draw for actual rendering. Supports optional nebula suppression for
+ * performance or visual effect purposes.
  *
  * @param {AIHorizon} game Game instance containing background data and rendering context.
  * @param {{ suppressNebula?: boolean }} [options] Optional rendering flags.
  *   suppressNebula: If true, skips nebula layer rendering (useful during transitions).
  */
 export function drawBackgroundLifecycle(game, options) {
-  const ctx = getGameContext(game);
-  if (options && options.suppressNebula) {
-    /** @type {any} */ (ctx).suppressNebula = true;
+  let ctx = DRAW_CONTEXTS.get(game);
+  if (!ctx) {
+    ctx = getGameContext(game);
+    DRAW_CONTEXTS.set(game, ctx);
+  } else {
+    fillGameContext(game, ctx);
   }
+  ctx.suppressNebula = !!(options && options.suppressNebula);
   BackgroundManager.draw(/** @type {any} */ (ctx));
 }

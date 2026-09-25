@@ -1,4 +1,5 @@
 import { CONFIG, PI2 } from "../constants.js";
+import { SpriteCache } from "../utils/SpriteCache.js";
 
 /**
  * Nebula – procedural multi-blob soft glow backgrounds (parallax-lite layer).
@@ -28,6 +29,8 @@ export class Nebula {
    * @property {number} wobbleAmp
    * @property {number} wobbleRate
    * @property {number} wobbleOffset
+   * @property {{ canvas: OffscreenCanvas | HTMLCanvasElement, size: number, halfSize: number } | null} [_sprite] Render cache: resolved sprite for `_spriteR`
+   * @property {number} [_spriteR] Render cache: radius the cached sprite was resolved for
    */
 
   /**
@@ -175,33 +178,93 @@ export class Nebula {
   }
 
   /**
-   * Render nebula layers (each blob as radial gradient with additive blending).
+   * Render nebula layers (each blob as a cached radial-gradient sprite with additive blending).
    *
-   * Blend Mode: uses globalCompositeOperation 'lighter' for glow accumulation.
+   * Blend Mode: uses globalCompositeOperation 'lighter' for glow accumulation (set once per call).
+   * Transforms: each blob's translate·rotate·scale is composed with the context's current base
+   * transform and applied via a single `setTransform`, avoiding a save/restore pair per blob.
+   * Contexts without `getTransform` (older browsers, test doubles) use the save/restore path.
+   * Sprites are resolved once per blob and cached on the blob (`_sprite`), so steady-state draws
+   * build no strings.
    * Fallback: if no blobs property, synthesizes single blob (legacy compatibility).
    *
-   * @param {CanvasRenderingContext2D} ctx 2D context.
+   * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} ctx 2D context.
    * @param {NebulaConfig[]} nebulaConfigs Array from init().
    */
   static draw(ctx, nebulaConfigs) {
+    const anyCtx = /** @type {any} */ (ctx);
+    if (typeof anyCtx.getTransform !== "function" || typeof anyCtx.setTransform !== "function") {
+      Nebula._drawWithSaveRestore(ctx, nebulaConfigs);
+      return;
+    }
+    const base = anyCtx.getTransform();
+    const ba = base.a;
+    const bb = base.b;
+    const bc = base.c;
+    const bd = base.d;
+    const be = base.e;
+    const bf = base.f;
+    const prevComposite = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = "lighter";
+    for (let n = 0; n < nebulaConfigs.length; n++) {
+      const nebula = nebulaConfigs[n];
+      const blobs = nebula.blobs || Nebula._legacyBlobs(nebula);
+      for (let i = 0; i < blobs.length; i++) {
+        const b = blobs[i];
+        const r = b.r || nebula.r;
+        const sprite = Nebula._spriteForBlob(b, nebula, r);
+        const ox = nebula.x + (b.ox || 0);
+        const oy = nebula.y + (b.oy || 0);
+        const rot = b.rot || 0;
+        const sx = b.sx || 1;
+        const sy = b.sy || 1;
+        const cos = Math.cos(rot);
+        const sin = Math.sin(rot);
+        // blob = translate(ox,oy) · rotate(rot) · scale(sx,sy); compose with base on the left.
+        const a = cos * sx;
+        const bm = sin * sx;
+        const c = -sin * sy;
+        const d = cos * sy;
+        ctx.setTransform(
+          ba * a + bc * bm,
+          bb * a + bd * bm,
+          ba * c + bc * d,
+          bb * c + bd * d,
+          ba * ox + bc * oy + be,
+          bb * ox + bd * oy + bf
+        );
+        if (sprite) {
+          ctx.drawImage(
+            sprite.canvas,
+            -sprite.halfSize,
+            -sprite.halfSize,
+            sprite.size,
+            sprite.size
+          );
+        } else {
+          Nebula._drawBlob(ctx, nebula.color0, nebula.color1, r);
+        }
+      }
+    }
+    ctx.setTransform(ba, bb, bc, bd, be, bf);
+    ctx.globalCompositeOperation = prevComposite;
+  }
+
+  /**
+   * Legacy drawing path using save/translate/rotate/scale/restore per blob.
+   * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} ctx
+   * @param {NebulaConfig[]} nebulaConfigs
+   * @private
+   */
+  static _drawWithSaveRestore(ctx, nebulaConfigs) {
     ctx.save();
     for (const nebula of nebulaConfigs) {
-      const blobs = nebula.blobs || [
-        {
-          ox: 0,
-          oy: 0,
-          r: nebula.r,
-          rot: 0,
-          sx: 1,
-          sy: 1,
-        },
-      ];
+      const blobs = nebula.blobs || Nebula._legacyBlobs(nebula);
       for (const b of blobs) {
-        const sprite = Nebula._getSprite(nebula.color0, nebula.color1, b.r || nebula.r);
-        const offsetX = nebula.x + (b.ox || 0);
-        const offsetY = nebula.y + (b.oy || 0);
+        const r = b.r || nebula.r;
+        const sprite = Nebula._spriteForBlob(b, nebula, r);
         ctx.save();
-        ctx.translate(offsetX, offsetY);
+        ctx.translate(nebula.x + (b.ox || 0), nebula.y + (b.oy || 0));
         ctx.rotate(b.rot || 0);
         ctx.scale(b.sx || 1, b.sy || 1);
         if (sprite) {
@@ -214,12 +277,52 @@ export class Nebula {
             sprite.size
           );
         } else {
-          Nebula._drawBlob(ctx, nebula.color0, nebula.color1, b.r || nebula.r);
+          Nebula._drawBlob(ctx, nebula.color0, nebula.color1, r);
         }
         ctx.restore();
       }
     }
     ctx.restore();
+  }
+
+  /**
+   * Resolve (and cache on the blob) the sprite for a blob radius.
+   * @param {NebulaBlob} b
+   * @param {NebulaConfig} nebula
+   * @param {number} r
+   * @returns {{ canvas: OffscreenCanvas | HTMLCanvasElement, size: number, halfSize: number } | null}
+   * @private
+   */
+  static _spriteForBlob(b, nebula, r) {
+    if (b._sprite !== undefined && b._spriteR === r) return b._sprite;
+    const sprite = Nebula._getSprite(nebula.color0, nebula.color1, r);
+    b._sprite = sprite;
+    b._spriteR = r;
+    return sprite;
+  }
+
+  /**
+   * Single centered blob for configs predating the multi-blob model.
+   * @param {NebulaConfig} nebula
+   * @returns {NebulaBlob[]}
+   * @private
+   */
+  static _legacyBlobs(nebula) {
+    return [
+      {
+        baseOx: 0,
+        baseOy: 0,
+        ox: 0,
+        oy: 0,
+        r: nebula.r,
+        rot: 0,
+        sx: 1,
+        sy: 1,
+        wobbleAmp: 0,
+        wobbleRate: 0,
+        wobbleOffset: 0,
+      },
+    ];
   }
 
   /**
@@ -249,6 +352,8 @@ export class Nebula {
         ox: (b.ox || 0) * sx,
         oy: (b.oy || 0) * sy,
         r: (b.r || 0) * sAvg,
+        _sprite: undefined,
+        _spriteR: undefined,
       }));
       return {
         ...n,
@@ -290,7 +395,7 @@ export class Nebula {
    */
   static _getSprite(color0, color1, radius) {
     if (!Number.isFinite(radius) || radius <= 0) return null;
-    if (!Nebula._spriteCache) Nebula._spriteCache = new Map();
+    if (!Nebula._spriteCache) Nebula._spriteCache = new SpriteCache(128);
     const quantRadius = Nebula._quantizeRadius(radius);
     const key = `${color0}|${color1}|${quantRadius.toFixed(2)}`;
     const cached = Nebula._spriteCache.get(key);
@@ -351,6 +456,6 @@ export class Nebula {
   }
 }
 
-/** @type {Map<string, { canvas: OffscreenCanvas | HTMLCanvasElement, size: number, halfSize: number }> | undefined} */
+/** @type {SpriteCache<{ canvas: OffscreenCanvas | HTMLCanvasElement, size: number, halfSize: number }> | undefined} */
 Nebula._spriteCache = undefined;
 Nebula._RADIUS_STEP = 8;

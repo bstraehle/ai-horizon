@@ -1,4 +1,5 @@
 import { CONFIG } from "../constants.js";
+import { Particle } from "../entities/Particle.js";
 import { SpawnManager } from "../managers/SpawnManager.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
@@ -32,6 +33,8 @@ export const GameFactories = {
   },
   /**
    * Spawn an explosion entity & its particle cloud subject to performance budget.
+   * Particle grays are drawn from the RNG (keeps seeded runs reproducible) then snapped to the
+   * discrete palette so the shared particle sprite cache stays small.
    * @param {AIHorizon} game
    * @param {number} x
    * @param {number} y
@@ -53,7 +56,9 @@ export const GameFactories = {
       const vy = (rng.nextFloat() - 0.5) * CONFIG.EXPLOSION.PARTICLE_SPEED_VAR;
       const size =
         rng.range(0, CONFIG.EXPLOSION.PARTICLE_SIZE_VARIATION) + CONFIG.EXPLOSION.PARTICLE_SIZE_MIN;
-      const gray = rng.range(40, 80);
+      const gray = Particle.quantizeGray(
+        rng.range(CONFIG.EXPLOSION.PARTICLE_GRAY_MIN, CONFIG.EXPLOSION.PARTICLE_GRAY_MAX)
+      );
       particles.push(
         particlePool.acquire(
           x,

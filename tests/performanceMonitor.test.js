@@ -113,6 +113,59 @@ describe("PerformanceMonitor", () => {
     expect(events.map((e) => e.level)).toEqual([1, 0]);
   });
 
+  it("escalates on sustained main-thread work even when frame deltas look healthy", () => {
+    const events = [];
+    const monitor = new PerformanceMonitor({
+      levels: [{ thresholdMs: 20, sampleWindow: 4, cooldownFrames: 0 }],
+      workBudgetMs: 16,
+      workEscalateFactor: 0.85,
+      onLevelChange: (level, meta) => events.push({ level, meta }),
+    });
+    // 120 Hz display: 8.3 ms deltas never exceed the 20 ms threshold, but CPU work is 15 ms/frame.
+    for (let i = 0; i < 4; i++) monitor.sample(8.3, { active: true, workMs: 15 });
+    expect(monitor.level).toBe(1);
+    expect(events[0].meta.workMs).toBeCloseTo(15, 5);
+  });
+
+  it("does not escalate on work alone while work stays under the headroom factor", () => {
+    const monitor = new PerformanceMonitor({
+      levels: [{ thresholdMs: 20, sampleWindow: 4, cooldownFrames: 0 }],
+      workBudgetMs: 16,
+      workEscalateFactor: 0.85,
+    });
+    for (let i = 0; i < 8; i++) monitor.sample(8.3, { active: true, workMs: 12 });
+    expect(monitor.level).toBe(0);
+  });
+
+  it("requires both signals to be healthy before recovering", () => {
+    const monitor = new PerformanceMonitor({
+      levels: [{ thresholdMs: 20, sampleWindow: 4, cooldownFrames: 0 }],
+      recoveryThresholdFactor: 0.9,
+      recoveryCooldownFrames: 0,
+      workBudgetMs: 16,
+      workRecoverFactor: 0.55,
+    });
+    for (let i = 0; i < 4; i++) monitor.sample(25, { active: true, workMs: 15 });
+    expect(monitor.level).toBe(1);
+    // Frames recovered but CPU work still above the recovery factor (8.8 ms): stay at level 1.
+    for (let i = 0; i < 8; i++) monitor.sample(10, { active: true, workMs: 12 });
+    expect(monitor.level).toBe(1);
+    for (let i = 0; i < 4; i++) monitor.sample(10, { active: true, workMs: 5 });
+    expect(monitor.level).toBe(0);
+  });
+
+  it("frames without work samples behave exactly as before (frame-delta only)", () => {
+    const monitor = new PerformanceMonitor({
+      levels: [{ thresholdMs: 10, sampleWindow: 3, cooldownFrames: 0 }],
+      recoveryThresholdFactor: 0.9,
+      recoveryCooldownFrames: 0,
+    });
+    for (let i = 0; i < 3; i++) monitor.sample(12, { active: true });
+    expect(monitor.level).toBe(1);
+    for (let i = 0; i < 3; i++) monitor.sample(5, { active: true });
+    expect(monitor.level).toBe(0);
+  });
+
   it("continues sampling at max level and recovers from it", () => {
     const monitor = new PerformanceMonitor({
       levels: [

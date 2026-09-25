@@ -1,7 +1,14 @@
 import { CONFIG } from "../constants.js";
 import { Background } from "../entities/Background.js";
+import { BackgroundLayer } from "../entities/BackgroundLayer.js";
 import { Nebula } from "../entities/Nebula.js";
 import { StarField } from "../entities/StarField.js";
+
+/**
+ * Cached gradient + nebula layer per main context (see BackgroundLayer).
+ * @type {WeakMap<object, BackgroundLayer>}
+ */
+const LAYERS = new WeakMap();
 /** @typedef {import('../types.js').RNGLike} RNGLike */
 
 /**
@@ -45,7 +52,12 @@ import { StarField } from "../entities/StarField.js";
 
 /**
  * BackgroundManager centralises creation, proportional resize and draw of the parallax background.
- * All methods are pure w.r.t their inputs (no mutation of passed objects) except for direct drawing.
+ * All methods are pure w.r.t their inputs (no mutation of passed objects) except for direct drawing
+ * and `setStarfieldDensity`, which deliberately adjusts an existing starfield in place.
+ *
+ * Star budget follows the platform (`isMobile`); the low-power hint only affects nebula density,
+ * so adaptive quality tiers scale the desktop starfield gradually rather than collapsing it to the
+ * mobile budget.
  */
 export class BackgroundManager {
   /**
@@ -86,8 +98,20 @@ export class BackgroundManager {
       BackgroundManager._nebulaCurrentPalette = palette;
       state.nebulaConfigs = Nebula.init(width, height, mobileHint, rng, palette);
     }
-    state.starField = StarField.init(width, height, rng, mobileHint, scale);
+    state.starField = StarField.init(width, height, rng, isMobile, scale);
     return state;
+  }
+
+  /**
+   * Adjust starfield density in place for a new quality scale (adaptive performance tiers).
+   * Unlike `init`, nothing is regenerated: existing stars keep their positions.
+   * @param {{ view: ViewSize, isMobile: boolean, starfieldScale?: number, rng?: RNGLike, background: { starField: any } }} ctxObj
+   */
+  static setStarfieldDensity(ctxObj) {
+    const { view, isMobile, starfieldScale, rng, background } = ctxObj;
+    if (!background || !background.starField || !view) return;
+    const scale = typeof starfieldScale === "number" ? starfieldScale : 1;
+    StarField.setDensity(background.starField, view.width, view.height, rng, isMobile, scale);
   }
 
   /**
@@ -125,6 +149,10 @@ export class BackgroundManager {
 
   /**
    * Draw all background layers. Paused state freezes star field animation time.
+   *
+   * The gradient and nebula come from a cached reduced-resolution layer (one drawImage per frame,
+   * re-rendered every few frames); when no offscreen canvas is available they are drawn directly.
+   * The starfield moves quickly and is always drawn per frame on the main context.
    * @param {BackgroundDrawContext} ctxObj
    */
   static draw(ctxObj) {
@@ -136,13 +164,35 @@ export class BackgroundManager {
       suppressNebula,
       background: { nebulaConfigs, starField },
     } = ctxObj;
-    Background.draw(ctx, width, height);
-    if (!suppressNebula && nebulaConfigs && (ctxObj.running || ctxObj.paused || ctxObj.gameOver)) {
-      Nebula.draw(ctx, nebulaConfigs);
+    const showNebula = !!(
+      !suppressNebula &&
+      nebulaConfigs &&
+      (ctxObj.running || ctxObj.paused || ctxObj.gameOver)
+    );
+    const layer = BackgroundManager._layerFor(ctx);
+    if (!layer || !layer.draw(ctx, width, height, nebulaConfigs, showNebula)) {
+      Background.draw(ctx, width, height);
+      if (showNebula) Nebula.draw(ctx, nebulaConfigs);
     }
     const timeSec = typeof ctxObj.timeSec === "number" ? ctxObj.timeSec : (animTime || 0) / 1000;
     const dtSec = typeof ctxObj.dtSec === "number" ? ctxObj.dtSec : CONFIG.TIME.DEFAULT_DT;
     StarField.draw(ctx, width, height, starField, timeSec, paused, dtSec, ctxObj.rng);
+  }
+
+  /**
+   * Get (or lazily create) the cached background layer bound to a main context.
+   * @param {CanvasRenderingContext2D} ctx
+   * @returns {BackgroundLayer | null}
+   * @private
+   */
+  static _layerFor(ctx) {
+    if (!ctx || typeof ctx !== "object") return null;
+    let layer = LAYERS.get(ctx);
+    if (!layer) {
+      layer = new BackgroundLayer();
+      LAYERS.set(ctx, layer);
+    }
+    return layer;
   }
 }
 

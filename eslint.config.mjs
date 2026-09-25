@@ -10,7 +10,7 @@ import eslintConfigPrettier from "eslint-config-prettier";
 export default [
   // Always ignore build artifacts and deps
   {
-    ignores: ["dist/**", "node_modules/**"],
+    ignores: ["dist/**", "node_modules/**", ".baseline/**"],
   },
   // Base recommended rules
   js.configs.recommended,

@@ -1,4 +1,5 @@
 import { CONFIG, PI2 } from "../constants.js";
+import { SpriteCache } from "../utils/SpriteCache.js";
 
 /**
  * Particle – generic visual effect sprite (glow circle) used for explosions, dust, etc.
@@ -8,6 +9,12 @@ import { CONFIG, PI2 } from "../constants.js";
  *  - Optional gravity applied each update (vy += GRAVITY * dt).
  *
  * Pool Friendly: purely numeric + color string. Reset overwrites all fields.
+ *
+ * Rendering / Performance:
+ *  - The glow sprite is resolved once per spawn (constructor / reset) from a bounded shared cache
+ *    keyed by quantized size + color, so `draw` is a single `drawImage` with no string building.
+ *  - Callers must supply colors from a small discrete palette (see CONFIG.EXPLOSION.PARTICLE_GRAY_*);
+ *    a continuous color would create one cached canvas per particle.
  */
 export class Particle {
   /**
@@ -30,6 +37,8 @@ export class Particle {
     this.maxLife = maxLife;
     this.size = size;
     this.color = color;
+    /** @private @type {{ canvas: OffscreenCanvas | HTMLCanvasElement, halfSize: number } | null} */
+    this._sprite = Particle._getSprite(size, color);
   }
 
   /**
@@ -46,15 +55,18 @@ export class Particle {
   /**
    * Render particle as soft glowing circle (shadowBlur sized by radius).
    * @param {CanvasRenderingContext2D} ctx 2D context.
+   * @param {number} [extrapolateSec=0] Seconds past the last simulated state (projects velocity).
    */
-  draw(ctx) {
+  draw(ctx, extrapolateSec = 0) {
     const alphaRaw = this.maxLife > 0 ? this.life / this.maxLife : 0;
     const alpha = Math.max(0, Math.min(1, alphaRaw));
     if (alpha <= 0) return;
-    const sprite = Particle._getSprite(this.size, this.color);
+    const x = extrapolateSec > 0 ? this.x + this.vx * extrapolateSec : this.x;
+    const y = extrapolateSec > 0 ? this.y + this.vy * extrapolateSec : this.y;
+    const sprite = this._sprite;
     if (sprite) {
       ctx.globalAlpha = alpha;
-      ctx.drawImage(sprite.canvas, this.x - sprite.halfSize, this.y - sprite.halfSize);
+      ctx.drawImage(sprite.canvas, x - sprite.halfSize, y - sprite.halfSize);
       ctx.globalAlpha = 1;
       return;
     }
@@ -64,7 +76,7 @@ export class Particle {
     ctx.shadowBlur = this.size;
     ctx.fillStyle = this.color;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, this.size, 0, PI2);
+    ctx.arc(x, y, this.size, 0, PI2);
     ctx.fill();
     ctx.restore();
   }
@@ -89,6 +101,74 @@ export class Particle {
     this.maxLife = maxLife;
     this.size = size;
     this.color = color;
+    this._sprite = Particle._getSprite(size, color);
+  }
+
+  /**
+   * Snap an explosion gray level to the discrete palette (CONFIG.EXPLOSION.PARTICLE_GRAY_*), so the
+   * number of distinct particle colors – and therefore cached sprites – stays small and bounded.
+   * @param {number} gray Raw lightness percentage (e.g. from the RNG).
+   * @returns {number} Quantized lightness percentage within [GRAY_MIN, GRAY_MAX].
+   */
+  static quantizeGray(gray) {
+    const cfg = CONFIG.EXPLOSION;
+    const min = cfg.PARTICLE_GRAY_MIN;
+    const max = cfg.PARTICLE_GRAY_MAX;
+    const step = cfg.PARTICLE_GRAY_STEP > 0 ? cfg.PARTICLE_GRAY_STEP : 1;
+    const clamped = Math.max(min, Math.min(max, gray));
+    return Math.min(max, min + Math.round((clamped - min) / step) * step);
+  }
+
+  /**
+   * Pre-render the sprites the game is expected to use (explosion grays, star burst colors, crater
+   * dust) across their quantized size ranges so the first explosions do not pay canvas creation.
+   * @param {Array<{ colors: string[], sizeMin: number, sizeMax: number }>} [specs] Override palette specs.
+   */
+  static preloadSprites(specs) {
+    const list = Array.isArray(specs) && specs.length ? specs : Particle._defaultPreloadSpecs();
+    const step = Particle._SIZE_STEP;
+    for (const spec of list) {
+      const from = Particle._quantizeSize(spec.sizeMin);
+      const to = Particle._quantizeSize(spec.sizeMax);
+      for (const color of spec.colors) {
+        for (let size = from; size <= to + 1e-9; size += step) Particle._getSprite(size, color);
+      }
+    }
+  }
+
+  /**
+   * @returns {Array<{ colors: string[], sizeMin: number, sizeMax: number }>}
+   * @private
+   */
+  static _defaultPreloadSpecs() {
+    const ex = CONFIG.EXPLOSION;
+    const grays = [];
+    for (let g = ex.PARTICLE_GRAY_MIN; g <= ex.PARTICLE_GRAY_MAX; g += ex.PARTICLE_GRAY_STEP) {
+      grays.push(`hsl(0, 0%, ${g}%)`);
+    }
+    const st = CONFIG.STAR;
+    const puff = CONFIG.ASTEROID.CRATER_EMBOSS;
+    return [
+      {
+        colors: grays,
+        sizeMin: ex.PARTICLE_SIZE_MIN,
+        sizeMax: ex.PARTICLE_SIZE_MIN + ex.PARTICLE_SIZE_VARIATION,
+      },
+      {
+        colors: [
+          CONFIG.COLORS.STAR.BASE,
+          CONFIG.COLORS.STAR_RED.BASE,
+          CONFIG.COLORS.STAR_BLUE.BASE,
+        ],
+        sizeMin: st.PARTICLE_SIZE_MIN,
+        sizeMax: st.PARTICLE_SIZE_MIN + st.PARTICLE_SIZE_VARIATION,
+      },
+      {
+        colors: [puff.PUFF_COLOR],
+        sizeMin: puff.PUFF_SIZE_MIN,
+        sizeMax: puff.PUFF_SIZE_MIN + puff.PUFF_SIZE_VAR,
+      },
+    ];
   }
 
   /**
@@ -99,7 +179,7 @@ export class Particle {
    */
   static _getSprite(size, color) {
     if (!Number.isFinite(size) || size <= 0 || !color) return null;
-    if (!Particle._spriteCache) Particle._spriteCache = new Map();
+    if (!Particle._spriteCache) Particle._spriteCache = new SpriteCache(Particle._CACHE_MAX);
     const quantSize = Particle._quantizeSize(size);
     const key = `${quantSize.toFixed(2)}|${String(color)}`;
     const cached = Particle._spriteCache.get(key);
@@ -130,8 +210,7 @@ export class Particle {
     offCtx.fill();
 
     const sprite = { canvas, halfSize: spriteSize / 2 };
-    Particle._spriteCache.set(key, sprite);
-    return sprite;
+    return Particle._spriteCache.set(key, sprite);
   }
 
   /**
@@ -145,8 +224,11 @@ export class Particle {
   }
 }
 
-/** @type {Map<string, { canvas: OffscreenCanvas | HTMLCanvasElement, halfSize: number }> | undefined} */
+/** @type {SpriteCache<{ canvas: OffscreenCanvas | HTMLCanvasElement, halfSize: number }> | undefined} */
 Particle._spriteCache = undefined;
 
 /** @type {number} */
 Particle._SIZE_STEP = 0.5;
+
+/** Upper bound on distinct cached particle sprites (safety net; palette keeps steady state ~100). */
+Particle._CACHE_MAX = 256;

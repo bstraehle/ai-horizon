@@ -38,14 +38,16 @@ export class Bullet {
   /**
    * Render bullet body + small trailing segment.
    * @param {CanvasRenderingContext2D} ctx 2D context (state saved/restored outside caller responsibility).
+   * @param {number} [extrapolateSec=0] Seconds past the last simulated state (projects upward motion).
    */
-  draw(ctx) {
+  draw(ctx, extrapolateSec = 0) {
+    const y = extrapolateSec > 0 ? this.y - this.speed * extrapolateSec : this.y;
     const sprite = Bullet._getSprite(this.width, this.height, this.style);
     if (sprite) {
-      ctx.drawImage(sprite.canvas, this.x - sprite.padX, this.y - sprite.padY);
+      ctx.drawImage(sprite.canvas, this.x - sprite.padX, y - sprite.padY);
       return;
     }
-    Bullet._drawBullet(ctx, this.width, this.height, this.x, this.y, this.style);
+    Bullet._drawBullet(ctx, this.width, this.height, this.x, y, this.style);
   }
 
   /**
