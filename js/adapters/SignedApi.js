@@ -10,10 +10,12 @@ let signedFetchPromise = null;
  *
  * The Cognito credential provider, SigV4 signer and their `@smithy` dependencies are over half of
  * the game bundle. They are only needed once a remote leaderboard / analysis request is actually
- * made, so `./Cognito.js` is loaded through a dynamic `import()` and the bundler emits it as a
- * separate chunk. The initial script the browser must download, parse and compile therefore
- * contains only game code; the SDK chunk is fetched in the background the first time it is needed
- * (typically the leaderboard load after startup, which was already asynchronous).
+ * made, so `./Cognito.js` is loaded through a dynamic `import()`. The build keeps that import
+ * external (`--external:*\/Cognito.js`) and bundles `Cognito.js` separately as an ES module next to
+ * `bundle.js`, so the initial script the browser must download, parse and compile contains only
+ * game code; the SDK file is fetched the first time it is needed (typically the leaderboard load
+ * after startup, which was already asynchronous). Flat, stable file names keep deployment a plain
+ * copy of `dist/` with no nested chunk directory.
  *
  * `loadSignedFetch` memoizes the in-flight/completed promise so concurrent callers share one load
  * and one client; a failed load is forgotten so a later call can retry.

@@ -41,7 +41,7 @@ For a production build, run `npm run build` and serve the generated `dist/` fold
 - `npm run ci:local` — run the full local verification suite
 - `npm run perf:bench -- http://localhost:8000` — headless-Chrome benchmark run (see below)
 
-The production build is an ES module bundle (`dist/bundle.js`, loaded with `<script type="module">`) plus lazily loaded chunks in `dist/chunks/`. The AWS SDK used for the remote leaderboard lives in those chunks and is only downloaded when a signed request is first needed, so the initial download contains game code only.
+The production build produces two flat script files in `dist/`: `bundle.js` (the game) and `Cognito.js` (the AWS SDK used for the remote leaderboard, loaded on demand via `import()` the first time a signed request is needed). The initial download therefore contains game code only, and deploying is still a plain copy of the `dist/` folder contents.
 
 ### Profiling flags
 
