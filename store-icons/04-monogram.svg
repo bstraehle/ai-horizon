@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#04050a"/><stop offset="0.5" stop-color="#090a12"/><stop offset="1" stop-color="#0c0d16"/></linearGradient>
+<radialGradient id="neb1"><stop offset="0" stop-color="#ff5c5c" stop-opacity="0.12"/><stop offset="1" stop-color="#ff5c5c" stop-opacity="0"/></radialGradient>
+<clipPath id="hull2"><path d="M0,-93.16 L120.96,66.28 L43.68,39.4 L0,52.84 L-43.68,39.4 L-120.96,66.28 Z"/></clipPath>
+<linearGradient id="bolt3" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#d9dee8"/><stop offset="0.5" stop-color="#ffffff"/><stop offset="1" stop-color="#f2f5fa"/></linearGradient>
+</defs>
+<rect width="512" height="512" fill="url(#bg)"/>
+<circle cx="256" cy="300" r="300" fill="url(#neb1)"/>
+<circle cx="48" cy="62" r="2.2" fill="#ffffff" opacity="0.85"/><circle cx="130" cy="38" r="1.6" fill="#dde6f4" opacity="0.6"/><circle cx="430" cy="54" r="2.6" fill="#ffffff" opacity="0.9"/><circle cx="470" cy="150" r="1.5" fill="#f3efe6" opacity="0.55"/><circle cx="36" cy="220" r="1.8" fill="#dde6f4" opacity="0.7"/><circle cx="488" cy="300" r="2" fill="#ffffff" opacity="0.6"/><circle cx="80" cy="420" r="1.6" fill="#f3efe6" opacity="0.55"/><circle cx="420" cy="452" r="2.4" fill="#dde6f4" opacity="0.8"/><circle cx="330" cy="486" r="1.4" fill="#ffffff" opacity="0.5"/><circle cx="200" cy="470" r="1.8" fill="#ffffff" opacity="0.6"/><circle cx="250" cy="30" r="1.4" fill="#dde6f4" opacity="0.5"/><circle cx="380" cy="120" r="1.2" fill="#ffffff" opacity="0.45"/>
+<g transform="translate(216 256) rotate(0)">
+<path d="M-28.56,52.84 L28.56,52.84 L0,130.12 Z" fill="#ff5c5c"/><path d="M-11.76,52.84 L11.76,52.84 L0,93.16 Z" fill="#ffffff" opacity="0.9"/>
+<path d="M0,-93.16 L120.96,66.28 L43.68,39.4 L0,52.84 L-43.68,39.4 L-120.96,66.28 Z" fill="#f6f7fa"/>
+<rect clip-path="url(#hull2)" x="3.36" y="-261.16" width="336" height="504" fill="#c6ccd6"/>
+<path d="M0,-93.16 L120.96,66.28 L43.68,39.4 L0,52.84 L-43.68,39.4 L-120.96,66.28 Z" fill="none" stroke="#0a0b0f" stroke-width="6.72" stroke-linejoin="round"/>
+<path d="M0,-42.76 L16.8,3.05 L-16.8,3.05 Z" fill="#15171d"/>
+</g>
+<rect transform="translate(392 250) rotate(0)" x="-23" y="-118" width="46" height="236" rx="23" fill="url(#bolt3)"/>
+<rect x="369" y="132" width="46" height="236" rx="23" fill="none" stroke="#0a0b0f" stroke-width="6.7"/>
+</svg>

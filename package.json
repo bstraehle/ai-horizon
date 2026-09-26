@@ -27,7 +27,8 @@
     "prepare": "husky || echo 'husky skipped'",
     "perf:bench": "node --experimental-websocket scripts/perf-bench.cjs",
     "shots": "node --experimental-websocket scripts/screenshot.cjs",
-    "shots:store": "node --experimental-websocket scripts/store-screenshots.cjs"
+    "shots:store": "node --experimental-websocket scripts/store-screenshots.cjs",
+    "icons": "node --experimental-websocket scripts/icon-concepts.cjs"
   },
   "vitest": {
     "setupFiles": "./tests/setup.js"
