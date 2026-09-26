@@ -23,8 +23,11 @@
  * (2s) → leaderboard (3s). No score is submitted (initials left empty). The default seed survived
  * ~50s on the 360x640 viewport; other seeds mostly die within 15s there.
  *
- * Output: H.264 yuv420p (bt709, faststart) at --fps; 360x640 @3x = 1080x1920 (9:16). Expect a
- * few minutes of rendering per minute of footage. ffmpeg is taken from --ffmpeg, $FFMPEG_PATH or
+ * Output: H.264 yuv420p (bt709, faststart) at --fps; 360x640 @3x = 1080x1920 (9:16). Frames are
+ * fed to ffmpeg as a plain numbered sequence at the output rate (held screens are hard-linked
+ * repeats), not through the concat demuxer, whose 1/25s image timebase quantises frame times and
+ * turns a 60 fps sequence into a 25 Hz stutter. Expect a few minutes of rendering per minute of
+ * footage. ffmpeg is taken from --ffmpeg, $FFMPEG_PATH or
  * PATH; otherwise a pinned static Windows build (gyan.dev 8.1.2 essentials, SHA-256 verified) is
  * downloaded once into .tools/ffmpeg (gitignored). On other platforms install ffmpeg first.
  */
@@ -175,7 +178,7 @@ async function main() {
   const ffmpeg = await resolveFfmpeg();
   fs.mkdirSync(path.dirname(out), { recursive: true });
   const framesDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-horizon-rec-"));
-  /** @type {{ file: string, duration: number }[]} */
+  /** @type {string[]} One entry per output frame (held frames repeat their file). */
   const frames = [];
   const frameMs = 1000 / fps;
   const url = `${base}/?seed=${seed}&autoplay=1&autodelay=600000&dpr=${scale}`;
@@ -189,12 +192,24 @@ async function main() {
     scale,
     chrome: opt("chrome", ""),
   });
+  // One numbered PNG per output frame; a held frame is repeated through hard links so ffmpeg
+  // reads a plain constant-rate image sequence and never has to resample timestamps.
+  const frameFile = (n) => path.join(framesDir, `f${String(n).padStart(6, "0")}.png`);
   const grab = async (duration) => {
     const res = await send("Page.captureScreenshot", { format: "png", optimizeForSpeed: true });
     if (!res.result) throw new Error(`screenshot failed: ${JSON.stringify(res.error)}`);
-    const file = path.join(framesDir, `f${String(frames.length + 1).padStart(6, "0")}.png`);
+    const file = frameFile(frames.length + 1);
     fs.writeFileSync(file, Buffer.from(res.result.data, "base64"));
-    frames.push({ file, duration });
+    frames.push(file);
+    for (let i = 1, n = Math.max(1, Math.round(duration * fps)); i < n; i++) {
+      const copy = frameFile(frames.length + 1);
+      try {
+        fs.linkSync(file, copy);
+      } catch {
+        fs.copyFileSync(file, copy);
+      }
+      frames.push(copy);
+    }
   };
   try {
     await send("Page.addScriptToEvaluateOnNewDocument", { source: CLOCK_SHIM });
@@ -228,8 +243,7 @@ async function main() {
       }
     }
     if (!over) throw new Error(`run did not finish within --max=${maxSec}s`);
-    const runSec = (frames.length - 1) / fps;
-    console.error(`[record] run over after ${runSec.toFixed(1)}s`);
+    console.error(`[record] run over after ${(frames.length / fps - holdSec).toFixed(1)}s`);
 
     // Back to real time for the network-bound debrief and the dialog flow.
     await send("Animation.setPlaybackRate", { playbackRate: 1 });
@@ -250,30 +264,25 @@ async function main() {
     close();
   }
 
-  const lines = ["ffconcat version 1.0"];
-  for (const f of frames) {
-    lines.push(`file '${path.basename(f.file)}'`);
-    lines.push(`duration ${f.duration.toFixed(5)}`);
-  }
-  lines.push(`file '${path.basename(frames[frames.length - 1].file)}'`);
-  const list = path.join(framesDir, "list.txt");
-  fs.writeFileSync(list, `${lines.join("\n")}\n`);
-  const total = frames.reduce((s, f) => s + f.duration, 0);
-  console.error(`[record] ${frames.length} frames, ${total.toFixed(1)}s; encoding (crf ${crf})`);
+  console.error(
+    `[record] ${frames.length} frames, ${(frames.length / fps).toFixed(1)}s; encoding (crf ${crf})`
+  );
   execFileSync(
     ffmpeg,
     [
       "-y",
       "-loglevel",
       "error",
-      "-f",
-      "concat",
-      "-safe",
-      "0",
+      "-framerate",
+      String(fps),
       "-i",
-      list,
+      path.join(framesDir, "f%06d.png"),
       "-vf",
-      `fps=${fps},scale=trunc(iw/2)*2:trunc(ih/2)*2:out_color_matrix=bt709,format=yuv420p`,
+      `scale=trunc(iw/2)*2:trunc(ih/2)*2:out_color_matrix=bt709,format=yuv420p`,
+      "-r",
+      String(fps),
+      "-vsync",
+      "cfr",
       "-c:v",
       "libx264",
       "-preset",
