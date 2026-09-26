@@ -23,16 +23,20 @@
  * 320–3840px per side and a longer side at most 2x the shorter one; keep TARGETS within that.
  *
  * The dev server must be running (`npm run serve`). Gameplay is driven by the built-in autopilot
- * (`?autoplay=1`) with a fixed seed; pass `--seed=` to vary the run if a take looks weak.
+ * (`?autoplay=1`); each target carries the seed that gave it a long run (the pilot's survival
+ * depends on the viewport width, and adaptive quality makes runs only roughly repeatable), and
+ * `--seed=` overrides it for every size if a take looks weak.
  */
 const path = require("node:path");
 const { capture } = require("./screenshot.cjs");
 
 const TARGETS = [
-  { w: 1440, h: 2880, css: [360, 720], scale: 4 }, // phone (2:1)
-  { w: 1000, h: 1600, css: [500, 800], scale: 2 }, // 7-inch tablet
-  { w: 1500, h: 2400, css: [750, 1200], scale: 2 }, // 10-inch tablet
+  { w: 1440, h: 2880, css: [360, 720], scale: 4, seed: 8 }, // phone (2:1)
+  { w: 1000, h: 1600, css: [500, 800], scale: 2, seed: 2024 }, // 7-inch tablet
+  { w: 1500, h: 2400, css: [750, 1200], scale: 2, seed: 314 }, // 10-inch tablet
 ];
+/** Seed for `--size` targets when `--seed` is not given (17 ran well at 360x740). */
+const DEFAULT_SEED = 17;
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -41,7 +45,7 @@ const opt = (name, fallback) => {
 };
 const base = (args.find((a) => !a.startsWith("--")) || "http://localhost:8000").replace(/\/$/, "");
 const outRoot = opt("out", "store-screenshots");
-const seed = opt("seed", "314");
+const seedOverride = opt("seed", "");
 const only = opt("only", "");
 const chrome = opt("chrome", "");
 const extraSizes = args.filter((a) => a.startsWith("--size=")).map((a) => parseSize(a.slice(7)));
@@ -63,6 +67,9 @@ function parseSize(spec) {
   return { w, h, css: [w / scale, h / scale], scale };
 }
 
+/** Start screen shows the remote top score, or 15s since navigation passed (empty/offline board). */
+const START_READY =
+  "performance.now() > 15000 || Number(document.getElementById('highScore').textContent) > 0";
 /** Gameplay is live: the start overlay is gone and the game-over dialog has not appeared. */
 const RUNNING =
   "document.getElementById('gameInfo').hidden && document.getElementById('gameOverScreen').hidden";
@@ -86,13 +93,16 @@ async function main() {
   const missing = [];
   for (const t of targets) {
     const outDir = path.join(outRoot, `${t.w}x${t.h}`);
+    const seed = seedOverride || t.seed || DEFAULT_SEED;
     const common = { outDir, width: t.css[0], height: t.css[1], scale: t.scale, chrome };
-    console.error(`\n== ${t.w}x${t.h} (css ${t.css[0]}x${t.css[1]} @${t.scale}x) -> ${outDir}`);
+    console.error(
+      `\n== ${t.w}x${t.h} (css ${t.css[0]}x${t.css[1]} @${t.scale}x, seed ${seed}) -> ${outDir}`
+    );
 
     await capture({
       ...common,
       url: `${base}/?dpr=${t.scale}`,
-      actions: ["wait 3000", "shot 1-initial"],
+      actions: [`waitfor ${START_READY}`, "wait 1000", "shot 1-initial"],
     });
 
     const files = await capture({
