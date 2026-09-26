@@ -4,3 +4,7 @@
 /.shots
 *.log
 /.tools
+
+# Store video intermediates (store-video/narrate.py)
+store-video/_raw-*.mp4
+store-video/.polly-cache/

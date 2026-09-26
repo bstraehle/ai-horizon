@@ -1,0 +1,61 @@
+{
+  "engine": "neural",
+  "voices": { "host": "Joanna", "narrator": "Matthew" },
+  "gap": 0.4,
+  "tail": 1.5,
+  "cues": [
+    { "at": 0.4, "voice": "host", "text": "Welcome to AI Horizon, a fast arcade space shooter." },
+    {
+      "at": 4.6,
+      "voice": "narrator",
+      "text": "Launch the mission. You have ninety seconds to score as many points as you can."
+    },
+    {
+      "at": 10.5,
+      "voice": "narrator",
+      "text": "Collect stars along the way. White stars are worth twenty-five points, red bonus stars fifty."
+    },
+    {
+      "at": 18.0,
+      "voice": "narrator",
+      "text": "Blast the asteroids. Hardened gray planets take many hits, but pay out a hundred points."
+    },
+    {
+      "at": 27.0,
+      "voice": "narrator",
+      "text": "The red planets are the eight bonus asteroids, worth two hundred and fifty points each."
+    },
+    {
+      "at": 36.5,
+      "voice": "narrator",
+      "text": "Aim carefully. Your shot accuracy earns an end-of-run bonus."
+    },
+    {
+      "at": 46.0,
+      "voice": "narrator",
+      "text": "Every thousand points adds another two hundred and fifty."
+    },
+    {
+      "at": 56.0,
+      "voice": "narrator",
+      "text": "Don't get hit. One asteroid collision forces you to eject and ends the run."
+    },
+    { "at": 67.0, "voice": "narrator", "text": "Stay sharp. The asteroid waves keep on coming." },
+    {
+      "at": 79.2,
+      "voice": "narrator",
+      "text": "Fifteen seconds left. It's the finale, and every point now counts double!"
+    },
+    { "at": 86.5, "voice": "narrator", "text": "Survive to the end for the full score." },
+    {
+      "at": 94.6,
+      "voice": "host",
+      "text": "Mission complete. An AI debrief officer, powered by Amazon Bedrock, reviews your run and shows you how to improve."
+    },
+    {
+      "at": 101.8,
+      "voice": "host",
+      "text": "Post your score to the leaderboard. Download AI Horizon on Google Play, and beat the high score!"
+    }
+  ]
+}
