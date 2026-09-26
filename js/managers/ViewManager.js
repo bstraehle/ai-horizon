@@ -33,15 +33,26 @@ export class ViewManager {
       typeof gAny === "object" && typeof gAny._dprOverride === "number" && gAny._dprOverride > 0
         ? gAny._dprOverride
         : null;
-    if (hintIsMobile && CONFIG.VIEW.DPR_MOBILE_MAX) {
-      deviceDpr = Math.min(deviceDpr, CONFIG.VIEW.DPR_MOBILE_MAX);
+    // Explicit cap (dev/capture flag `?dpr=`): replaces the platform and performance ceilings so
+    // high-density screenshots render the canvas at full device resolution.
+    const dprCapOverride =
+      typeof gAny === "object" &&
+      typeof gAny._dprCapOverride === "number" &&
+      gAny._dprCapOverride > 0
+        ? gAny._dprCapOverride
+        : null;
+    let maxDpr = CONFIG.VIEW.DPR_MAX;
+    if (dprCapOverride) {
+      maxDpr = dprCapOverride;
+    } else {
+      if (hintIsMobile && CONFIG.VIEW.DPR_MOBILE_MAX) {
+        deviceDpr = Math.min(deviceDpr, CONFIG.VIEW.DPR_MOBILE_MAX);
+      }
+      if (perfDprOverride) {
+        deviceDpr = Math.min(deviceDpr, perfDprOverride);
+        maxDpr = Math.min(CONFIG.VIEW.DPR_MAX, perfDprOverride);
+      }
     }
-    if (perfDprOverride) {
-      deviceDpr = Math.min(deviceDpr, perfDprOverride);
-    }
-    const maxDpr = perfDprOverride
-      ? Math.min(CONFIG.VIEW.DPR_MAX, perfDprOverride)
-      : CONFIG.VIEW.DPR_MAX;
     const dpr = Math.max(CONFIG.VIEW.DPR_MIN, Math.min(maxDpr, deviceDpr));
     const cssWidth = Math.round(window.innerWidth);
     const cssHeight = Math.round(window.innerHeight);

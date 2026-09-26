@@ -82,6 +82,18 @@ describe("ViewManager.resize", () => {
     );
   });
 
+  it("honours a dpr cap override above the configured ceilings", () => {
+    Object.defineProperty(window, "devicePixelRatio", { value: 4, configurable: true });
+    const capped = /** @type {any} */ (makeGame());
+    ViewManager.resize(capped);
+    expect(capped.view.dpr).toBeCloseTo(CONFIG.VIEW.DPR_MAX, 5);
+    const raised = /** @type {any} */ (makeGame());
+    raised._dprCapOverride = 4;
+    raised._isMobile = true; // mobile ceiling is bypassed too
+    ViewManager.resize(raised);
+    expect(raised.view.dpr).toBeCloseTo(4, 5);
+  });
+
   it("clears carried-over motion when placing the player at spawn", () => {
     const game = makeGame();
     const player = /** @type {any} */ (game.player);

@@ -26,6 +26,20 @@ describe("attachDevTools", () => {
     expect(attachDevTools(makeGame(), "?debug=other&autoplay=0")).toBeNull();
   });
 
+  it("applies a dpr cap override and resizes, without attaching hooks", () => {
+    const game = /** @type {any} */ (makeGame());
+    game.resizeCanvas = vi.fn();
+    game.drawBackground = vi.fn();
+    expect(attachDevTools(game, "?dpr=4")).toBeNull();
+    expect(game._dprCapOverride).toBe(4);
+    expect(game.resizeCanvas).toHaveBeenCalledTimes(1);
+    // The menu background is repainted after the resize cleared the canvas.
+    expect(game.drawBackground).toHaveBeenCalledWith({ suppressNebula: true });
+    const bad = /** @type {any} */ (makeGame());
+    attachDevTools(bad, "?dpr=99");
+    expect(bad._dprCapOverride).toBeUndefined();
+  });
+
   it("enables only the overlay for debug=perf", () => {
     const handle = attachDevTools(makeGame(), "?debug=perf");
     expect(handle).not.toBeNull();
