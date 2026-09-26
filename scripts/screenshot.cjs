@@ -129,6 +129,11 @@ async function capture(options) {
       } else if (msg.method === "Runtime.exceptionThrown") {
         const d = msg.params.exceptionDetails;
         console.error("[page error]", (d.exception && d.exception.description) || d.text);
+      } else if (msg.method === "Runtime.consoleAPICalled" && msg.params.type === "error") {
+        const text = (msg.params.args || [])
+          .map((a) => (a.value !== undefined ? String(a.value) : a.description || ""))
+          .join(" ");
+        console.error("[page console.error]", text.slice(0, 400));
       }
     });
     const send = (method, params = {}) =>

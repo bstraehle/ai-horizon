@@ -4,8 +4,12 @@
  *
  * Usage:
  *   node --experimental-websocket scripts/store-screenshots.cjs [url] [--out=store-screenshots]
- *       [--seed=12345] [--only=1440x2880] [--chrome=<path>]
+ *       [--seed=314] [--only=1440x2880] [--size=WxH[@scale]]... [--chrome=<path>]
  *   npm run shots:store
+ *
+ * `--size` renders an extra ad-hoc output size (repeatable) in addition to TARGETS. Without an
+ * explicit `@scale` the largest integer factor of both sides that keeps the CSS width >= 360px is
+ * used (1440x2960 -> 360x740 @4). Note that 1440x2960 itself breaks the Play Console 2:1 rule.
  *
  * Writes four PNGs per target size into <out>/<W>x<H>/:
  *   1-initial.png      start screen (title + Launch Mission)
@@ -37,9 +41,27 @@ const opt = (name, fallback) => {
 };
 const base = (args.find((a) => !a.startsWith("--")) || "http://localhost:8000").replace(/\/$/, "");
 const outRoot = opt("out", "store-screenshots");
-const seed = opt("seed", "12345");
+const seed = opt("seed", "314");
 const only = opt("only", "");
 const chrome = opt("chrome", "");
+const extraSizes = args.filter((a) => a.startsWith("--size=")).map((a) => parseSize(a.slice(7)));
+
+/**
+ * Parse `WxH[@scale]` into a target; picks the scale when omitted.
+ * @param {string} spec
+ * @returns {{ w:number, h:number, css:[number,number], scale:number }}
+ */
+function parseSize(spec) {
+  const m = /^(\d+)x(\d+)(?:@(\d+))?$/.exec(spec);
+  if (!m) throw new Error(`--size expects WxH[@scale], got "${spec}"`);
+  const w = Number(m[1]);
+  const h = Number(m[2]);
+  const scale = m[3]
+    ? Number(m[3])
+    : [4, 3, 2, 1].find((s) => w % s === 0 && h % s === 0 && w / s >= 360) || 1;
+  if (w % scale || h % scale) throw new Error(`${spec}: sides must be multiples of the scale`);
+  return { w, h, css: [w / scale, h / scale], scale };
+}
 
 /** Gameplay is live: the start overlay is gone and the game-over dialog has not appeared. */
 const RUNNING =
@@ -59,7 +81,7 @@ const SKIP_INITIALS = `(() => {
 const LEADERBOARD_VISIBLE = "!document.getElementById('leaderboardScreen').hidden";
 
 async function main() {
-  const targets = TARGETS.filter((t) => !only || `${t.w}x${t.h}` === only);
+  const targets = TARGETS.filter((t) => !only || `${t.w}x${t.h}` === only).concat(extraSizes);
   if (!targets.length) throw new Error(`no target matches --only=${only}`);
   const missing = [];
   for (const t of targets) {
