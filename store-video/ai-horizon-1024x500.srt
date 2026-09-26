@@ -1,0 +1,51 @@
+1
+00:00:00,400 --> 00:00:04,120
+Welcome to AI Horizon, a fast arcade space shooter.
+
+2
+00:00:04,600 --> 00:00:08,800
+Launch the mission. You have ninety seconds to score as many points as you can.
+
+3
+00:00:10,500 --> 00:00:16,044
+Collect stars along the way. White stars are worth twenty-five points, red bonus stars fifty.
+
+4
+00:00:18,000 --> 00:00:23,064
+Blast the asteroids. Hardened gray planets take many hits, but pay out a hundred points.
+
+5
+00:00:27,000 --> 00:00:31,152
+The red planets are the eight bonus asteroids, worth two hundred and fifty points each.
+
+6
+00:00:36,500 --> 00:00:40,052
+Aim carefully. Your shot accuracy earns an end-of-run bonus.
+
+7
+00:00:46,000 --> 00:00:48,664
+Every thousand points adds another two hundred and fifty.
+
+8
+00:00:56,000 --> 00:01:00,368
+Don't get hit. One asteroid collision forces you to eject and ends the run.
+
+9
+00:01:07,000 --> 00:01:10,144
+Stay sharp. The asteroid waves keep on coming.
+
+10
+00:01:19,200 --> 00:01:23,568
+Fifteen seconds left. It's the finale, and every point now counts double!
+
+11
+00:01:26,500 --> 00:01:28,468
+Survive to the end for the full score.
+
+12
+00:01:34,600 --> 00:01:42,112
+Mission complete. An AI debrief officer, powered by Amazon Bedrock, reviews your run and shows you how to improve.
+
+13
+00:01:42,512 --> 00:01:48,632
+Post your score to the leaderboard. Download AI Horizon on Google Play, and beat the high score!
