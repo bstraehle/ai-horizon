@@ -1058,6 +1058,10 @@ class AIHorizon {
       wasGameOver = false;
     }
     this.resetGameState(wasGameOver);
+    // Forget the previous run's pointer position so the ship starts level at its spawn point
+    // instead of dashing (and banking) toward a stale target; steering resumes on the next
+    // pointer move / touch / key press.
+    this.input.clearMouse();
     this.resizeCanvas();
     GameUI.hideGameInfo(this);
     this.state.start();

@@ -7,6 +7,8 @@ import { prefersReducedMotion } from "../utils/motion.js";
 /** Maximum visual bank (rad) at full lateral speed and how quickly the bank follows velocity. */
 const MAX_BANK = 0.42;
 const BANK_RESPONSE = 9;
+/** Lateral speed (as a multiple of the ship's speed) that produces a full bank; softens mouse dashes. */
+const BANK_SPEED_SCALE = 1.6;
 
 /**
  * Player – user-controlled ship (movement + drawing only; side-effects externalized).
@@ -106,9 +108,20 @@ export class Player {
     if (dtSec > 0) {
       this.vx = (this.x - prevX) / dtSec;
       this.vy = (this.y - prevY) / dtSec;
-      const target = this.speed > 0 ? clamp(this.vx / this.speed, -1, 1) : 0;
+      const target = this.speed > 0 ? clamp(this.vx / (this.speed * BANK_SPEED_SCALE), -1, 1) : 0;
       this._bank += (target - this._bank) * Math.min(1, dtSec * BANK_RESPONSE);
     }
+  }
+
+  /**
+   * Forget carried-over motion (velocity hint and bank) after the ship is teleported, e.g. to its
+   * spawn point at game start, so it appears level and still rather than leaning from the previous
+   * run's last movement.
+   */
+  resetMotion() {
+    this.vx = 0;
+    this.vy = 0;
+    this._bank = 0;
   }
 
   /**

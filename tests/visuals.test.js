@@ -140,9 +140,25 @@ describe("Player banking", () => {
     const p = new Player(100, 100, 25, 25, 480);
     const view = { width: 800, height: 600 };
     for (let i = 0; i < 30; i++) p.update({ ArrowRight: true }, { x: 0, y: 0 }, view, 1 / 60);
-    expect(p._bank).toBeGreaterThan(0.9);
+    // Keyboard speed is 1/BANK_SPEED_SCALE of a full bank (mouse dashes can reach 1).
+    expect(p._bank).toBeGreaterThan(0.55);
+    expect(p._bank).toBeLessThan(0.7);
     for (let i = 0; i < 60; i++) p.update({}, { x: 0, y: 0 }, view, 1 / 60);
     expect(Math.abs(p._bank)).toBeLessThan(0.02);
+  });
+
+  it("resetMotion levels the ship and forgets its velocity hint", () => {
+    const p = new Player(100, 100, 25, 25, 480);
+    const view = { width: 800, height: 600 };
+    for (let i = 0; i < 30; i++) p.update({ ArrowRight: true }, { x: 0, y: 0 }, view, 1 / 60);
+    expect(p._bank).toBeGreaterThan(0.5);
+    p.resetMotion();
+    expect(p._bank).toBe(0);
+    expect(p.vx).toBe(0);
+    expect(p.vy).toBe(0);
+    const ctx = makeCtx();
+    p.draw(/** @type {any} */ (ctx), 0);
+    expect(ctx.calls.rotate).toBe(0);
   });
 
   it("does not lean when the user prefers reduced motion", () => {

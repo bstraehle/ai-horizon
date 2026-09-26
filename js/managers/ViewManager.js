@@ -6,7 +6,8 @@ import { CONFIG, clamp } from "../constants.js";
  */
 export class ViewManager {
   /**
-   * Resize & reposition preserving relative player center/bottom when running; otherwise recenter + spawn offset.
+   * Resize & reposition preserving relative player center/bottom when running; otherwise recenter + spawn offset
+   * (and clear the player's carried-over velocity/bank via `resetMotion` when available).
    * @param {{ canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, view: {width:number,height:number,dpr:number,resolutionScale?:number}, player:{x:number,y:number,width:number,height:number}, canvasRect?:DOMRect, state: import('../core/GameStateMachine.js').GameStateMachine }} game
    */
   static resize(game) {
@@ -77,6 +78,9 @@ export class ViewManager {
     } else {
       player.x = view.width / 2 - player.width / 2;
       player.y = view.height - player.height - CONFIG.PLAYER.SPAWN_Y_OFFSET;
+      // Spawn placement is a teleport: drop any motion carried over from the previous run.
+      const p = /** @type {any} */ (player);
+      if (typeof p.resetMotion === "function") p.resetMotion();
     }
 
     game.canvasRect = canvas.getBoundingClientRect();

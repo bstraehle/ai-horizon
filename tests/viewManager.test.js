@@ -82,6 +82,25 @@ describe("ViewManager.resize", () => {
     );
   });
 
+  it("clears carried-over motion when placing the player at spawn", () => {
+    const game = makeGame();
+    const player = /** @type {any} */ (game.player);
+    player.vx = 500;
+    player._bank = 0.9;
+    player.resetMotion = vi.fn(() => {
+      player.vx = 0;
+      player._bank = 0;
+    });
+    ViewManager.resize(game);
+    expect(player.resetMotion).toHaveBeenCalledTimes(1);
+    // While running, a resize keeps motion (no teleport).
+    game.state.start();
+    player.vx = 300;
+    ViewManager.resize(game);
+    expect(player.resetMotion).toHaveBeenCalledTimes(1);
+    expect(player.vx).toBe(300);
+  });
+
   it("preserves relative position on subsequent resizes", () => {
     const game = makeGame();
     ViewManager.resize(game);
