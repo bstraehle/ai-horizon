@@ -6,23 +6,23 @@ import { EngineTrail } from "../entities/EngineTrail.js";
 import { Nebula } from "../entities/Nebula.js";
 import { Particle } from "../entities/Particle.js";
 
-/** Transparent margin around the bullet bolt so its glow is not clipped. */
-const BULLET_PAD = 8;
-/** Star atlas canvas size and the star's outer radius inside it (rest is glow). */
+/** Transparent margin around the bullet bolt so its soft edge is not clipped. */
+const BULLET_PAD = 4;
+/** Star atlas canvas size and the star's outer radius inside it (rest is a faint soft edge). */
 const STAR_CANVAS = 96;
-const STAR_RADIUS = 27;
+const STAR_RADIUS = 34;
 
 /**
- * SpriteManager – pre-renders bullet bolts and collectible star variants to offscreen canvases
+ * SpriteManager – pre-renders bullet bolts (white; red / blue when upgraded) and collectible star variants to offscreen canvases
  * (performance cache). Returns a simple atlas; if context creation fails, canvases remain blank and
  * runtime falls back to entity draws.
  *
  * Atlas geometry contract (consumed by RenderManager):
  *  - `bullet` / `bulletUpgraded`: (WIDTH + 2·bulletPad) × (HEIGHT + TRAIL + 2·bulletPad); the bolt
- *    core occupies the centre column, glow fills the padding → draw at (x - pad, y - pad).
+ *    core occupies the centre column, the soft edge fills the padding → draw at (x - pad, y - pad).
  *  - `star*`: STAR_CANVAS square whose star spans 2·STAR_RADIUS; `starDrawScale` converts a
  *    star's logical size into the canvas draw size so the glyph matches the hitbox and the glow
- *    extends beyond it.
+ *    keeps a small margin around it.
  */
 export class SpriteManager {
   /**
@@ -36,6 +36,10 @@ export class SpriteManager {
       CONFIG.COLORS.BULLET_UPGRADED || CONFIG.COLORS.BULLET,
       trail
     );
+    const bulletUpBlueCanvas = SpriteManager._renderBullet(
+      CONFIG.COLORS.BULLET_UPGRADED_BLUE || CONFIG.COLORS.BULLET_UPGRADED || CONFIG.COLORS.BULLET,
+      trail
+    );
     const starCanvas = SpriteManager._renderStar(CONFIG.COLORS.STAR);
     const starRedCanvas = SpriteManager._renderStar(CONFIG.COLORS.STAR_RED);
     const starBlueCanvas = SpriteManager._renderStar(CONFIG.COLORS.STAR_BLUE);
@@ -43,6 +47,7 @@ export class SpriteManager {
     const atlas = {
       bullet: bulletCanvas,
       bulletUpgraded: bulletUpCanvas,
+      bulletUpgradedBlue: bulletUpBlueCanvas,
       bulletTrail: trail,
       bulletPad: BULLET_PAD,
       star: starCanvas,
@@ -63,7 +68,7 @@ export class SpriteManager {
   }
 
   /**
-   * Laser bolt: white-hot capsule core with a coloured halo and a fading tail.
+   * Laser bolt: a thin flat capsule with a short fading tail.
    * @param {{ GRAD_TOP:string, GRAD_MID:string, GRAD_BOTTOM:string, SHADOW:string, TRAIL:string }} palette
    * @param {number} trail Tail length (px).
    * @returns {HTMLCanvasElement}
@@ -79,41 +84,33 @@ export class SpriteManager {
     if (!c) return canvas;
     const x = BULLET_PAD;
     const y = BULLET_PAD;
-    const r = bw / 2;
+    const coreW = Math.max(2, bw * 0.5);
+    const cx = x + bw / 2;
     c.save();
-    // Tail: fades out below the core.
-    const tail = c.createLinearGradient(0, y + bh * 0.6, 0, y + bh + trail);
+    // Tail: a thinner line fading out below the core.
+    const tail = c.createLinearGradient(0, y + bh * 0.7, 0, y + bh + trail);
     tail.addColorStop(0, palette.TRAIL);
     tail.addColorStop(1, "rgba(0,0,0,0)");
     c.fillStyle = tail;
-    c.fillRect(x + bw * 0.2, y + bh * 0.6, bw * 0.6, bh * 0.4 + trail);
-    // Core capsule with glow.
+    c.fillRect(cx - coreW * 0.35, y + bh * 0.7, coreW * 0.7, bh * 0.3 + trail);
+    // Core: crisp thin capsule with a barely-there soft edge.
     c.shadowColor = palette.SHADOW;
-    c.shadowBlur = BULLET_PAD;
-    const grad = c.createLinearGradient(0, y, 0, y + bh);
-    grad.addColorStop(0, palette.GRAD_TOP);
-    grad.addColorStop(0.45, palette.GRAD_MID);
-    grad.addColorStop(1, palette.GRAD_BOTTOM);
-    c.fillStyle = grad;
+    c.shadowBlur = 3;
+    c.fillStyle = palette.GRAD_MID;
     c.beginPath();
-    c.moveTo(x, y + r);
-    c.arc(x + r, y + r, r, Math.PI, 0);
-    c.lineTo(x + bw, y + bh - r);
-    c.arc(x + r, y + bh - r, r, 0, Math.PI);
+    c.moveTo(cx - coreW / 2, y + coreW / 2);
+    c.arc(cx, y + coreW / 2, coreW / 2, Math.PI, 0);
+    c.lineTo(cx + coreW / 2, y + bh - coreW / 2);
+    c.arc(cx, y + bh - coreW / 2, coreW / 2, 0, Math.PI);
     c.closePath();
     c.fill();
-    c.fill();
-    // Hot centre line.
-    c.shadowBlur = 0;
-    c.fillStyle = "rgba(255,255,255,0.9)";
-    c.fillRect(x + bw / 2 - 0.5, y + r, 1, bh - r * 2);
     c.restore();
     return canvas;
   }
 
   /**
-   * Collectible star: soft outer glow, gradient body, bright core highlight.
-   * @param {{ GRAD_IN:string, GRAD_MID:string, GRAD_OUT:string, GLOW?:string, BASE:string }} palette
+   * Collectible star: flat two-tone body with a thin outline and a faint soft edge.
+   * @param {{ GRAD_IN:string, GRAD_MID:string, GRAD_OUT:string, GLOW?:string, BASE:string, OUTLINE?:string }} palette
    * @returns {HTMLCanvasElement}
    * @private
    */
@@ -128,36 +125,24 @@ export class SpriteManager {
     const size = STAR_RADIUS;
     const glow = palette.GLOW || palette.BASE;
     c.save();
-    // Halo.
-    const halo = c.createRadialGradient(cx, cy, size * 0.3, cx, cy, STAR_CANVAS / 2);
-    halo.addColorStop(0, glow);
-    halo.addColorStop(0.55, glow.replace(/[\d.]+\)$/, "0.14)"));
-    halo.addColorStop(1, "rgba(0,0,0,0)");
-    c.fillStyle = halo;
-    c.fillRect(0, 0, STAR_CANVAS, STAR_CANVAS);
-    // Body.
-    const grad = c.createRadialGradient(cx, cy, 0, cx, cy, size);
-    grad.addColorStop(0, palette.GRAD_IN);
-    grad.addColorStop(0.45, palette.GRAD_MID);
-    grad.addColorStop(1, palette.GRAD_OUT);
-    c.fillStyle = grad;
+    // Flat body with a faint soft edge so the pickup still separates from dark backgrounds.
     c.shadowColor = glow;
-    c.shadowBlur = 10;
-    SpriteManager._traceStar(c, cx, cy, size, size * 0.46);
+    c.shadowBlur = 8;
+    c.fillStyle = palette.GRAD_MID || palette.BASE;
+    SpriteManager._traceStar(c, cx, cy, size, size * 0.45);
     c.fill();
     c.shadowBlur = 0;
+    // Hard shadow facet on the right half (two-tone), then a thin dark outline.
+    c.save();
+    c.clip();
+    c.fillStyle = palette.GRAD_OUT;
+    c.fillRect(cx + size * 0.04, 0, STAR_CANVAS, STAR_CANVAS);
+    c.restore();
     c.lineJoin = "round";
-    c.strokeStyle = "rgba(255,255,255,0.55)";
-    c.lineWidth = 1.2;
+    c.strokeStyle = palette.OUTLINE || "rgba(0,0,0,0.85)";
+    c.lineWidth = 2;
+    SpriteManager._traceStar(c, cx, cy, size, size * 0.45);
     c.stroke();
-    // Core sparkle.
-    const core = c.createRadialGradient(cx, cy - size * 0.1, 0, cx, cy - size * 0.1, size * 0.5);
-    core.addColorStop(0, "rgba(255,255,255,0.95)");
-    core.addColorStop(1, "rgba(255,255,255,0)");
-    c.fillStyle = core;
-    c.beginPath();
-    c.arc(cx, cy - size * 0.1, size * 0.5, 0, Math.PI * 2);
-    c.fill();
     c.restore();
     return canvas;
   }

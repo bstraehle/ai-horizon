@@ -68,7 +68,7 @@
 /** @typedef {import('./core/GameStateMachine.js').GameStateMachine} GameStateMachine */
 
 /** Pre-rendered sprite atlas surfaces used by RenderManager. */
-/** @typedef {{ bullet: HTMLCanvasElement, bulletUpgraded?: HTMLCanvasElement, bulletTrail: number, bulletPad?: number, star: HTMLCanvasElement, starBlue?: HTMLCanvasElement, starRed: HTMLCanvasElement, starBaseSize: number, starDrawScale?: number }} SpriteAtlas */
+/** @typedef {{ bullet: HTMLCanvasElement, bulletUpgraded?: HTMLCanvasElement, bulletUpgradedBlue?: HTMLCanvasElement, bulletTrail: number, bulletPad?: number, star: HTMLCanvasElement, starBlue?: HTMLCanvasElement, starRed: HTMLCanvasElement, starBaseSize: number, starDrawScale?: number }} SpriteAtlas */
 
 /**
  * Main game state shape used by the orchestrator in game.js.

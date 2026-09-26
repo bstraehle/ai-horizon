@@ -83,7 +83,7 @@ describe("Asteroid visual state", () => {
     expect(b._angle).toBe(a._angle);
     expect(b._spin).toBe(a._spin);
     for (const f of a._shape) {
-      expect(f).toBeGreaterThanOrEqual(0.72);
+      expect(f).toBeGreaterThanOrEqual(0.74);
       expect(f).toBeLessThanOrEqual(1);
     }
     expect(Math.abs(a._spin)).toBeLessThanOrEqual(0.9);
@@ -213,15 +213,16 @@ describe("StarField variants and Particle spark palette", () => {
     expect(heroes).toBeLessThan(200);
   });
 
-  it("maps quantized levels to a small warm palette with rising hue and lightness", () => {
+  it("maps quantized levels to a small gray palette with rising lightness", () => {
     const ex = CONFIG.EXPLOSION;
     const colors = [];
     for (let g = ex.PARTICLE_GRAY_MIN; g <= ex.PARTICLE_GRAY_MAX; g += ex.PARTICLE_GRAY_STEP) {
       colors.push(Particle.sparkColor(g));
     }
     expect(new Set(colors).size).toBe(colors.length);
-    const hues = colors.map((c) => Number(/hsl\((\d+)/.exec(c)?.[1]));
-    for (let i = 1; i < hues.length; i++) expect(hues[i]).toBeGreaterThanOrEqual(hues[i - 1]);
+    const lights = colors.map((c) => Number(/(\d+)%\)$/.exec(c)?.[1]));
+    for (let i = 1; i < lights.length; i++) expect(lights[i]).toBeGreaterThan(lights[i - 1]);
+    expect(lights[lights.length - 1]).toBe(100);
     expect(Particle.sparkColor(-1000)).toBe(colors[0]);
     expect(Particle.sparkColor(1000)).toBe(colors[colors.length - 1]);
   });

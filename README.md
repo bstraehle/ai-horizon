@@ -26,11 +26,11 @@ For a production build, run `npm run build` and serve the generated `dist/` fold
 
 ## Visual design
 
-The look is a "deep-space neon" system: a near-black indigo field with a soft vignette, cyan for everything that belongs to the player (ship, bolts, UI accent), warm gold for pickups, hot orange/red for danger, and violet/pink vs. cyan/teal nebulae that alternate between runs.
+The in-game look is "clean minimal": a near-black field with a soft vignette and a faint haze, white and light-gray flat shapes with thin dark outlines, and a single accent colour per run — red or blue, following the nebula palette that alternates between games — reserved for the engine flame, upgraded bolts, bonus planets/stars and score popups. The HUD and screens keep the original dark UI.
 
-- Colours live in one place: `CONFIG.COLORS` in `js/constants.js` for the canvas, mirrored by the CSS custom properties at the top of `style.css` for the HUD and screens. Change a token there rather than hard-coding a colour.
-- Entities are procedural "lit vector" art (irregular rocks with rim light, shaded planets with atmosphere and glowing cracks, a delta-wing ship with engine glow, glowing bolts and stars) rendered once into cached sprites; per-frame cost stays a `drawImage`.
-- Motion flourishes — ship banking, asteroid spin, pickup pulse, explosion shockwave, hit flash, brief screen shake on big impacts — are render-only (the fixed-step simulation and seeded runs are unaffected) and are switched off when the OS requests `prefers-reduced-motion`.
+- Canvas colours live in one place, `CONFIG.COLORS` in `js/constants.js`; asteroid palettes are two-tone (`FACE` / `FACET`) and the run accent is `COLORS.ACCENT`. Change a token there rather than hard-coding a colour.
+- Entities are procedural "flat geometric" art (low-poly rocks with one hard shadow facet, discs with a crescent shadow for planets, an arrowhead ship, thin bolts, two-tone stars) rendered once into cached sprites with no gradients or blurs; per-frame cost stays a `drawImage`.
+- Motion flourishes — ship banking, asteroid spin, pickup pulse, explosion shockwave ring, hit flash, brief screen shake on big impacts — are render-only (the fixed-step simulation and seeded runs are unaffected) and are switched off when the OS requests `prefers-reduced-motion`.
 - `npm run shots -- "<url>" --actions="wait 3000; shot name"` captures headless-Chrome screenshots for visual QA (see `scripts/screenshot.cjs` for the action syntax).
 
 ## Project structure

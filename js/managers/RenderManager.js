@@ -69,7 +69,12 @@ export class RenderManager {
    */
   static drawBullets(ctx, bullets, sprites, viewWidth, viewHeight, extrapolateSec = 0) {
     const sprNormal = sprites && sprites.bullet;
-    const sprUpgraded = sprites && /** @type {any} */ (sprites).bulletUpgraded;
+    const palette = BackgroundManager.getCurrentNebulaPalette();
+    // Upgraded bolts take the run's accent colour (red / blue) like the bonus items.
+    const sprUpgraded =
+      sprites &&
+      ((palette === "blue" && /** @type {any} */ (sprites).bulletUpgradedBlue) ||
+        /** @type {any} */ (sprites).bulletUpgraded);
     const trail = (sprites && sprites.bulletTrail) || CONFIG.BULLET.TRAIL;
     const pad = (sprites && sprites.bulletPad) || 0;
     if (sprNormal) {
@@ -235,7 +240,7 @@ export class RenderManager {
       game.engineTrail.draw(ctx, t);
     }
     if (game.player && typeof game.player.draw === "function") {
-      game.player.draw(ctx, t);
+      game.player.draw(ctx, t, BackgroundManager.getCurrentNebulaPalette());
     }
     if (shaking) ctx.restore();
 

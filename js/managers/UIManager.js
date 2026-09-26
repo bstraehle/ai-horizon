@@ -608,12 +608,6 @@ export class UIManager {
       const mins = Math.floor(s / 60);
       const secs = s % 60;
       timerEl.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
-      // Drive the chip's countdown bar (CSS --timer-progress) once per displayed second.
-      const box = timerEl.parentElement;
-      if (box && box.style && typeof box.style.setProperty === "function") {
-        const total = CONFIG.GAME.TIMER_SECONDS || 90;
-        box.style.setProperty("--timer-progress", String(Math.max(0, Math.min(1, s / total))));
-      }
     }
     if (!styleChanged) return;
 

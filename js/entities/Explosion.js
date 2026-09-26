@@ -6,8 +6,8 @@ import { SpriteCache } from "../utils/SpriteCache.js";
  *
  * Visual Model:
  *  - Life decays linearly; alpha derived from life/maxLife.
- *  - Scale grows using (1 + (1 - alpha) * SCALE_GAIN) for ease-out like expansion.
- *  - Multi-stop radial gradient provides hot core -> cooler edge fade.
+ *  - A flat white flash disc fades (alpha²) while a thin shockwave ring expands to
+ *    (1 + (1 - alpha) * (SCALE_GAIN + 0.8)) × radius — the "clean minimal" impact.
  *
  * Pool Friendly: purely numeric state; reset overwrites all fields.
  *
@@ -134,14 +134,12 @@ export class Explosion {
     const cached = Explosion._spriteCache.get(key);
     if (cached) return cached;
 
-    // Frame layout: the fireball grows as alpha decays while a thin shockwave ring races ahead of
-    // it; the sprite is sized to the ring at this step so both stay inside the canvas.
+    // Frame layout: a flat flash disc fades while a thin shockwave ring races outward; the sprite
+    // is sized to the ring at this step so both stay inside the canvas.
     const progress = 1 - alpha;
-    const scale = 1 + progress * CONFIG.EXPLOSION.SCALE_GAIN;
-    const radius = (width / 2) * scale;
     const ringRadius = (width / 2) * (1 + progress * (CONFIG.EXPLOSION.SCALE_GAIN + 0.8));
     const pad = 6;
-    const outer = Math.max(radius, ringRadius);
+    const outer = ringRadius;
     const size = Math.ceil(outer * 2 + pad * 2);
     let canvas;
     if (typeof OffscreenCanvas === "function") {
@@ -158,27 +156,24 @@ export class Explosion {
     offCtx.clearRect(0, 0, size, size);
     const center = size / 2;
     const C = CONFIG.COLORS.EXPLOSION;
-    // Fireball: white-hot core → gold → orange, fading with alpha.
-    const gradient = offCtx.createRadialGradient(center, center, 0, center, center, radius);
-    gradient.addColorStop(0, `${C.GRAD_IN}${alpha})`);
-    gradient.addColorStop(0.25, `${C.GRAD_MID1}${alpha * 0.85})`);
-    gradient.addColorStop(0.65, `${C.GRAD_MID2}${alpha * 0.55})`);
+    // Flash: a flat disc that fades quickly; a soft edge keeps it from looking cut out.
+    const flashRadius = (width / 2) * (0.55 + progress * 0.45);
+    const flashAlpha = alpha * alpha;
+    const gradient = offCtx.createRadialGradient(center, center, 0, center, center, flashRadius);
+    gradient.addColorStop(0, `${C.GRAD_IN}${flashAlpha})`);
+    gradient.addColorStop(0.7, `${C.GRAD_MID1}${flashAlpha * 0.9})`);
     gradient.addColorStop(1, C.GRAD_OUT);
     offCtx.fillStyle = gradient;
     offCtx.beginPath();
-    offCtx.arc(center, center, radius, 0, PI2);
+    offCtx.arc(center, center, flashRadius, 0, PI2);
     offCtx.fill();
-    // Shockwave ring: thin, bright early, thinning and fading as it expands.
+    // Shockwave ring: thin line racing outward, fading as it expands.
     if (progress > 0.05 && C.RING) {
-      const ringAlpha = Math.max(0, 0.9 * alpha);
-      offCtx.strokeStyle = `${C.RING}${ringAlpha})`;
-      offCtx.lineWidth = Math.max(1, (width / 2) * 0.16 * alpha + 0.5);
-      offCtx.shadowColor = `${C.RING}${ringAlpha})`;
-      offCtx.shadowBlur = 6;
+      offCtx.strokeStyle = `${C.RING}${Math.max(0, 0.95 * alpha)})`;
+      offCtx.lineWidth = Math.max(1, 2.2 * alpha + 0.6);
       offCtx.beginPath();
       offCtx.arc(center, center, ringRadius, 0, PI2);
       offCtx.stroke();
-      offCtx.shadowBlur = 0;
     }
     const sprite = { canvas, pad, radius: outer };
     Explosion._spriteCache.set(key, sprite);

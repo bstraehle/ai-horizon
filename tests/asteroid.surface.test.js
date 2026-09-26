@@ -179,6 +179,8 @@ describe("Asteroid fallback drawing (no offscreen canvas)", () => {
     a.draw(/** @type {any} */ (main));
     expect(a._surfaceSprite).toBeNull();
     expect(main.calls.drawImage).toBe(0);
-    expect(main.calls.bodyGradients).toBeGreaterThan(0);
+    // Flat style: the body is drawn with arcs (planet disc, craters), no gradients.
+    expect(main.calls.arcs).toBeGreaterThan(0);
+    expect(main.calls.bodyGradients).toBe(0);
   });
 });

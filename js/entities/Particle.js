@@ -120,8 +120,8 @@ export class Particle {
   }
 
   /**
-   * Map a quantized explosion level (see quantizeGray) to a warm spark colour: low levels are deep
-   * orange, high levels gold-white. Integer components keep the colour set bounded.
+   * Map a quantized explosion level (see quantizeGray) to a spark colour: light gray for low
+   * levels rising to white. Integer components keep the colour set bounded.
    * @param {number} level Quantized lightness percentage within [GRAY_MIN, GRAY_MAX].
    * @returns {string} CSS hsl() colour.
    */
@@ -129,9 +129,8 @@ export class Particle {
     const cfg = CONFIG.EXPLOSION;
     const span = Math.max(1, cfg.PARTICLE_GRAY_MAX - cfg.PARTICLE_GRAY_MIN);
     const t = Math.max(0, Math.min(1, (level - cfg.PARTICLE_GRAY_MIN) / span));
-    const hue = Math.round(14 + t * 32);
-    const light = Math.round(52 + t * 22);
-    return `hsl(${hue}, 100%, ${light}%)`;
+    const light = Math.round(68 + t * 32);
+    return `hsl(0, 0%, ${light}%)`;
   }
 
   /**

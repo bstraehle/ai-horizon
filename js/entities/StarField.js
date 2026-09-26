@@ -423,11 +423,11 @@ export class StarField {
 /** @type {SpriteCache<{ canvas: OffscreenCanvas | HTMLCanvasElement, offset: number }> | undefined} */
 StarField._spriteCache = undefined;
 StarField._SIZE_STEP = 0.25;
-/** Star colour/shape variants; index 3 is the sparkling "hero" star. */
+/** Star colour/shape variants; index 3 is the brighter "hero" star (no sparkle in the flat style). */
 StarField.VARIANTS = [
   { color: CONFIG.COLORS.STARFIELD.WHITE, sparkle: false },
   { color: CONFIG.COLORS.STARFIELD.BLUE, sparkle: false },
   { color: CONFIG.COLORS.STARFIELD.WARM, sparkle: false },
-  { color: CONFIG.COLORS.STARFIELD.HERO, sparkle: true },
+  { color: CONFIG.COLORS.STARFIELD.HERO, sparkle: false },
 ];
 StarField.HERO_VARIANT = 3;
