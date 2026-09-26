@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { BackgroundManager } from "../js/managers/BackgroundManager.js";
 import { Nebula } from "../js/entities/Nebula.js";
 
@@ -49,6 +49,10 @@ describe("Nebula visibility across states", () => {
         ],
       },
     ];
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   function runDraw({ running, paused, gameOver }) {
