@@ -6,6 +6,10 @@ import { prefersReducedMotion } from "../utils/motion.js";
  * State lives on the game object (`_shakeT` remaining seconds, `_shakeDur`, `_shakeMag` px) and is
  * advanced with the real frame delta inside the render pass, so it never touches the fixed-step
  * simulation or the seeded RNG. Disabled entirely under prefers-reduced-motion.
+ *
+ * Lifecycle: a shake only decays while frames render. The death jolt is triggered on the same tick
+ * that stops the loop, so it stays pending across the game-over screens; `resetShake` is called
+ * from the run reset (systems/ResetLifecycle) so it does not replay on the next spawn.
  */
 
 /** @typedef {{ _shakeT?: number, _shakeDur?: number, _shakeMag?: number }} ShakeHost */
@@ -22,6 +26,16 @@ export function triggerShake(host, magnitude, duration = 0.35) {
   host._shakeMag = mag;
   host._shakeDur = duration;
   host._shakeT = duration;
+}
+
+/**
+ * Cancel any pending shake so the next rendered frame is steady.
+ * @param {ShakeHost} host Game instance.
+ */
+export function resetShake(host) {
+  if (!host) return;
+  host._shakeT = 0;
+  host._shakeMag = 0;
 }
 
 /**

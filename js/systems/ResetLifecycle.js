@@ -9,6 +9,7 @@ import { SpriteManager } from "../managers/SpriteManager.js";
 import { CONFIG } from "../constants.js";
 import { InputState } from "../core/InputState.js";
 import { warmUpPools } from "../ui/PoolWarmup.js";
+import { resetShake } from "./ScreenShake.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
 /**
@@ -56,6 +57,7 @@ export function releaseAllDynamic(game) {
  *  - Mutates game.score, game.shotsFired, and all stat counters to zero.
  *  - Clears entity arrays (asteroids, bullets, explosions, particles, stars, scorePopups).
  *  - Resets fire rate limiter and creates fresh InputState.
+ *  - Cancels a pending screen shake (the death jolt outlives the stopped loop).
  *  - Updates UI timer display.
  *
  * @param {AIHorizon} game Game instance to reset.
@@ -96,6 +98,7 @@ export function resetCoreRuntimeState(game) {
   game.scorePopups = [];
   game.fireLimiter.reset();
   game.input = new InputState();
+  resetShake(game);
 }
 
 /**

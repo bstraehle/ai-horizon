@@ -5,7 +5,8 @@ import { Player } from "../js/entities/Player.js";
 import { Particle } from "../js/entities/Particle.js";
 import { StarField } from "../js/entities/StarField.js";
 import { RenderManager } from "../js/managers/RenderManager.js";
-import { triggerShake, shakeOffset } from "../js/systems/ScreenShake.js";
+import { triggerShake, shakeOffset, resetShake } from "../js/systems/ScreenShake.js";
+import { resetCoreRuntimeState } from "../js/systems/ResetLifecycle.js";
 import { prefersReducedMotion, setReducedMotion } from "../js/utils/motion.js";
 import { CONFIG } from "../js/constants.js";
 
@@ -202,6 +203,28 @@ describe("ScreenShake", () => {
     triggerShake(quiet, 10, 0.5);
     expect(quiet._shakeT).toBeUndefined();
     expect(prefersReducedMotion()).toBe(true);
+  });
+
+  it("does not replay a death jolt at the next spawn: a run reset clears pending shake", () => {
+    setReducedMotion(false);
+    const out = { x: 0, y: 0 };
+    const host = {};
+    triggerShake(host, 12, 0.5);
+    resetShake(host);
+    expect(shakeOffset(host, 1 / 60, out)).toEqual({ x: 0, y: 0 });
+
+    // Player death triggers the shake and stops the loop on the same tick, so most of it is still
+    // pending when the next game starts; the core reset must drop it.
+    const game = /** @type {any} */ ({
+      timerSeconds: 90,
+      updateScore() {},
+      fireLimiter: { reset() {} },
+    });
+    triggerShake(game, 12, 0.5);
+    shakeOffset(game, 1 / 60, out);
+    expect(game._shakeT).toBeGreaterThan(0);
+    resetCoreRuntimeState(game);
+    expect(shakeOffset(game, 1 / 60, out)).toEqual({ x: 0, y: 0 });
   });
 });
 
