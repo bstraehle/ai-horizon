@@ -1,28 +1,32 @@
 #!/usr/bin/env node
 /**
- * record-autoplay – record an autopilot run of the game as an MP4 (store listing / promo video).
+ * record-autoplay – render an autopilot run of the game to an MP4 (store listing / promo video).
  *
  * Usage:
  *   node --experimental-websocket scripts/record-autoplay.cjs [url] [--out=store-video/autoplay.mp4]
- *       [--width=360 --height=640 --scale=2] [--seed=12345] [--hold=4] [--fps=30] [--max=130]
- *       [--ffmpeg=<path>]
+ *       [--width=360 --height=640 --scale=3] [--seed=12345] [--hold=4] [--fps=60] [--max=130]
+ *       [--crf=16] [--ffmpeg=<path>]
  *   npm run record
  *
- * Sequence: title screen held --hold seconds (default 4, via the game's `autodelay` flag, so the
- * remote high score is showing) → the run → debrief held 4s once the AI analysis has rendered → Ok
- * → initials prompt 2s → leaderboard held 3s. No score is submitted (initials are left empty; the
- * default seed survived ~50s on the 360x640 viewport — runs are only roughly repeatable because
- * adaptive quality reacts to frame timing, so re-run or change --seed if a take is short). Frames
- * come from the
- * DevTools screencast (the whole page: canvas, HUD and dialogs) with their capture timestamps; the
- * screencast only emits on repaint, so each frame lasts until the next one and the final frame
- * until the recording stopped. ffmpeg resamples to a constant frame rate and encodes H.264
- * yuv420p (limited range) with faststart, which YouTube / Play Console accept. The default
- * viewport 360x640 @2x gives a 720x1280 (9:16) phone video; use --scale=3 for 1080x1920.
+ * Offline, deterministic rendering rather than a live screen recording: a shim installed before the
+ * page loads takes over `requestAnimationFrame` and `performance.now()` once the run starts, so the
+ * game loop only advances when this script steps the clock by exactly one output frame
+ * (1000/fps ms, i.e. one or two fixed simulation steps). After each step a lossless PNG screenshot
+ * is taken at full device resolution. Pacing is therefore perfect regardless of how slowly headless
+ * software rendering draws, frames are never JPEG-compressed, and because no wall-clock time
+ * passes inside a frame the adaptive quality monitor stays at the baseline tier (full starfield,
+ * particles and spawn rates). CSS animations still run on real time, so their playback rate is
+ * scaled to the measured capture speed via the Animation domain.
  *
- * ffmpeg is taken from --ffmpeg, $FFMPEG_PATH or PATH. Otherwise a pinned static Windows build
- * (gyan.dev 8.1.2 essentials, SHA-256 verified) is downloaded once into .tools/ffmpeg (gitignored);
- * on other platforms install ffmpeg and put it on PATH.
+ * Sequence: title screen (held --hold s, with the remote high score loaded) → the run, stepped
+ * frame by frame → game-over dialog (1.2s) → AI debrief once rendered (4s) → Ok → initials prompt
+ * (2s) → leaderboard (3s). No score is submitted (initials left empty). The default seed survived
+ * ~50s on the 360x640 viewport; other seeds mostly die within 15s there.
+ *
+ * Output: H.264 yuv420p (bt709, faststart) at --fps; 360x640 @3x = 1080x1920 (9:16). Expect a
+ * few minutes of rendering per minute of footage. ffmpeg is taken from --ffmpeg, $FFMPEG_PATH or
+ * PATH; otherwise a pinned static Windows build (gyan.dev 8.1.2 essentials, SHA-256 verified) is
+ * downloaded once into .tools/ffmpeg (gitignored). On other platforms install ffmpeg first.
  */
 const { execFileSync, spawnSync } = require("node:child_process");
 const crypto = require("node:crypto");
@@ -40,11 +44,12 @@ const base = (args.find((a) => !a.startsWith("--")) || "http://localhost:8000").
 const out = path.resolve(opt("out", "store-video/autoplay.mp4"));
 const width = Number(opt("width", "360")) || 360;
 const height = Number(opt("height", "640")) || 640;
-const scale = Number(opt("scale", "2")) || 2;
+const scale = Number(opt("scale", "3")) || 3;
 const seed = opt("seed", "12345");
 const holdSec = Number(opt("hold", "4")) || 4;
-const fps = Number(opt("fps", "30")) || 30;
+const fps = Number(opt("fps", "60")) || 60;
 const maxSec = Number(opt("max", "130")) || 130;
+const crf = Number(opt("crf", "16")) || 16;
 
 const FFMPEG_PIN = {
   url: "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.zip",
@@ -53,10 +58,55 @@ const FFMPEG_PIN = {
 };
 const TOOLS_DIR = path.resolve(__dirname, "..", ".tools", "ffmpeg");
 
-const RUNNING =
-  "document.getElementById('gameInfo').hidden && document.getElementById('gameOverScreen').hidden";
-const DEBRIEF_READY =
-  "!document.getElementById('gameOverScreen').hidden && !document.getElementById('okBtn').disabled";
+/**
+ * Installed before any page script runs. Real time until `__frameClock.enable()`; afterwards
+ * `performance.now()` is frozen between `step(ms)` calls and rAF callbacks run only inside them.
+ */
+const CLOCK_SHIM = `(() => {
+  const realNow = performance.now.bind(performance);
+  const realRaf = window.requestAnimationFrame.bind(window);
+  const realCaf = window.cancelAnimationFrame.bind(window);
+  const queue = new Map();
+  let nextId = 1;
+  let virtual = false;
+  let vnow = 0;
+  performance.now = () => (virtual ? vnow : realNow());
+  window.requestAnimationFrame = (cb) => {
+    if (!virtual) return realRaf(cb);
+    const id = nextId++;
+    queue.set(id, cb);
+    return id;
+  };
+  window.cancelAnimationFrame = (id) => {
+    if (!queue.delete(id)) realCaf(id);
+  };
+  window.__frameClock = {
+    enable() {
+      if (virtual) return;
+      vnow = realNow();
+      virtual = true;
+    },
+    step(ms) {
+      vnow += ms;
+      const cbs = Array.from(queue.values());
+      queue.clear();
+      for (const cb of cbs) cb(vnow);
+      return vnow;
+    },
+    disable() {
+      if (!virtual) return;
+      virtual = false;
+      const cbs = Array.from(queue.values());
+      queue.clear();
+      for (const cb of cbs) realRaf(cb);
+    },
+  };
+})();`;
+
+const START_READY =
+  "performance.now() > 15000 || Number(document.getElementById('highScore').textContent) > 0";
+const GAME_OVER = "!document.getElementById('gameOverScreen').hidden";
+const DEBRIEF_READY = `${GAME_OVER} && !document.getElementById('okBtn').disabled`;
 const SKIP_INITIALS = `(() => {
   const screen = document.getElementById('initialsScreen');
   if (!screen || screen.hidden) return 'no-initials';
@@ -125,66 +175,91 @@ async function main() {
   const ffmpeg = await resolveFfmpeg();
   fs.mkdirSync(path.dirname(out), { recursive: true });
   const framesDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-horizon-rec-"));
-  /** @type {{ file: string, t: number }[]} */
+  /** @type {{ file: string, duration: number }[]} */
   const frames = [];
-  const url = `${base}/?seed=${seed}&autoplay=1&autodelay=${Math.round(holdSec * 1000)}&dpr=${scale}`;
-  console.error(`[record] ${url} at ${width}x${height} @${scale}x`);
-  const session = await connect({ url, width, height, scale, chrome: opt("chrome", "") });
-  const { send, evaluate, on, close } = session;
-  let stoppedAt = 0;
-  try {
-    on("Page.screencastFrame", (p) => {
-      const file = path.join(framesDir, `f${String(frames.length + 1).padStart(6, "0")}.jpg`);
-      fs.writeFileSync(file, Buffer.from(p.data, "base64"));
-      frames.push({ file, t: p.metadata.timestamp });
-      send("Page.screencastFrameAck", { sessionId: p.sessionId });
-    });
-    await send("Page.startScreencast", {
-      format: "jpeg",
-      quality: 88,
-      maxWidth: width * scale,
-      maxHeight: height * scale,
-      everyNthFrame: 1,
-    });
+  const frameMs = 1000 / fps;
+  const url = `${base}/?seed=${seed}&autoplay=1&autodelay=600000&dpr=${scale}`;
+  console.error(`[record] ${url} at ${width}x${height} @${scale}x, ${fps} fps`);
 
-    if (!(await waitFor(evaluate, RUNNING, holdSec * 1000 + 15000))) {
-      throw new Error("autopilot did not start");
+  // Start on about:blank so the clock shim is registered before the game script runs.
+  const { send, evaluate, close } = await connect({
+    url: "about:blank",
+    width,
+    height,
+    scale,
+    chrome: opt("chrome", ""),
+  });
+  const grab = async (duration) => {
+    const res = await send("Page.captureScreenshot", { format: "png", optimizeForSpeed: true });
+    if (!res.result) throw new Error(`screenshot failed: ${JSON.stringify(res.error)}`);
+    const file = path.join(framesDir, `f${String(frames.length + 1).padStart(6, "0")}.png`);
+    fs.writeFileSync(file, Buffer.from(res.result.data, "base64"));
+    frames.push({ file, duration });
+  };
+  try {
+    await send("Page.addScriptToEvaluateOnNewDocument", { source: CLOCK_SHIM });
+    await send("Animation.enable");
+    await send("Page.navigate", { url });
+    if (!(await waitFor(evaluate, START_READY, 20000))) throw new Error("page did not load");
+    await sleep(500);
+    await grab(holdSec);
+
+    // Take over the clock, launch, and step the run one output frame at a time.
+    await evaluate("__frameClock.enable()");
+    await evaluate("document.getElementById('startBtn').click()");
+    const maxFrames = Math.ceil(maxSec * fps);
+    let over = false;
+    const t0 = Date.now();
+    for (let i = 0; i < maxFrames && !over; i++) {
+      await evaluate(`__frameClock.step(${frameMs})`);
+      await grab(1 / fps);
+      if (i % 10 === 9) {
+        over = !!(await evaluate(GAME_OVER));
+        // Keep CSS animations (finale flash, death punch) in step with virtual time.
+        const realPerFrame = (Date.now() - t0) / (i + 1);
+        await send("Animation.setPlaybackRate", {
+          playbackRate: Math.min(1, frameMs / Math.max(realPerFrame, frameMs)),
+        });
+        if (i % 300 === 299) {
+          console.error(
+            `[record] ${((i + 1) / fps).toFixed(0)}s of run rendered (${realPerFrame.toFixed(0)} ms/frame)`
+          );
+        }
+      }
     }
-    console.error("[record] run started");
-    const runStart = Date.now();
-    if (!(await waitFor(evaluate, DEBRIEF_READY, maxSec * 1000))) {
-      throw new Error(`run did not finish within --max=${maxSec}s`);
-    }
-    console.error(`[record] run over after ${((Date.now() - runStart) / 1000).toFixed(1)}s`);
-    await sleep(4000);
+    if (!over) throw new Error(`run did not finish within --max=${maxSec}s`);
+    const runSec = (frames.length - 1) / fps;
+    console.error(`[record] run over after ${runSec.toFixed(1)}s`);
+
+    // Back to real time for the network-bound debrief and the dialog flow.
+    await send("Animation.setPlaybackRate", { playbackRate: 1 });
+    await evaluate("__frameClock.disable()");
+    await sleep(400);
+    await grab(1.2);
+    if (!(await waitFor(evaluate, DEBRIEF_READY, 60000))) throw new Error("debrief never rendered");
+    await sleep(400);
+    await grab(4);
     await evaluate("document.getElementById('okBtn').click()");
-    await sleep(2000);
+    await sleep(600);
+    await grab(2);
     await evaluate(SKIP_INITIALS);
     await waitFor(evaluate, LEADERBOARD_VISIBLE, 10000);
-    await sleep(3000);
-    // Screencast timestamps are seconds since the epoch, so the wall clock marks the end.
-    stoppedAt = Date.now() / 1000;
-    await send("Page.stopScreencast");
-    await sleep(300);
+    await sleep(600);
+    await grab(3);
   } finally {
     close();
   }
 
-  if (frames.length < 2) throw new Error("no screencast frames captured");
-  const first = frames[0].t;
-  const end = Math.max(stoppedAt, frames[frames.length - 1].t + 1 / fps);
   const lines = ["ffconcat version 1.0"];
-  for (let i = 0; i < frames.length; i++) {
-    const next = i + 1 < frames.length ? frames[i + 1].t : end;
-    lines.push(`file '${path.basename(frames[i].file)}'`);
-    lines.push(`duration ${Math.max(0.001, next - frames[i].t).toFixed(4)}`);
+  for (const f of frames) {
+    lines.push(`file '${path.basename(f.file)}'`);
+    lines.push(`duration ${f.duration.toFixed(5)}`);
   }
   lines.push(`file '${path.basename(frames[frames.length - 1].file)}'`);
   const list = path.join(framesDir, "list.txt");
   fs.writeFileSync(list, `${lines.join("\n")}\n`);
-  console.error(
-    `[record] ${frames.length} frames over ${(end - first).toFixed(1)}s (${(frames.length / (end - first)).toFixed(1)} fps captured); encoding at ${fps} fps`
-  );
+  const total = frames.reduce((s, f) => s + f.duration, 0);
+  console.error(`[record] ${frames.length} frames, ${total.toFixed(1)}s; encoding (crf ${crf})`);
   execFileSync(
     ffmpeg,
     [
@@ -198,13 +273,19 @@ async function main() {
       "-i",
       list,
       "-vf",
-      `fps=${fps},scale=trunc(iw/2)*2:trunc(ih/2)*2:in_range=jpeg:out_range=mpeg,format=yuv420p`,
+      `fps=${fps},scale=trunc(iw/2)*2:trunc(ih/2)*2:out_color_matrix=bt709,format=yuv420p`,
       "-c:v",
       "libx264",
       "-preset",
-      "medium",
+      "slow",
       "-crf",
-      "20",
+      String(crf),
+      "-colorspace",
+      "bt709",
+      "-color_primaries",
+      "bt709",
+      "-color_trc",
+      "bt709",
       "-movflags",
       "+faststart",
       out,
