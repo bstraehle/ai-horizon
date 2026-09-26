@@ -28,7 +28,8 @@
     "perf:bench": "node --experimental-websocket scripts/perf-bench.cjs",
     "shots": "node --experimental-websocket scripts/screenshot.cjs",
     "shots:store": "node --experimental-websocket scripts/store-screenshots.cjs",
-    "icons": "node --experimental-websocket scripts/icon-concepts.cjs"
+    "icons": "node --experimental-websocket scripts/icon-concepts.cjs",
+    "record": "node --experimental-websocket scripts/record-autoplay.cjs"
   },
   "vitest": {
     "setupFiles": "./tests/setup.js"

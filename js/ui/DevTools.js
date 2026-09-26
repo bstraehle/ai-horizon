@@ -18,6 +18,8 @@ import { PerfOverlay } from "./PerfOverlay.js";
  *  - `debug=perf` → PerfOverlay HUD + console session summary at game over.
  *  - `autoplay=1` → Autopilot drives input and auto-starts the game (pair with `?seed=` for
  *    reproducible before/after profiles).
+ *  - `autodelay=MS` → title-screen hold before the auto-start (default 800ms; recordings use a
+ *    longer hold so the remote high score has loaded and the title reads).
  *  - `dpr=N` → raises the render DPR ceiling to N (0 < N <= 8) for high-density screenshots
  *    (store listings); applied immediately via `game.resizeCanvas()`.
  *
@@ -52,6 +54,8 @@ export function attachDevTools(game, search) {
 
   const overlay = wantOverlay ? new PerfOverlay(game) : null;
   const autopilot = wantAutopilot ? new Autopilot() : null;
+  const autoDelay = Number(params.get("autodelay"));
+  const defaultDelayMs = Number.isFinite(autoDelay) && autoDelay >= 0 ? autoDelay : 800;
   return {
     overlay,
     autopilot,
@@ -64,7 +68,7 @@ export function attachDevTools(game, search) {
     onGameOver() {
       if (overlay) overlay.logSummary();
     },
-    autoStart(delayMs = 800) {
+    autoStart(delayMs = defaultDelayMs) {
       if (!autopilot || typeof setTimeout !== "function") return;
       setTimeout(() => {
         try {

@@ -17,7 +17,8 @@
  *
  * Programmatic use (see store-screenshots.cjs): `require("./screenshot.cjs").capture(options)` with
  * `actions` as an array of single commands, which lets `eval`/`waitfor` expressions contain
- * semicolons.
+ * semicolons. `connect(options)` exposes the underlying DevTools session (send / evaluate / event
+ * subscription) for tools that need more than screenshots, e.g. record-autoplay.cjs's screencast.
  *
  * Shares the zero-dependency DevTools-protocol approach of perf-bench.cjs (Node's built-in
  * WebSocket; flagged on Node < 22). Rendering is software-based but visually identical.
@@ -61,24 +62,23 @@ async function waitForDebugger(port) {
 }
 
 /**
- * Launch headless Chrome at `url`, run the action list, write PNGs into `outDir`.
- * @param {{ url: string, outDir: string, actions: string[], width?: number, height?: number,
- *   scale?: number, timeoutMs?: number, chrome?: string }} options
- * @returns {Promise<string[]>} Paths of the screenshots written.
+ * Launch headless Chrome at `url` with the viewport emulated, and open a DevTools-protocol session.
+ * @param {{ url: string, width?: number, height?: number, scale?: number, chrome?: string }} options
+ * @returns {Promise<{ send: (method: string, params?: object) => Promise<any>,
+ *   evaluate: (expression: string) => Promise<any>,
+ *   on: (method: string, handler: (params: any) => void) => void, close: () => void }>}
+ *  `send` resolves with the raw protocol response (`result` / `error`); `evaluate` returns the
+ *  expression value (promises awaited); `on` subscribes to protocol events such as
+ *  `Page.screencastFrame`; `close` ends the session and kills Chrome.
  */
-async function capture(options) {
+async function connect(options) {
   if (typeof WebSocket !== "function") {
     throw new Error("Global WebSocket unavailable: run with `node --experimental-websocket`");
   }
-  const { url, outDir, actions } = options;
   const width = options.width || 1600;
   const height = options.height || 900;
   const scale = options.scale || 1;
-  const timeoutMs = options.timeoutMs || 120000;
   const port = 9333 + Math.floor(Math.random() * 500);
-  const written = [];
-
-  fs.mkdirSync(outDir, { recursive: true });
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "ai-horizon-shots-"));
   const proc = spawn(
     findChrome(options.chrome),
@@ -94,7 +94,7 @@ async function capture(options) {
       "--hide-scrollbars",
       `--window-size=${width},${height}`,
       `--force-device-scale-factor=${scale}`,
-      url,
+      options.url,
     ],
     { stdio: "ignore" }
   );
@@ -119,47 +119,82 @@ async function capture(options) {
       ws.addEventListener("open", resolve, { once: true });
       ws.addEventListener("error", reject, { once: true });
     });
-    let nextId = 1;
-    const pending = new Map();
-    ws.addEventListener("message", (ev) => {
-      const msg = JSON.parse(String(ev.data));
-      if (msg.id && pending.has(msg.id)) {
-        pending.get(msg.id)(msg);
-        pending.delete(msg.id);
-      } else if (msg.method === "Runtime.exceptionThrown") {
-        const d = msg.params.exceptionDetails;
-        console.error("[page error]", (d.exception && d.exception.description) || d.text);
-      } else if (msg.method === "Runtime.consoleAPICalled" && msg.params.type === "error") {
-        const text = (msg.params.args || [])
-          .map((a) => (a.value !== undefined ? String(a.value) : a.description || ""))
-          .join(" ");
-        console.error("[page console.error]", text.slice(0, 400));
-      }
+  } catch (err) {
+    cleanup();
+    throw err;
+  }
+  let nextId = 1;
+  const pending = new Map();
+  const listeners = new Map();
+  ws.addEventListener("message", (ev) => {
+    const msg = JSON.parse(String(ev.data));
+    if (msg.id && pending.has(msg.id)) {
+      pending.get(msg.id)(msg);
+      pending.delete(msg.id);
+    } else if (msg.method === "Runtime.exceptionThrown") {
+      const d = msg.params.exceptionDetails;
+      console.error("[page error]", (d.exception && d.exception.description) || d.text);
+    } else if (msg.method === "Runtime.consoleAPICalled" && msg.params.type === "error") {
+      const text = (msg.params.args || [])
+        .map((a) => (a.value !== undefined ? String(a.value) : a.description || ""))
+        .join(" ");
+      console.error("[page console.error]", text.slice(0, 400));
+    }
+    if (msg.method && listeners.has(msg.method)) {
+      for (const handler of listeners.get(msg.method)) handler(msg.params);
+    }
+  });
+  const send = (method, params = {}) =>
+    new Promise((resolve) => {
+      const id = nextId++;
+      pending.set(id, resolve);
+      ws.send(JSON.stringify({ id, method, params }));
     });
-    const send = (method, params = {}) =>
-      new Promise((resolve) => {
-        const id = nextId++;
-        pending.set(id, resolve);
-        ws.send(JSON.stringify({ id, method, params }));
-      });
-    const evaluate = async (expression) => {
-      const res = await send("Runtime.evaluate", {
-        expression,
-        returnByValue: true,
-        awaitPromise: true,
-      });
-      return res.result && res.result.result ? res.result.result.value : undefined;
-    };
-
-    await send("Runtime.enable");
-    await send("Page.enable");
-    await send("Emulation.setDeviceMetricsOverride", {
-      width,
-      height,
-      deviceScaleFactor: scale,
-      mobile: false,
+  const evaluate = async (expression) => {
+    const res = await send("Runtime.evaluate", {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
     });
+    return res.result && res.result.result ? res.result.result.value : undefined;
+  };
+  const on = (method, handler) => {
+    if (!listeners.has(method)) listeners.set(method, []);
+    listeners.get(method).push(handler);
+  };
 
+  await send("Runtime.enable");
+  await send("Page.enable");
+  await send("Emulation.setDeviceMetricsOverride", {
+    width,
+    height,
+    deviceScaleFactor: scale,
+    mobile: false,
+  });
+  return {
+    send,
+    evaluate,
+    on,
+    close() {
+      ws.close();
+      cleanup();
+    },
+  };
+}
+
+/**
+ * Launch headless Chrome at `url`, run the action list, write PNGs into `outDir`.
+ * @param {{ url: string, outDir: string, actions: string[], width?: number, height?: number,
+ *   scale?: number, timeoutMs?: number, chrome?: string }} options
+ * @returns {Promise<string[]>} Paths of the screenshots written.
+ */
+async function capture(options) {
+  const { outDir, actions } = options;
+  const timeoutMs = options.timeoutMs || 120000;
+  const written = [];
+  fs.mkdirSync(outDir, { recursive: true });
+  const { send, evaluate, close } = await connect(options);
+  try {
     for (const raw of actions) {
       const cmd = raw.trim();
       if (!cmd) continue;
@@ -205,8 +240,7 @@ async function capture(options) {
       }
     }
   } finally {
-    if (ws) ws.close();
-    cleanup();
+    close();
   }
   return written;
 }
@@ -230,7 +264,7 @@ async function main() {
   process.exit(0);
 }
 
-module.exports = { capture };
+module.exports = { capture, connect, findChrome, sleep };
 
 if (require.main === module) {
   main().catch((err) => {

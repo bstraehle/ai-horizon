@@ -63,6 +63,24 @@ describe("attachDevTools", () => {
     }
   });
 
+  it("honours autodelay for the default auto-start hold", () => {
+    vi.useFakeTimers();
+    try {
+      const game = makeGame();
+      attachDevTools(game, "?autoplay=1&autodelay=3000")?.autoStart();
+      vi.advanceTimersByTime(2999);
+      expect(game.startGame).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(game.startGame).toHaveBeenCalledTimes(1);
+      const plain = makeGame();
+      attachDevTools(plain, "?autoplay=1&autodelay=nope")?.autoStart();
+      vi.advanceTimersByTime(800);
+      expect(plain.startGame).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("forwards metrics to the overlay and drives input via the autopilot", () => {
     const game = makeGame();
     game.state = { isRunning: () => true };
