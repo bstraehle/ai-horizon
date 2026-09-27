@@ -511,7 +511,9 @@ body.about-body,
 }
 .about-content h1 {
   font-size: clamp(1.5rem, 3vw + 1rem, 2.5rem);
-  margin-bottom: var(--space-5);
+  /* Matches the page's top padding plus the heading's own leading, so the title sits centred
+     between the page edge and the video below it. */
+  margin-bottom: var(--space-7);
   margin-top: 0;
   text-align: center;
   text-shadow: 0 0 20px var(--color-title-shadow);
@@ -557,6 +559,11 @@ body.about-body,
   display: block;
   height: auto;
   width: 100%;
+}
+/* The video box has no descender/leading below it like a text line does; add that room so the gap
+   to the next paragraph reads the same as the gap between paragraphs. */
+.about-content .about-video-wrap {
+  margin-bottom: calc(var(--space-4) + 0.25em);
 }
 .about-content p.about-back {
   margin: 8px auto 0;
