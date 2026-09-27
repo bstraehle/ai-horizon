@@ -5,7 +5,11 @@ Usage:
       [--out store-video/ai-horizon-1024x500.mp4] [--size 1024x500] [--crf 14]
 
 The raw video comes from `npm run record -- --width=1024 --height=500 --scale=2 --seed=39996 ...`
-(supersampled 2x). Each narration cue has a target start time `at` (seconds of video) and a voice;
+(supersampled 2x). The 16:9 build uses the same script on a 960x540 @2x recording:
+`npm run record -- --width=960 --height=540 --scale=2 --seed=2024 --out=store-video/_raw-1920x1080.mp4`
+then `python store-video/narrate.py --raw store-video/_raw-1920x1080.mp4 --size 1920x1080
+--out store-video/ai-horizon-1920x1080.mp4` (seed 2024 completes the full 90s at that aspect; 39996
+dies after 15s). Each narration cue has a target start time `at` (seconds of video) and a voice;
 cues never overlap: a cue starts at max(at, previous cue end + gap). The last frame is held until
 the final cue has finished plus `tail` seconds. Speech is synthesised with the Polly neural engine
 as 24 kHz MP3 (cached in store-video/.polly-cache/), mixed onto a 48 kHz track and loudness
