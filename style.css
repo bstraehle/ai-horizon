@@ -550,6 +550,14 @@ body.about-body,
   padding: 0;
   text-decoration: underline;
 }
+/* Embedded video: fill the paragraph's width and derive the height from the 16:9 ratio. */
+.about-content .about-video {
+  aspect-ratio: 16 / 9;
+  border: 0;
+  display: block;
+  height: auto;
+  width: 100%;
+}
 .about-content p.about-back {
   margin: 8px auto 0;
   max-width: 720px;
