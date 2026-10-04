@@ -1427,6 +1427,7 @@ export class UIManager {
   }
 
   /** Focus-in guard for overlays (keeps primary controls focused).
+   * Links (About/Privacy) on the start and leaderboard overlays may take focus.
    * @param {FocusEvent} e
    * @param {HTMLElement|null} gameInfo
    * @param {HTMLElement|null} startBtn
@@ -1477,6 +1478,8 @@ export class UIManager {
     }
 
     if (overlayGameOverVisible) {
+      const targetIsLink = t && typeof t.closest === "function" && t.closest("a");
+      if (targetIsLink) return;
       const isRestart =
         t === restartBtn || (t && typeof t.closest === "function" && t.closest("#restartBtn"));
       const initialsEl = /** @type {HTMLElement|null} */ (document.getElementById("initialsInput"));

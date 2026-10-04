@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { JSDOM } from "jsdom";
 import { UIManager } from "../js/managers/UIManager.js";
 import { LeaderboardManager } from "../js/managers/LeaderboardManager.js";
+import { FocusManager } from "../js/managers/FocusManager.js";
 
 function setupDOM() {
   const dom = new JSDOM(
@@ -50,5 +51,46 @@ describe("UIManager.restartBtn focus persistence", () => {
 
     // After guard, focus should still be on restartBtn.
     expect(document.activeElement).toBe(restartBtn);
+  });
+});
+
+describe("UIManager.handleDocumentFocusIn on the leaderboard overlay", () => {
+  /** @type {import("vitest").MockInstance} */
+  let focusSpy;
+  const originalElement = globalThis.Element;
+
+  beforeEach(() => {
+    const dom = setupDOM();
+    globalThis.Element = dom.window.Element;
+    const group = document.createElement("div");
+    group.innerHTML = `<a id="lbAbout" href="about.html">About</a>`;
+    document.getElementById("leaderboardScreen").appendChild(group);
+    FocusManager.unlock();
+    focusSpy = vi.spyOn(UIManager, "focusWithRetry").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    focusSpy.mockRestore();
+    globalThis.Element = originalElement;
+  });
+
+  /** @param {Element} target */
+  const focusIn = (target) =>
+    UIManager.handleDocumentFocusIn(
+      /** @type {any} */ ({ target }),
+      null,
+      null,
+      document.getElementById("leaderboardScreen"),
+      document.getElementById("restartBtn")
+    );
+
+  it("lets the About/Privacy links keep focus", () => {
+    focusIn(document.getElementById("lbAbout"));
+    expect(focusSpy).not.toHaveBeenCalled();
+  });
+
+  it("still redirects other focus targets to the restart button", () => {
+    focusIn(document.getElementById("leaderboardList"));
+    expect(focusSpy).toHaveBeenCalledWith(document.getElementById("restartBtn"));
   });
 });

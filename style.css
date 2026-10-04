@@ -488,6 +488,19 @@ body {
   border-color: var(--color-border);
   box-shadow: none;
 }
+/* Leaderboard panel actions: the list-to-button, button-to-links and links-to-border gaps are all
+   --space-6. The panel's bottom padding equals the links' top margin, so with the links' symmetric
+   padding the gaps above and below the About/Privacy links match. Trimming the links' text box to cap
+   height and baseline drops the font's uneven internal leading so the visible gaps match exactly. */
+#leaderboardScreen .leaderboard {
+  margin-bottom: var(--space-6);
+}
+#leaderboardScreen .game-over-content {
+  padding-bottom: var(--space-4);
+}
+#leaderboardScreen .action-link {
+  text-box: trim-both cap alphabetic;
+}
 /* 8. About Page ------------------------------------------ */
 .about-page {
   box-sizing: border-box;
