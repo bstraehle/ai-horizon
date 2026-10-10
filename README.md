@@ -1,6 +1,6 @@
 # AI HORIZON
 
-![AI HORIZON architecture](docs/architecture.svg)
+<video src="docs/architecture.drawio.mp4" title="AI HORIZON architecture" controls autoplay loop muted playsinline></video>
 
 An arcade-style space shooter for the browser: collect stars, blast asteroids, and beat the 90-second clock. Built with vanilla JavaScript and HTML5 Canvas, installable as a PWA, and backed by an optional serverless AWS leaderboard with AI run analysis. Controls and scoring are described in [`about.html`](about.html).
 
