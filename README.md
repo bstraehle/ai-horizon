@@ -1,80 +1,41 @@
-# AI Horizon
+# AI HORIZON
 
-![AI Horizon system architecture](docs/architecture.svg)
+![AI HORIZON architecture](docs/architecture.svg)
 
-AI Horizon is a fast, responsive HTML5 Canvas space shooter built with vanilla JavaScript and ES modules. It combines arcade action, particle-heavy visuals, deterministic seeded runs, and a local/remote leaderboard.
+An arcade-style space shooter for the browser: collect stars, blast asteroids, and beat the 90-second clock. Built with vanilla JavaScript and HTML5 Canvas, installable as a PWA, and backed by an optional serverless AWS leaderboard with AI run analysis. Controls and scoring are described in [`about.html`](about.html).
 
 ## Quick start
 
-Requirements: Node 20.19+ or 22.12+.
+Requires Node 20.19+ or 22.12+.
 
-1. Install dependencies: `npm install`
-2. Start the dev server: `npm run serve`
-3. Open http://localhost:8000
+```bash
+npm install
+npm run serve   # http://localhost:8000
+```
 
-For a production build, run `npm run build` and serve the generated `dist/` folder.
+## Commands
 
-> The game must be served over HTTP because it uses ES modules.
+| Command            | Purpose                                   |
+| ------------------ | ----------------------------------------- |
+| `npm run serve`    | Dev server at http://localhost:8000       |
+| `npm run build`    | Production build into `dist/`             |
+| `npm test`         | Unit tests (Vitest)                       |
+| `npm run ci:local` | Lint, format check, type check, and tests |
 
-## Current highlights
+## Deploy
 
-- Fast gameplay with layered starfields, nebula effects, and asteroid waves
-- Hardened planetary asteroids, score popups, and impact effects
-- Deterministic runs via `?seed=...`
-- Local and optional remote leaderboard support with conflict retry
-- PWA-friendly assets and mobile-friendly controls
+Copy the contents of `dist/` to static HTTPS hosting (production uses Amazon S3 behind CloudFront). The Lambda functions for the leaderboard and run analysis live in `server/lambda/`; the client's AWS endpoints are configured in `js/adapters/awsConfig.js`.
 
-## Visual design
+## URL flags
 
-The in-game look is "clean minimal": a near-black field with a soft vignette and a faint haze, white and light-gray flat shapes with thin dark outlines, and a single accent colour per run — red or blue, following the nebula palette that alternates between games — reserved for the engine flame, upgraded bolts, bonus planets/stars and score popups. The HUD and screens keep the original dark UI.
+- `?seed=12345` — reproducible run
+- `?autoplay=1` — autopilot plays the game
+- `?debug=perf` — on-screen performance overlay
 
-- Canvas colours live in one place, `CONFIG.COLORS` in `js/constants.js`; asteroid palettes are two-tone (`FACE` / `FACET`) and the run accent is `COLORS.ACCENT`. Change a token there rather than hard-coding a colour.
-- Entities are procedural "flat geometric" art (low-poly rocks with one hard shadow facet, discs with a crescent shadow for planets, an arrowhead ship, thin bolts, two-tone stars) rendered once into cached sprites with no gradients or blurs; per-frame cost stays a `drawImage`.
-- Motion flourishes — ship banking, asteroid spin, pickup pulse, explosion shockwave ring, hit flash, brief screen shake on big impacts — are render-only (the fixed-step simulation and seeded runs are unaffected) and are switched off when the OS requests `prefers-reduced-motion`.
-- `npm run shots -- "<url>" --actions="wait 3000; shot name"` captures headless-Chrome screenshots for visual QA (see `scripts/screenshot.cjs` for the action syntax).
+## Project layout
 
-## Project structure
-
-- `js/` — game loop, entities, managers, systems, adapters, and constants
-- `tests/` — Vitest coverage for gameplay logic and edge cases
-- `server/lambda/` — example remote leaderboard endpoint
-- `docs/` — architecture and supporting documentation
-
-## Development commands
-
-- `npm run serve` — start the dev server
-- `npm run build` — create the production bundle
-- `npm run test` / `npm run test:watch` — run tests
-- `npm run lint` / `npm run lint:fix` — lint and fix issues
-- `npm run typecheck` — validate JSDoc-based type checking
-- `npm run ci:local` — run the full local verification suite
-- `npm run perf:bench -- http://localhost:8000` — headless-Chrome benchmark run (see below)
-
-The production build produces two flat script files in `dist/`: `bundle.js` (the game) and `Cognito.js` (the AWS SDK used for the remote leaderboard, loaded on demand via `import()` the first time a signed request is needed). The initial download therefore contains game code only, and deploying is still a plain copy of the `dist/` folder contents.
-
-### Profiling flags
-
-Diagnostics are opt-in via query parameters and cost nothing when absent:
-
-- `?debug=perf` — on-screen frame diagnostics (fps, update/draw ms with p95, entity and pool counts, sprite cache sizes, adaptive performance level, canvas resolution). A JSON session summary is logged to the console at game over.
-- `?autoplay=1` — a scripted pilot drives the ship and auto-starts the game, for reproducible profiling runs.
-
-Combine them with a fixed seed for before/after comparisons, e.g. `http://localhost:8000/?seed=12345&debug=perf&autoplay=1`.
-
-`npm run perf:bench -- <url>` automates this: it launches headless Chrome (or Edge) against the URL with those flags, waits for the game-over summary and prints it as JSON. Runs use software rendering, so compare two runs against each other rather than against real-device targets. Node 22+ has the required WebSocket built in; the script passes `--experimental-websocket` for Node 20/21.
-
-## Players
-
-If you are playing the game, the main controls and scoring details are described in `about.html`.
-
-For the best experience:
-
-- open the game in a modern browser
-- use a local server when running it from source
-- try different seeds with `?seed=...` to explore different runs
-
-For remote leaderboard support, the app should be served over HTTPS in production.
-
----
-
-Happy hacking!
+- `js/` — game source (core, entities, managers, systems, UI, AWS adapters)
+- `server/lambda/` — AWS Lambda functions
+- `tests/` — Vitest unit tests
+- `scripts/` — headless-Chrome tooling (benchmarks, screenshots, recordings)
+- `docs/` — architecture diagram (`architecture.drawio` is the editable source)
