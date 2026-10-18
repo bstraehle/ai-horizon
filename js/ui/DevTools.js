@@ -1,5 +1,6 @@
 import { Autopilot } from "./Autopilot.js";
 import { PerfOverlay } from "./PerfOverlay.js";
+import { FocusManager } from "../managers/FocusManager.js";
 
 /**
  * @typedef {Object} DevToolsHandle
@@ -22,6 +23,11 @@ import { PerfOverlay } from "./PerfOverlay.js";
  *    longer hold so the remote high score has loaded and the title reads).
  *  - `dpr=N` → raises the render DPR ceiling to N (0 < N <= 8) for high-density screenshots
  *    (store listings); applied immediately via `game.resizeCanvas()`.
+ *  - `debug=focus` → console trace of focus changes, pointer/key input, window focus and overlay
+ *    transitions (with the active focus lock), for diagnosing lost overlay focus. Observes only.
+ *  - `soundlog=1` → appends every sound-effect call to `window.__soundLog` as
+ *    `{ t: performance.now(), method, args }` (narration excluded) so a recorder can rebuild the
+ *    soundtrack offline (see scripts/render-sfx.cjs). Sounds still play as usual.
  *
  * Returns null when neither the overlay nor the autopilot is requested (the dpr cap alone needs no
  * per-frame hooks) so the game loop carries no diagnostics cost in normal sessions. Keeps
@@ -35,6 +41,8 @@ export function attachDevTools(game, search) {
   const params = new URLSearchParams(resolveSearch(search));
   const wantOverlay = params.get("debug") === "perf";
   const wantAutopilot = params.get("autoplay") === "1";
+  if (params.get("debug") === "focus") attachFocusTrace();
+  if (params.get("soundlog") === "1") attachSoundLog(game);
   const dprCap = Number(params.get("dpr"));
   if (Number.isFinite(dprCap) && dprCap > 0 && dprCap <= 8) {
     game._dprCapOverride = dprCap;
@@ -78,6 +86,121 @@ export function attachDevTools(game, search) {
         }
       }, delayMs);
     },
+  };
+}
+
+/** AudioManager sound-effect methods captured by `soundlog=1` (narration is deliberately absent). */
+export const SOUND_LOG_METHODS = [
+  "playAsteroidHit",
+  "playHardenedExplosion",
+  "playUpgrade",
+  "playStarCollect",
+  "playFatal",
+];
+
+/**
+ * Wrap the game's sound-effect methods so each call is appended to `log` (default
+ * `window.__soundLog`) with the current `performance.now()` – virtual time under the recorder's
+ * frame clock – before delegating to the original method.
+ * @param {any} game Game instance exposing `audio`.
+ * @param {any[]} [log]
+ * @returns {any[]|null} The log array, or null when there is no audio manager.
+ */
+export function attachSoundLog(game, log) {
+  const audio = game && game.audio;
+  if (!audio) return null;
+  const g = /** @type {any} */ (globalThis);
+  const entries = log || (g.__soundLog = g.__soundLog || []);
+  for (const method of SOUND_LOG_METHODS) {
+    const original = audio[method];
+    if (typeof original !== "function") continue;
+    audio[method] = (/** @type {any[]} */ ...args) => {
+      entries.push({ t: performance.now(), method, args: JSON.parse(JSON.stringify(args)) });
+      return original.apply(audio, args);
+    };
+  }
+  return entries;
+}
+
+/**
+ * Log focus-relevant events to the console (`[focus]` prefix). Listeners are passive window
+ * capture listeners registered before any focus lock, so they see events even when the lock
+ * stops propagation, and never alter behavior.
+ * @param {Document} [doc]
+ * @returns {() => void} Detach.
+ */
+export function attachFocusTrace(doc = document) {
+  const win = doc.defaultView;
+  if (!win) return () => {};
+  const t0 = Date.now();
+  /** @param {any} el */
+  const name = (el) => {
+    if (!el || !el.tagName) return el === win ? "window" : String(el);
+    if (el.id) return `#${el.id}`;
+    const cls =
+      typeof el.className === "string" && el.className ? `.${el.className.split(" ")[0]}` : "";
+    return `${el.tagName.toLowerCase()}${cls}`;
+  };
+  const visible = (/** @type {string} */ id) => {
+    const el = doc.getElementById(id);
+    return !!el && !el.hidden && !el.classList.contains("hidden");
+  };
+  const state = () => {
+    const screens = [
+      ["gameInfo", "start"],
+      ["gameOverScreen", "debrief"],
+      ["initialsScreen", "initials"],
+      ["leaderboardScreen", "leaderboard"],
+    ]
+      .filter(([id]) => visible(id))
+      .map(([, label]) => label);
+    const lock = FocusManager._lock ? name(FocusManager._lock.target) : "none";
+    return `active=${name(doc.activeElement)} screens=[${screens.join(",")}] lock=${lock} hasFocus=${doc.hasFocus()}`;
+  };
+  /** @param {string} what */
+  const log = (what) => console.log(`[focus] +${Date.now() - t0}ms ${what} | ${state()}`);
+
+  /** @param {Event} e */
+  const onEvent = (e) => {
+    const any = /** @type {any} */ (e);
+    if (e.type === "keydown" && !["Enter", " ", "Tab", "Escape"].includes(any.key)) return;
+    const extra =
+      e.type === "keydown"
+        ? ` key=${any.key === " " ? "Space" : any.key}`
+        : e.type.startsWith("pointer")
+          ? ` pointer=${any.pointerType}`
+          : e.type === "focusin" || e.type === "focusout"
+            ? ` related=${name(any.relatedTarget)}`
+            : "";
+    log(`${e.type} target=${name(e.target)}${extra}`);
+  };
+  const types = ["focusin", "focusout", "pointerdown", "pointerup", "click", "keydown"];
+  for (const type of types) win.addEventListener(type, onEvent, { capture: true, passive: true });
+  const onWin = (/** @type {Event} */ e) => log(`window ${e.type}`);
+  win.addEventListener("blur", onWin);
+  win.addEventListener("focus", onWin);
+  const onVis = () => log(`visibility ${doc.visibilityState}`);
+  doc.addEventListener("visibilitychange", onVis);
+
+  let leaderboardShown = visible("leaderboardScreen");
+  const observer = new win.MutationObserver(() => {
+    const now = visible("leaderboardScreen");
+    if (now && !leaderboardShown) {
+      log("leaderboard shown");
+      for (const ms of [100, 500, 1500, 3000]) setTimeout(() => log(`  leaderboard +${ms}ms`), ms);
+    }
+    leaderboardShown = now;
+  });
+  const lb = doc.getElementById("leaderboardScreen");
+  if (lb) observer.observe(lb, { attributes: true, attributeFilter: ["class", "hidden"] });
+  log("trace attached");
+
+  return () => {
+    for (const type of types) win.removeEventListener(type, onEvent, { capture: true });
+    win.removeEventListener("blur", onWin);
+    win.removeEventListener("focus", onWin);
+    doc.removeEventListener("visibilitychange", onVis);
+    observer.disconnect();
   };
 }
 

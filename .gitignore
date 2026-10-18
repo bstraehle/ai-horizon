@@ -7,4 +7,5 @@
 
 # Store video intermediates (store-video/narrate.py)
 store-video/_raw-*.mp4
+store-video/_sfx-*
 store-video/.polly-cache/

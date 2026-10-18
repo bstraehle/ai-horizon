@@ -12,9 +12,17 @@ then `python store-video/narrate.py --raw store-video/_raw-1920x1080.mp4 --size 
 dies after 15s). Each narration cue has a target start time `at` (seconds of video) and a voice;
 cues never overlap: a cue starts at max(at, previous cue end + gap). The last frame is held until
 the final cue has finished plus `tail` seconds. Speech is synthesised with the Polly neural engine
-as 24 kHz MP3 (cached in store-video/.polly-cache/), mixed onto a 48 kHz track and loudness
-normalised to -16 LUFS; a matching .srt is written next to the MP4. Conventions follow the svg-to-mp4 agent skill: female host for the
-intro/outro, male narrator for the gameplay, us-east-1 fallback when the engine is unavailable.
+as 24 kHz MP3 (cached in store-video/.polly-cache/), mixed onto a 48 kHz track and normalised to
+-16 LUFS integrated (linear gain + peak limiter, so the voice/effects balance is preserved); a
+matching .srt is written next to the MP4. Conventions follow the svg-to-mp4 agent skill: female host
+for the intro/outro, male narrator for the gameplay, us-east-1 fallback when the engine is unavailable.
+
+Game sound (optional): record with `--sfx=store-video/_sfx-1920x1080.json`, render it with
+`node --experimental-websocket scripts/render-sfx.cjs --events=store-video/_sfx-1920x1080.json`,
+then pass `--sfx store-video/_sfx-1920x1080.wav`. The effects are set `--sfx-lu` (default 10) LU
+below the measured loudness of the voice-over cues and ducked further by a sidechain compressor
+keyed on the narration, so the voice stays clear (>= ~10 dB over the game) while the game is
+audible between and under the cues.
 """
 from __future__ import annotations
 
@@ -31,6 +39,9 @@ HERE = Path(__file__).resolve().parent
 FFMPEG_DIR = HERE.parent / ".tools" / "ffmpeg" / "ffmpeg-8.1.2-essentials_build" / "bin"
 RATE = 48000
 FALLBACK_REGION = "us-east-1"
+TARGET_LUFS = -16.0
+PEAK_LIMIT = 0.84  # ~-1.5 dBFS
+DUCK = "sidechaincompress=threshold=0.03:ratio=4:attack=15:release=350:knee=4"
 
 
 def tool(name: str) -> str:
@@ -69,6 +80,36 @@ def duration(video: Path) -> float:
     return float(subprocess.run(cmd, check=True, capture_output=True, text=True).stdout.strip())
 
 
+def loudness(audio: Path) -> float:
+    """Integrated loudness (LUFS) via ffmpeg's loudnorm analysis."""
+    cmd = [tool("ffmpeg"), "-hide_banner", "-nostats", "-i", str(audio),
+           "-af", "loudnorm=print_format=json", "-f", "null", "-"]
+    err = subprocess.run(cmd, check=True, capture_output=True, text=True).stderr
+    return float(json.loads(err[err.rindex("{"):err.rindex("}") + 1])["input_i"])
+
+
+def mix(narration: Path, sfx: Path | None, sfx_lu: float, out: Path) -> None:
+    """Narration alone, or narration over the effects bed ducked by the narration (float WAV)."""
+    if sfx is None:
+        cmd = [tool("ffmpeg"), "-y", "-v", "error", "-i", str(narration),
+               "-af", "aformat=channel_layouts=stereo", "-c:a", "pcm_f32le", str(out)]
+    else:
+        voice = loudness(narration)
+        sfx_lufs = voice - sfx_lu
+        gain = sfx_lufs - loudness(sfx)
+        graph = (
+            "[0:a]aformat=sample_rates=48000:channel_layouts=stereo,asplit=2[voice][key];"
+            f"[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume={gain:.2f}dB,apad[bed];"
+            f"[bed][key]{DUCK}[ducked];"
+            "[voice][ducked]amix=inputs=2:duration=first:normalize=0[out]"
+        )
+        cmd = [tool("ffmpeg"), "-y", "-v", "error", "-i", str(narration), "-i", str(sfx),
+               "-filter_complex", graph, "-map", "[out]", "-c:a", "pcm_f32le", str(out)]
+        print(f"effects bed: {gain:+.1f} dB to {sfx_lufs:.1f} LUFS ({sfx_lu:g} LU under the "
+              f"{voice:.1f} LUFS voice-over), ducked while it speaks", file=sys.stderr)
+    subprocess.run(cmd, check=True)
+
+
 def srt_time(s: float) -> str:
     ms = int(round(s * 1000))
     return f"{ms // 3600000:02d}:{ms // 60000 % 60:02d}:{ms // 1000 % 60:02d},{ms % 1000:03d}"
@@ -81,6 +122,8 @@ def main() -> None:
     ap.add_argument("--out", default=str(HERE / "ai-horizon-1024x500.mp4"))
     ap.add_argument("--size", default="1024x500")
     ap.add_argument("--crf", default="14")
+    ap.add_argument("--sfx", default=None, help="game sound WAV from scripts/render-sfx.cjs")
+    ap.add_argument("--sfx-lu", type=float, default=10.0, help="effects bed level below the voice-over (LU)")
     args = ap.parse_args()
 
     raw, out = Path(args.raw), Path(args.out)
@@ -114,19 +157,25 @@ def main() -> None:
         encoding="utf-8",
     )
 
+    mixed = out.with_suffix(".mix.wav")
+    mix(wav, Path(args.sfx) if args.sfx else None, args.sfx_lu, mixed)
+    gain = TARGET_LUFS - loudness(mixed)
+
     w, h = args.size.split("x")
     hold = max(0.0, total - raw_len)
     vf = (f"scale={w}:{h}:flags=lanczos:out_color_matrix=bt709,"
           f"tpad=stop_mode=clone:stop_duration={hold:.3f},format=yuv420p")
     subprocess.run(
-        [tool("ffmpeg"), "-y", "-v", "error", "-i", str(raw), "-i", str(wav), "-vf", vf,
+        [tool("ffmpeg"), "-y", "-v", "error", "-i", str(raw), "-i", str(mixed), "-vf", vf,
          "-c:v", "libx264", "-preset", "slow", "-crf", args.crf, "-profile:v", "high", "-r", "60",
          "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709",
-         "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-c:a", "aac", "-b:a", "192k", "-ac", "2", "-ar", str(RATE),
+         "-af", f"volume={gain:.2f}dB,alimiter=limit={PEAK_LIMIT}:level=false",
+         "-c:a", "aac", "-b:a", "192k", "-ac", "2", "-ar", str(RATE),
          "-t", f"{total:.3f}", "-movflags", "+faststart", str(out)],
         check=True,
     )
     wav.unlink()
+    mixed.unlink()
     print(f"wrote {out} ({out.stat().st_size / 1e6:.1f} MB, {total:.1f}s, {len(cues)} cues)")
 
 

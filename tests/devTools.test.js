@@ -1,6 +1,7 @@
 // @ts-check
 import { describe, it, expect, vi } from "vitest";
-import { attachDevTools } from "../js/ui/DevTools.js";
+import { JSDOM } from "jsdom";
+import { attachDevTools, attachFocusTrace, attachSoundLog } from "../js/ui/DevTools.js";
 
 function makeGame() {
   return {
@@ -79,6 +80,72 @@ describe("attachDevTools", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("debug=focus traces focus, keys and the leaderboard transition without blocking events", async () => {
+    const dom = new JSDOM(
+      `<!doctype html><body>
+        <div id="leaderboardScreen" class="hidden" hidden><button id="restartBtn">Launch</button></div>
+        <button id="okBtn">Ok</button>
+      </body>`,
+      { url: "http://localhost/" }
+    );
+    const doc = dom.window.document;
+    const logs = /** @type {string[]} */ ([]);
+    const spy = vi.spyOn(console, "log").mockImplementation((msg) => logs.push(String(msg)));
+    vi.useFakeTimers();
+    try {
+      const detach = attachFocusTrace(doc);
+      const ok = /** @type {HTMLButtonElement} */ (doc.getElementById("okBtn"));
+      ok.focus();
+      const key = new dom.window.KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        cancelable: true,
+      });
+      ok.dispatchEvent(key);
+      ok.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "a", bubbles: true }));
+      const lb = /** @type {HTMLElement} */ (doc.getElementById("leaderboardScreen"));
+      lb.classList.remove("hidden");
+      lb.hidden = false;
+      await Promise.resolve();
+      vi.advanceTimersByTime(3000);
+      expect(key.defaultPrevented).toBe(false);
+      expect(logs.some((l) => l.includes("focusin target=#okBtn"))).toBe(true);
+      expect(logs.some((l) => l.includes("keydown target=#okBtn key=Enter"))).toBe(true);
+      expect(logs.some((l) => l.includes("key=a"))).toBe(false);
+      expect(logs.filter((l) => l.includes("leaderboard shown"))).toHaveLength(1);
+      expect(logs.some((l) => l.includes("leaderboard +3000ms"))).toBe(true);
+      expect(logs.every((l) => l.startsWith("[focus]") && l.includes("lock="))).toBe(true);
+      detach();
+      const before = logs.length;
+      ok.blur();
+      expect(logs.length).toBe(before);
+    } finally {
+      vi.useRealTimers();
+      spy.mockRestore();
+    }
+  });
+
+  it("soundlog records sound-effect calls (not narration) and still plays them", () => {
+    const calls = /** @type {any[]} */ ([]);
+    const audio = {
+      playAsteroidHit: (/** @type {any} */ o) => calls.push(["hit", o]),
+      playStarCollect: (/** @type {any} */ o) => calls.push(["star", o]),
+      playSpeech: () => calls.push(["speech"]),
+    };
+    const log = /** @type {any[]} */ ([]);
+    expect(attachSoundLog({ audio }, log)).toBe(log);
+    audio.playAsteroidHit({ heavy: true, pan: 0.5 });
+    audio.playStarCollect({ bonus: false, pan: -1 });
+    audio.playSpeech();
+    expect(calls.map((c) => c[0])).toEqual(["hit", "star", "speech"]);
+    expect(log.map((e) => [e.method, e.args])).toEqual([
+      ["playAsteroidHit", [{ heavy: true, pan: 0.5 }]],
+      ["playStarCollect", [{ bonus: false, pan: -1 }]],
+    ]);
+    expect(log.every((e) => typeof e.t === "number")).toBe(true);
+    expect(attachSoundLog({}, [])).toBeNull();
   });
 
   it("forwards metrics to the overlay and drives input via the autopilot", () => {

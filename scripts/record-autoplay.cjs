@@ -5,7 +5,7 @@
  * Usage:
  *   node --experimental-websocket scripts/record-autoplay.cjs [url] [--out=store-video/autoplay.mp4]
  *       [--width=360 --height=640 --scale=3] [--seed=12345] [--hold=4] [--fps=60] [--max=130]
- *       [--crf=16] [--ffmpeg=<path>]
+ *       [--crf=16] [--ffmpeg=<path>] [--sfx=store-video/_sfx.json]
  *   npm run record
  *
  * Offline, deterministic rendering rather than a live screen recording: a shim installed before the
@@ -22,6 +22,11 @@
  * frame by frame → game-over dialog (1.2s) → AI debrief once rendered (4s) → Ok → initials prompt
  * (2s) → leaderboard (3s). No score is submitted (initials left empty). The default seed survived
  * ~50s on the 360x640 viewport; other seeds mostly die within 15s there.
+ *
+ * Sound: screenshots carry no audio, so with --sfx the page runs with `soundlog=1` and every
+ * sound-effect call made during the stepped run is written to that JSON as
+ * `{ fps, duration, events: [{ at, method, args }] }`, where `at` is seconds into this video.
+ * scripts/render-sfx.cjs turns it into a WAV with the game's own AudioManager.
  *
  * Output: H.264 yuv420p (bt709, faststart) at --fps; 360x640 @3x = 1080x1920 (9:16). Frames are
  * fed to ffmpeg as a plain numbered sequence at the output rate (held screens are hard-linked
@@ -53,6 +58,7 @@ const holdSec = Number(opt("hold", "4")) || 4;
 const fps = Number(opt("fps", "60")) || 60;
 const maxSec = Number(opt("max", "130")) || 130;
 const crf = Number(opt("crf", "16")) || 16;
+const sfxOut = opt("sfx", "") ? path.resolve(opt("sfx", "")) : "";
 
 const FFMPEG_PIN = {
   url: "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.zip",
@@ -181,7 +187,9 @@ async function main() {
   /** @type {string[]} One entry per output frame (held frames repeat their file). */
   const frames = [];
   const frameMs = 1000 / fps;
-  const url = `${base}/?seed=${seed}&autoplay=1&autodelay=600000&dpr=${scale}`;
+  const url = `${base}/?seed=${seed}&autoplay=1&autodelay=600000&dpr=${scale}${sfxOut ? "&soundlog=1" : ""}`;
+  /** Virtual clock reading at the start of the run (sound timeline origin). */
+  let runStartMs = 0;
   console.error(`[record] ${url} at ${width}x${height} @${scale}x, ${fps} fps`);
 
   // Start on about:blank so the clock shim is registered before the game script runs.
@@ -221,6 +229,7 @@ async function main() {
 
     // Take over the clock, launch, and step the run one output frame at a time.
     await evaluate("__frameClock.enable()");
+    runStartMs = await evaluate("performance.now()");
     await evaluate("document.getElementById('startBtn').click()");
     const maxFrames = Math.ceil(maxSec * fps);
     let over = false;
@@ -244,6 +253,9 @@ async function main() {
     }
     if (!over) throw new Error(`run did not finish within --max=${maxSec}s`);
     console.error(`[record] run over after ${(frames.length / fps - holdSec).toFixed(1)}s`);
+    // Only the stepped run is on the virtual clock, so only its sounds map onto video frames. A
+    // sound fired during step k first appears in frame k-1 (frames are grabbed after stepping).
+    const soundLog = sfxOut ? (await evaluate("window.__soundLog || []")) || [] : [];
 
     // Back to real time for the network-bound debrief and the dialog flow.
     await send("Animation.setPlaybackRate", { playbackRate: 1 });
@@ -260,6 +272,19 @@ async function main() {
     await waitFor(evaluate, LEADERBOARD_VISIBLE, 10000);
     await sleep(600);
     await grab(3);
+    if (sfxOut) {
+      const events = soundLog.map((/** @type {any} */ e) => ({
+        at: Math.max(0, holdSec + (e.t - runStartMs) / 1000 - 1 / fps),
+        method: e.method,
+        args: e.args,
+      }));
+      fs.mkdirSync(path.dirname(sfxOut), { recursive: true });
+      fs.writeFileSync(
+        sfxOut,
+        JSON.stringify({ fps, duration: frames.length / fps, events }, null, 1)
+      );
+      console.error(`[record] wrote ${events.length} sound events to ${sfxOut}`);
+    }
   } finally {
     close();
   }
