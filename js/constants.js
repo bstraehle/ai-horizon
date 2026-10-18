@@ -413,6 +413,22 @@ export const CONFIG = deepFreeze({
   RNG: {
     SEED_PARAM: "seed",
   },
+  AUDIO: {
+    MASTER_VOLUME: 0.5,
+    MAX_VOICES: 16,
+    STORAGE_KEY: "aiHorizonMuted",
+    MIN_INTERVAL_MS: {
+      HIT: 25,
+      BOOM: 60,
+      UPGRADE: 1000,
+      STAR: 30,
+      BONUS_STAR: 60,
+      FATAL: 1000,
+    },
+    STAR_STREAK_WINDOW_MS: 700,
+    REVERB_SECONDS: 2,
+    MAX_PAN: 0.7,
+  },
   SHARE: {
     URL: "https://www.agentmode.dev/",
     TITLE: "AI HORIZON",

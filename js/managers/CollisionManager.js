@@ -51,6 +51,11 @@ function markHardenedHit(game, asteroid) {
  */
 
 /**
+ * Emitted as `bulletDamagedAsteroid` when a bullet hits a hardened planet without destroying it.
+ * @typedef {BulletHitAsteroidPayload} BulletDamagedAsteroidPayload
+ */
+
+/**
  * @typedef {Object} PlayerHitAsteroidPayload
  * @property {{ x:number,y:number,width:number,height:number, getBounds?:()=>Rect }} asteroid
  */
@@ -212,6 +217,8 @@ export class CollisionManager {
                       a[AST_FRAME_FLAG] = frameId;
                       deadAsteroids.push(a);
                       if (events) events.emit("bulletHitAsteroid", { asteroid: a, bullet: b });
+                    } else if (!shouldDestroy && events) {
+                      events.emit("bulletDamagedAsteroid", { asteroid: a, bullet: b });
                     }
                   } else if (typeof a.onShieldHit === "function") {
                     markHardenedHit(game, a);
@@ -220,6 +227,7 @@ export class CollisionManager {
                     } catch {
                       /* ignore */
                     }
+                    if (events) events.emit("bulletDamagedAsteroid", { asteroid: a, bullet: b });
                   }
                 } else if (a && a[AST_FRAME_FLAG] !== frameId) {
                   a[AST_FRAME_FLAG] = frameId;

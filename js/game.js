@@ -8,6 +8,8 @@
  *  - Seeds & exposes deterministic RNG (query param: `?seed=VALUE`)
  *  - Handles lifecycle: start, pause/resume, game over, full & soft resets
  *  - Wires cross-cutting event handlers (see `systems/EventHandlers.js`)
+ *  - Owns synthesized sound effects (`managers/AudioManager.js`), unlocked on launch and
+ *    suspended while paused or hidden; mute via the Sound toggles or the M key
  *
  * Design highlights:
  *  - Object pools pre-warmed to avoid first-interaction jank
@@ -42,6 +44,7 @@ import { LeaderboardManager } from "./managers/LeaderboardManager.js";
 import { AIAnalysisManager } from "./managers/AIAnalysisManager.js";
 import { ViewManager } from "./managers/ViewManager.js";
 import { ScoringManager } from "./managers/ScoringManager.js";
+import { AudioManager } from "./managers/AudioManager.js";
 
 import { ObjectPool } from "./utils/ObjectPool.js";
 import { RateLimiter } from "./utils/RateLimiter.js";
@@ -54,6 +57,7 @@ import { applyPerformanceProfile } from "./ui/PerformanceProfiles.js";
 import { warmUpPools } from "./ui/PoolWarmup.js";
 import { attachDevTools } from "./ui/DevTools.js";
 import { initShareLink } from "./ui/Share.js";
+import { initSoundToggles } from "./ui/SoundToggle.js";
 import { detectMobilePlatform } from "./utils/mobilePlatform.js";
 import { updateGame } from "./systems/GameUpdate.js";
 import { drawGame, drawFrame, samplePerformance } from "./systems/GameRender.js";
@@ -161,6 +165,8 @@ class AIHorizon {
 
     this.input = new InputState();
     this.events = new EventBus();
+    /** Synthesized sound effects; unlocked on Launch Mission, muted state persisted. */
+    this.audio = new AudioManager();
 
     // Guard to prevent an accidental 'click' on the Game Over / Restart UI that
     // can be synthesized when the user lifts the finger they were using for
@@ -320,6 +326,7 @@ class AIHorizon {
     InputBindings.bind(this);
     InputBindings.setup(this);
     initShareLink(document.getElementById("shareLink"), () => this.score);
+    initSoundToggles(this.audio);
     this._unsubscribeEvents = EventHandlers.register(this);
 
     // Global capture listener to intercept the first post-game synthetic click.
@@ -681,6 +688,7 @@ class AIHorizon {
   handleVisibilityChange() {
     const hidden = typeof document !== "undefined" && document.hidden;
     if (hidden) {
+      this.audio.suspend();
       this._resumeLoopOnVisibility = this._loopRunning;
       if (this.loop && this._loopRunning) {
         this.loop.stop();
@@ -694,6 +702,7 @@ class AIHorizon {
       this._loopRunning = true;
     }
     this._resumeLoopOnVisibility = false;
+    if (!this.state.isPaused()) this.audio.resume();
 
     UIManager.handleVisibilityChange(
       this.gameInfo,
@@ -1060,6 +1069,8 @@ class AIHorizon {
       wasGameOver = false;
     }
     this.resetGameState(wasGameOver);
+    // Launch / restart is a user gesture, so this is where browsers allow audio to start.
+    this.audio.unlock();
     // Forget the previous run's pointer position so the ship starts level at its spawn point
     // instead of dashing (and banking) toward a stale target; steering resumes on the next
     // pointer move / touch / key press.
@@ -1086,9 +1097,11 @@ class AIHorizon {
     if (this.state.isPaused()) {
       this.state.resume();
       GameUI.hidePause(this);
+      this.audio.resume();
     } else if (this.state.isRunning()) {
       this.state.pause();
       GameUI.showPause(this);
+      this.audio.suspend();
     }
     this._pausedFrameRendered = false;
   }
@@ -1386,9 +1399,24 @@ class AIHorizon {
     resetFull(this);
   }
 
-  /** Update the on-screen score display. */
+  /**
+   * Update the on-screen score display, and play the caliber-upgrade cue once per run when the
+   * score first reaches `CONFIG.GAME.BULLET_UPGRADE_SCORE` during play (not from the end-of-run
+   * accuracy bonus).
+   */
   updateScore() {
     GameUI.setScore(this);
+    const upgraded = ScoringManager.isBulletUpgraded(this.score);
+    if (
+      upgraded &&
+      !this._caliberUpgraded &&
+      !this._accuracyBonusApplied &&
+      this.state &&
+      this.state.isRunning()
+    ) {
+      this.audio.playUpgrade();
+    }
+    this._caliberUpgraded = upgraded;
   }
   /** Recalculate and persist high score if exceeded. */
   updateHighScore() {

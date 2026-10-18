@@ -5,6 +5,21 @@ import { UIManager } from "../managers/UIManager.js";
 import { triggerShake } from "./ScreenShake.js";
 
 /**
+ * Sound options for an asteroid impact: stereo pan from the asteroid's horizontal position and
+ * `heavy` once the bullet caliber upgrade is active (evaluated before the impact's points land).
+ * @param {any} game
+ * @param {any} asteroid
+ * @returns {{ heavy: boolean, pan: number }}
+ */
+function soundOptions(game, asteroid) {
+  const width = game && game.view && game.view.width;
+  const cx =
+    asteroid && typeof asteroid.x === "number" ? asteroid.x + (asteroid.width || 0) / 2 : 0;
+  const pan = width > 0 ? Math.max(-1, Math.min(1, (cx / width) * 2 - 1)) : 0;
+  return { heavy: ScoringManager.isBulletUpgraded(game && game.score), pan };
+}
+
+/**
  * EventHandlers – centralized wiring of EventBus driven gameplay side‑effects.
  *
  * Purpose
@@ -16,11 +31,17 @@ import { triggerShake } from "./ScreenShake.js";
  * Behavior & Covered Events
  * -------------------------
  * - bulletHitAsteroid: Awards score (different value for hardened asteroids), spawns an
- *   explosion entity and optionally a score popup.
- * - playerHitAsteroid: Triggers the game over sequence exactly once per emission chain.
+ *   explosion entity, optionally a score popup, and plays the asteroid-hit or planet-explosion
+ *   sound via the optional `game.audio` (AudioManager), panned by screen position and heavier
+ *   once the bullet caliber upgrade is active.
+ * - bulletDamagedAsteroid: Non-lethal hit on a hardened planet; plays the regular asteroid-hit
+ *   sound (same pan / heavy rules).
+ * - playerHitAsteroid: Plays the fatal crash sound and triggers the game over sequence exactly
+ *   once per emission chain.
  * - Planet kills and the player's death also request a short screen shake (render-only, skipped
  *   under prefers-reduced-motion; see systems/ScreenShake.js).
- * - collectedStar (score path): Awards score (bonus for red stars) and shows a popup for red stars.
+ * - collectedStar (score path): Awards score (bonus for red stars), plays the star or bonus-star
+ *   pickup sound (panned by position) and shows a popup for red stars.
  * - collectedStar (particle path): Emits a deterministic radial particle burst whose velocity
  *   magnitudes incorporate RNG variance for visual variety while keeping angle distribution stable.
  *
@@ -98,6 +119,7 @@ export const EventHandlers = {
        */
       events.on("bulletHitAsteroid", function (/** @type {{ asteroid:any }} */ payload) {
         const { asteroid } = payload;
+        const sound = soundOptions(game, asteroid);
         let add = CONFIG.GAME.ASTEROID_SCORE;
         if (asteroid && asteroid.isHardened) {
           add = asteroid.isBonus
@@ -116,6 +138,11 @@ export const EventHandlers = {
           }
         }
         game.createExplosion(asteroid.x + asteroid.width / 2, asteroid.y + asteroid.height / 2);
+        if (asteroid && asteroid.isHardened) {
+          game.audio?.playHardenedExplosion(!!asteroid.isBonus, sound);
+        } else {
+          game.audio?.playAsteroidHit(sound);
+        }
         if (asteroid && asteroid.isHardened) triggerShake(game, asteroid.isBonus ? 7 : 5, 0.32);
         if (asteroid && asteroid.isHardened && typeof game.createScorePopup === "function") {
           const baseColor = CONFIG.COLORS.SCORE.POPUP;
@@ -141,12 +168,24 @@ export const EventHandlers = {
     );
 
     unsubs.push(
+      /**
+       * bulletDamagedAsteroid handler – non-lethal hit on a hardened planet; plays the same impact
+       * sound as a regular asteroid hit. Scoring and visuals are handled elsewhere.
+       * @param {any} payload
+       */
+      events.on("bulletDamagedAsteroid", function (/** @type {{ asteroid:any }} */ payload) {
+        game.audio?.playAsteroidHit(soundOptions(game, payload && payload.asteroid));
+      })
+    );
+
+    unsubs.push(
       events.on("playerHitAsteroid", () => {
         if (game && /** @type {any} */ (game)._dramaticEndPlayed) {
           game.gameOver();
           return;
         }
         /** @type {any} */ (game)._dramaticEndPlayed = true;
+        game.audio?.playFatal();
         try {
           const p = /** @type {any} */ (game.player);
           if (p && typeof game.createExplosion === "function") {
@@ -184,6 +223,10 @@ export const EventHandlers = {
       events.on("collectedStar", function (/** @type {{ star:any }} */ payload) {
         const { star } = payload;
         const add = star && star.isRed ? CONFIG.GAME.STAR_SCORE_BONUS : CONFIG.GAME.STAR_SCORE;
+        game.audio?.playStarCollect({
+          bonus: !!(star && star.isRed),
+          pan: soundOptions(game, star).pan,
+        });
         const r = ScoringManager.add(game, add);
         try {
           game.regularStarsCollected = (game.regularStarsCollected || 0) + 1;

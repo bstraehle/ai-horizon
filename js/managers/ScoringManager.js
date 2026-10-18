@@ -25,6 +25,16 @@ import { CONFIG } from "../constants.js";
  */
 export const ScoringManager = {
   /**
+   * Whether `score` has reached the bullet (caliber) upgrade threshold
+   * (`CONFIG.GAME.BULLET_UPGRADE_SCORE`; disabled when <= 0).
+   * @param {number} score
+   * @returns {boolean}
+   */
+  isBulletUpgraded(score) {
+    const threshold = CONFIG.GAME.BULLET_UPGRADE_SCORE | 0;
+    return threshold > 0 && typeof score === "number" && score >= threshold;
+  },
+  /**
    * Add base points and apply milestone bonuses.
    * Also applies a time-based finale multiplier when within the final N seconds of the timer.
    * @param {{ score:number, timerRemaining?:number, finaleBaseScore?:number, finaleBonus?:number }} game Game-like object exposing mutable numeric 'score'.

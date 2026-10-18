@@ -6,6 +6,8 @@ An arcade-style space shooter for the browser: collect stars, blast asteroids, a
 
 **Play now:** [agentmode.dev](https://www.agentmode.dev) (browser, installable) · [Google Play](https://play.google.com/store/apps/details?id=dev.agentmode.aihorizon)
 
+Sound effects are synthesized live with the Web Audio API (no audio files): layered, distorted impacts panned to where the hit happens (the same for regular asteroids and hits on armored planets), planet explosions with sub-bass, rumble and debris (bonus planets detonate twice), star pickups that climb a musical scale on quick streaks, a brighter chime for bonus stars, and a crash when your ship is hit. When the bullet caliber upgrades at 2,500 points, a power-up cue plays and impacts get heavier for the rest of the run. Toggle them with **Sound: On/Off** on the start and leaderboard screens or the **M** key; the choice is remembered. The leaderboard keeps the top 10 scores.
+
 After a run, **Share** on the leaderboard screen sends your score and the game link via the device's share sheet, or copies them to the clipboard where sharing isn't supported.
 
 ## Quick start
