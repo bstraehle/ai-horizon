@@ -30,8 +30,6 @@ npm run serve   # http://localhost:8000
 
 Copy the contents of `dist/` to static HTTPS hosting (production uses Amazon S3 behind CloudFront). The Lambda functions for the leaderboard and run analysis live in `server/lambda/`; the client's AWS endpoints are configured in `js/adapters/awsConfig.js`.
 
-The leaderboard API accepts one score per request (`PUT ?id=1` with `{ "entry": { id, score, accuracy?, game-summary?, ai-analysis? } }`). The Lambda validates it (1–3 letter initials not on the blocklist, integer score up to `MAX_SCORE`), sets the date, ranks the top 10 and returns the authoritative list; it rejects full-list payloads from older clients with HTTP 400. Each entry must carry its `game-summary`, and the Lambda checks that the stats are physically possible (spawn rates, fire cooldown, hits per kill) and add up to the score using the game's scoring rules; the rules are mirrored in the Lambda and kept in sync with `js/constants.js` by a unit test. When `ALERT_TOPIC_ARN` is set, a new #1 and rejected run summaries (at most one per Lambda instance every 10 minutes) are e-mailed through SNS. Remove an entry with `node scripts/leaderboard-remove.cjs ABC` (dry run) and add `--yes` to apply. The initials blocklist exists both in `server/lambda/leaderboard.js` and `js/utils/initials.js`; a unit test keeps the two in sync. API Gateway stage throttling and reserved concurrency on the analysis Lambda are configured in AWS, not in this repo.
-
 ## URL flags
 
 - `?seed=12345` — reproducible run
