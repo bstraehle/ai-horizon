@@ -30,4 +30,10 @@ describe("LeaderboardManager submit + render", () => {
     expect(li.textContent).toContain("ABC");
     expect(li.textContent).toContain("150");
   });
+
+  it("rejects blocked or malformed initials without storing anything", async () => {
+    expect(await LeaderboardManager.submit(150, "ASS")).toBe(false);
+    expect(await LeaderboardManager.submit(150, "ab")).toBe(false);
+    expect(localStorage.getItem(LeaderboardManager.KEY_LEADERBOARD)).toBeNull();
+  });
 });

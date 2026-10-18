@@ -11,16 +11,17 @@ import { RemoteStorageAdapter } from "../../adapters/RemoteStorageAdapter.js";
  * @property {any} [game-summary]
  * @property {any} [ai-analysis]
  *
- * @typedef {Object} SaveRemoteResult
- * @property {boolean} ok        True on successful authoritative save.
- * @property {boolean} conflict  True when optimistic concurrency conflict detected.
- * @property {LeaderboardEntry[]} entries Authoritative entries after the attempt.
+ * @typedef {Object} SubmitRemoteResult
+ * @property {boolean} ok        True when the server processed the submission.
+ * @property {boolean} accepted  True when the entry made it onto the leaderboard.
+ * @property {LeaderboardEntry[]|null} entries Authoritative entries (null on failure).
  */
 
 /**
  * Persistence repository (local + optional remote) for leaderboard entries.
- * Provides a small async API: loadLocal, loadRemote, saveLocal, saveRemote.
- * Remote operations support optimistic concurrency via a version token.
+ * Provides a small async API: loadLocal, loadRemote, saveLocal, submitRemote.
+ * Local storage holds the whole list; the remote endpoint only accepts a single entry and does the
+ * ranking itself, so a client can never overwrite other players' scores.
  */
 export class LeaderboardRepository {
   /**
@@ -37,8 +38,6 @@ export class LeaderboardRepository {
     this.maxEntries = typeof opts.maxEntries === "number" ? opts.maxEntries : 10;
     this._storageAdapter = opts.storageAdapter || new LocalStorageAdapter();
     this._remoteAdapter = opts.remoteAdapter || new RemoteStorageAdapter({});
-    /** @type {number|undefined} */
-    this._version = undefined;
   }
 
   /**
@@ -53,8 +52,7 @@ export class LeaderboardRepository {
 
   /**
    * Load entries from remote endpoint (if configured) supporting legacy payload shapes.
-   * - Accepts either an array or an object with `scores` and optional `version`.
-   * - Updates internal `_version` when version token present.
+   * - Accepts either an array or an object with `scores`.
    * @returns {Promise<LeaderboardEntry[]>}
    */
   async loadRemote() {
@@ -63,7 +61,6 @@ export class LeaderboardRepository {
     let arr = null;
     if (Array.isArray(parsed)) arr = parsed;
     else if (parsed && Array.isArray(parsed.scores)) arr = parsed.scores;
-    this._version = typeof parsed?.version === "number" ? parsed.version : 0;
     if (!arr) return [];
     return normalize(arr).slice(0, this.maxEntries);
   }
@@ -78,30 +75,23 @@ export class LeaderboardRepository {
   }
 
   /**
-   * Save entries to remote endpoint with optimistic concurrency.
-   * Conflict path returns `ok:false, conflict:true` plus server's authoritative list.
-   * Network / adapter failure returns `ok:false, conflict:false` and echoes client payload.
-   * @param {LeaderboardEntry[]} entries Proposed (normalized, sorted) entries.
-   * @returns {Promise<SaveRemoteResult>}
+   * Submit a single entry (`PUT { entry }`). The server validates it (initials blocklist, score
+   * bounds), merges it into the ranked list and returns the authoritative top-N.
+   * Rejection (HTTP 4xx), throttling, conflicts and network failures all return `ok:false` with
+   * `entries: null`; callers keep their optimistic list in that case.
+   * @param {LeaderboardEntry} entry
+   * @returns {Promise<SubmitRemoteResult>}
    */
-  async saveRemote(entries) {
-    if (!this.endpoint) return { ok: false, conflict: false, entries };
-    const payload = entries.slice(0, this.maxEntries);
-    /** @type {{scores:LeaderboardEntry[], version?:number}} */
-    const body = { scores: payload };
-    if (typeof this._version === "number") body.version = this._version;
-    const parsed = await this._remoteAdapter.putJSON(this.endpoint, body);
-    if (parsed === null) return { ok: false, conflict: false, entries: payload };
-    if (parsed && parsed.conflict) {
-      if (typeof parsed.version === "number") this._version = parsed.version;
-      const arr = Array.isArray(parsed.scores) ? parsed.scores : [];
-      return { ok: false, conflict: true, entries: normalize(arr).slice(0, this.maxEntries) };
-    }
-    if (typeof parsed?.version === "number") this._version = parsed.version;
-    let arr = null;
-    if (Array.isArray(parsed)) arr = parsed;
-    else if (parsed && Array.isArray(parsed.scores)) arr = parsed.scores;
-    const norm = arr ? normalize(arr).slice(0, this.maxEntries) : payload;
-    return { ok: true, conflict: false, entries: norm };
+  async submitRemote(entry) {
+    if (!this.endpoint) return { ok: false, accepted: false, entries: null };
+    /** @type {any} */
+    const parsed = await this._remoteAdapter.putJSON(this.endpoint, { entry });
+    if (!parsed || !Array.isArray(parsed.scores))
+      return { ok: false, accepted: false, entries: null };
+    return {
+      ok: true,
+      accepted: parsed.accepted === true,
+      entries: normalize(parsed.scores).slice(0, this.maxEntries),
+    };
   }
 }

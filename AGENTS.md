@@ -14,7 +14,14 @@
    serve the bundle from memory, so `dist/` stays stale after dev-server sessions.
 2. Bump `CACHE_VERSION` in `sw.js` whenever cached assets change (HTML, JS, CSS). Otherwise
    returning PWA / Play Store (TWA) users can get fresh HTML with a stale cached `bundle.js`.
-3. Upload `dist/` to S3 and invalidate CloudFront. Lambdas in `server/lambda/` deploy separately.
+3. Upload `dist/` to S3 and invalidate CloudFront. Lambdas in `server/lambda/` deploy separately:
+   each is a single-file zip whose entry is `index.mjs` (handler `index.handler`), e.g. copy
+   `server/lambda/leaderboard.js` to `index.mjs`, zip it, and
+   `aws lambda update-function-code --function-name ai-horizon-leaderboard --zip-file fileb://leaderboard.zip --region us-west-2`.
+   Functions: `ai-horizon-leaderboard`, `ai-horizon-analysis` (API `0p6x6bw6c2`, stage `dev`).
+   The leaderboard Lambda mirrors scoring constants (`RULES`) and the initials blocklist; when
+   changing `CONFIG.GAME` scoring/spawn values, update `RULES` and redeploy the Lambda (tests fail
+   until they match). Alerts go to SNS topic `ai-horizon-alerts` via env var `ALERT_TOPIC_ARN`.
 
 ## Store video (16:9, with game sound)
 

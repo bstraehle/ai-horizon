@@ -3,6 +3,7 @@ import { LeaderboardManager } from "../managers/LeaderboardManager.js";
 import { UIManager } from "../managers/UIManager.js";
 import { FocusManager } from "../managers/FocusManager.js";
 import { GameUI } from "./GameUI.js";
+import { isAllowedInitials } from "../utils/initials.js";
 
 /**
  * Orchestrates the complete Game Over UI workflow.
@@ -14,7 +15,8 @@ import { GameUI } from "./GameUI.js";
  *
  * Workflow:
  *  1. If score > 0, shows initials input screen for high score submission.
- *  2. Validates initials (3 uppercase letters) with visual feedback on invalid input.
+ *  2. Validates initials (3 uppercase letters, not on the blocklist in utils/initials.js) with
+ *     visual feedback on invalid input.
  *  3. Submits score to LeaderboardManager with accuracy and AI analysis metadata.
  *  4. Transitions from initials screen to leaderboard screen.
  *  5. Renders updated leaderboard and manages focus to restart button.
@@ -66,7 +68,7 @@ export function handleGameOver(game) {
           return true;
         }
 
-        if (!/^[A-Z]{3}$/.test(raw)) {
+        if (!/^[A-Z]{3}$/.test(raw) || !isAllowedInitials(raw)) {
           try {
             initialsInput.classList.add("invalid");
             setTimeout(() => initialsInput.classList.remove("invalid"), 0);

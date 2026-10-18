@@ -7,7 +7,7 @@
   "headers": {
     "Content-Type": "application/json"
   },
-  "body": "{\"scores\":\"[{\\\"id\\\":\\\"BJS\\\",\\\"score\\\":1650},{\\\"id\\\":\\\"BJS\\\",\\\"score\\\":870},{\\\"id\\\":\\\"BJS\\\",\\\"score\\\":640}]\",\"id\":1}",
+  "body": "{\"entry\":{\"id\":\"BJS\",\"score\":1650,\"accuracy\":0.5}}",
   "isBase64Encoded": false,
   "requestContext": {
     "requestId": "test-request-2",

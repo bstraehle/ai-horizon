@@ -18,7 +18,6 @@ describe("LeaderboardManager duplicate initials handling", () => {
 
     // Clear any cached data
     LeaderboardManager._cacheEntries = null;
-    LeaderboardManager._version = undefined;
   });
 
   it("should replace existing initials with higher score", async () => {
@@ -110,7 +109,7 @@ describe("LeaderboardManager duplicate initials handling", () => {
     await LeaderboardManager.submit(100, "DDD", { remote: false }); // Manually set the date for testing
     let entries = await LeaderboardManager.load({ remote: false });
     entries[0].date = firstDate;
-    await LeaderboardManager.save(entries, { remote: false });
+    await LeaderboardManager.save(entries);
 
     // Submit higher score (will get new date)
     await LeaderboardManager.submit(200, "DDD", { remote: false });

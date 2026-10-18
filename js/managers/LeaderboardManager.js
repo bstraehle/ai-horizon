@@ -1,11 +1,14 @@
 /**
  * LeaderboardManager – static facade for a Top-N high score list supporting local + remote persistence.
- * All mutating async methods return Promises; minimal internal mutable state (_cacheEntries, _version, timers).
+ * All mutating async methods return Promises; minimal internal mutable state (_cacheEntries, timers).
+ * Offline mode stores the whole list in localStorage; remote mode submits one entry at a time and
+ * the leaderboard Lambda owns ranking, de-duplication and validation.
  */
 import { qualifiesForInitials, formatRow, formatRows } from "./leaderboard/LeaderboardFormatter.js";
 import { LeaderboardRepository } from "./leaderboard/LeaderboardRepository.js";
 import { RemoteStorageAdapter } from "../adapters/RemoteStorageAdapter.js";
 import { getApiEndpoint, loadSignedFetch } from "../adapters/SignedApi.js";
+import { isAllowedInitials } from "../utils/initials.js";
 
 /**
  * @typedef {Object} LeaderboardEntry
@@ -16,6 +19,29 @@ import { getApiEndpoint, loadSignedFetch } from "../adapters/SignedApi.js";
  * @property {any} [game-summary]
  * @property {any} [ai-analysis]
  */
+
+/**
+ * Copy the persisted fields of an entry, serializing `game-summary` / `ai-analysis` to JSON strings.
+ * @param {LeaderboardEntry} entry
+ * @returns {LeaderboardEntry}
+ */
+function toStoredEntry(entry) {
+  /** @type {LeaderboardEntry} */
+  const cleaned = { id: entry.id, score: entry.score };
+  if (typeof entry.accuracy === "number" && !isNaN(entry.accuracy))
+    cleaned.accuracy = entry.accuracy;
+  if (entry.date) cleaned.date = entry.date;
+  for (const key of /** @type {const} */ (["game-summary", "ai-analysis"])) {
+    const value = entry[key];
+    if (value === undefined || value === null) continue;
+    try {
+      cleaned[key] = typeof value === "string" ? value : JSON.stringify(value);
+    } catch {
+      // If serialization fails, skip this field
+    }
+  }
+  return cleaned;
+}
 
 export class LeaderboardManager {
   static IS_REMOTE = true;
@@ -28,8 +54,6 @@ export class LeaderboardManager {
   static _cacheEntries = null;
   /** @type {Promise<LeaderboardEntry[]>|null} */
   static _pendingLoadPromise = null;
-  /** @type {number|undefined} */
-  static _version = undefined;
   /** @type {number} */
   static _lastRemoteSync = 0;
 
@@ -138,7 +162,6 @@ export class LeaderboardManager {
     const p = (async () => {
       const repo = await LeaderboardManager._createRepository();
       const entries = remote ? await repo.loadRemote() : await repo.loadLocal();
-      if (typeof repo._version === "number") LeaderboardManager._version = repo._version;
       LeaderboardManager._cacheEntries = entries.slice();
       if (remote) {
         const now = (typeof performance !== "undefined" && performance.now()) || Date.now();
@@ -155,221 +178,98 @@ export class LeaderboardManager {
   }
 
   /**
-   * Save entries (local or remote) with optimistic concurrency + conflict merge.
+   * Persist the whole list to local storage (offline mode), then publish it to the cache, the
+   * `leaderboard:updated` event and `#leaderboardList`. Remote boards are only written through
+   * {@link LeaderboardManager.submit}, which sends a single entry.
    * @param {LeaderboardEntry[]} entries
-   * @param {{remote?:boolean}=} options
    * @returns {Promise<boolean>}
    */
-  static async save(entries, { remote = this.IS_REMOTE } = {}) {
-    const payload = entries.slice(0, LeaderboardManager.MAX_ENTRIES).map((entry) => {
-      /** @type {LeaderboardEntry} */
-      const cleaned = { id: entry.id, score: entry.score };
-      if (typeof entry.accuracy === "number") cleaned.accuracy = entry.accuracy;
-      if (entry.date) cleaned.date = entry.date;
-      if (entry["game-summary"] !== undefined && entry["game-summary"] !== null) {
-        try {
-          cleaned["game-summary"] =
-            typeof entry["game-summary"] === "string"
-              ? entry["game-summary"]
-              : JSON.stringify(entry["game-summary"]);
-        } catch {
-          // If serialization fails, skip this field
-        }
-      }
-      if (entry["ai-analysis"] !== undefined && entry["ai-analysis"] !== null) {
-        try {
-          cleaned["ai-analysis"] =
-            typeof entry["ai-analysis"] === "string"
-              ? entry["ai-analysis"]
-              : JSON.stringify(entry["ai-analysis"]);
-        } catch {
-          // If serialization fails, skip this field
-        }
-      }
-      return cleaned;
-    });
+  static async save(entries) {
+    const payload = entries.slice(0, LeaderboardManager.MAX_ENTRIES).map(toStoredEntry);
     const repo = await LeaderboardManager._createRepository();
-    if (typeof LeaderboardManager._version === "number")
-      repo._version = LeaderboardManager._version;
-
-    if (!remote) {
-      const ok = await repo.saveLocal(payload);
-      if (ok) {
-        LeaderboardManager._cacheEntries = payload.slice();
-        try {
-          if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
-            const CE = typeof window.CustomEvent === "function" ? window.CustomEvent : CustomEvent;
-            if (CE)
-              window.dispatchEvent(
-                new CE("leaderboard:updated", { detail: LeaderboardManager._cacheEntries.slice() })
-              );
-          }
-        } catch (_) {
-          /* ignore */
-        }
-        try {
-          const listEl =
-            typeof document !== "undefined" ? document.getElementById("leaderboardList") : null;
-          if (listEl) LeaderboardManager.render(listEl, LeaderboardManager._cacheEntries);
-        } catch (_) {
-          /* ignore */
-        }
-      }
-      return ok;
-    }
-
-    LeaderboardManager._cacheEntries = payload.slice();
-    try {
-      const listEl =
-        typeof document !== "undefined" ? document.getElementById("leaderboardList") : null;
-      if (listEl) LeaderboardManager.render(listEl, LeaderboardManager._cacheEntries);
-    } catch (_) {
-      /* ignore */
-    }
-
-    let attempt = 0;
-    const MAX_ATTEMPTS = 3;
-    /** @type {{ok:boolean, conflict:boolean, entries:LeaderboardEntry[]}} */
-    let lastResult = { ok: false, conflict: false, entries: payload };
-    while (attempt < MAX_ATTEMPTS) {
-      lastResult = await repo.saveRemote(payload);
-      if (lastResult.ok) break;
-      if (lastResult.conflict) {
-        LeaderboardManager._cacheEntries = lastResult.entries.slice();
-        if (typeof repo._version === "number") LeaderboardManager._version = repo._version;
-        const map = new Map();
-        for (const e of lastResult.entries) {
-          map.set(e.id, {
-            score: e.score,
-            accuracy: e.accuracy,
-            date: e.date,
-            "game-summary": e["game-summary"],
-            "ai-analysis": e["ai-analysis"],
-          });
-        }
-        for (const e of entries) {
-          const prev = map.get(e.id);
-          if (prev === undefined || prev === null || e.score > prev.score) {
-            map.set(e.id, {
-              score: e.score,
-              accuracy: e.accuracy,
-              date: e.date,
-              "game-summary": e["game-summary"],
-              "ai-analysis": e["ai-analysis"],
-            });
-          }
-        }
-        const merged = Array.from(map, ([id, data]) => {
-          /** @type {LeaderboardEntry} */
-          const entry = { id, score: data.score };
-          if (typeof data.accuracy === "number") entry.accuracy = data.accuracy;
-          if (data.date) entry.date = data.date;
-          if (data["game-summary"] !== undefined && data["game-summary"] !== null) {
-            try {
-              entry["game-summary"] =
-                typeof data["game-summary"] === "string"
-                  ? data["game-summary"]
-                  : JSON.stringify(data["game-summary"]);
-            } catch {
-              // If serialization fails, skip this field
-            }
-          }
-          if (data["ai-analysis"] !== undefined && data["ai-analysis"] !== null) {
-            try {
-              entry["ai-analysis"] =
-                typeof data["ai-analysis"] === "string"
-                  ? data["ai-analysis"]
-                  : JSON.stringify(data["ai-analysis"]);
-            } catch {
-              // If serialization fails, skip this field
-            }
-          }
-          return entry;
-        })
-          .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
-          .slice(0, LeaderboardManager.MAX_ENTRIES);
-        payload.splice(0, payload.length, ...merged);
-        attempt += 1;
-        continue;
-      }
-      break;
-    }
-    const serverEntries = lastResult.entries;
-    if (typeof repo._version === "number") LeaderboardManager._version = repo._version;
-    LeaderboardManager._cacheEntries = serverEntries.slice();
-    if (remote && lastResult.ok) {
-      const now = (typeof performance !== "undefined" && performance.now()) || Date.now();
-      LeaderboardManager._lastRemoteSync = now;
-    }
-    try {
-      if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
-        const CE = typeof window.CustomEvent === "function" ? window.CustomEvent : CustomEvent;
-        if (CE)
-          window.dispatchEvent(new CE("leaderboard:updated", { detail: serverEntries.slice() }));
-      }
-    } catch (_) {
-      /* ignore */
-    }
-    try {
-      const listEl =
-        typeof document !== "undefined" ? document.getElementById("leaderboardList") : null;
-      if (listEl) LeaderboardManager.render(listEl, serverEntries);
-    } catch (_) {
-      /* ignore */
-    }
-    return lastResult.ok;
+    const ok = await repo.saveLocal(payload);
+    if (ok) LeaderboardManager._publish(payload);
+    return ok;
   }
 
   /**
-   * Append score + persist (validates score/id).
-   * If the same initials already exist, only keep the higher score.
+   * Record a score. Initials must be 1-3 letters and not blocklisted (see utils/initials.js);
+   * invalid scores or initials resolve to `false` without persisting anything.
+   * The same initials keep only their higher score.
+   * - Local: merges into the stored list and saves it.
+   * - Remote: renders the merged list optimistically, sends only the new entry, then publishes the
+   *   server's authoritative list (or keeps the optimistic one when the request fails).
    * @param {number} score
    * @param {string} userId
    * @param {{remote?:boolean, accuracy?:number, gameSummary?:any, aiAnalysis?:any}=} options
-   * @returns {Promise<boolean>}
+   * @returns {Promise<boolean>} True when stored locally / accepted for processing by the server.
    */
   static async submit(score, userId, { remote = false, accuracy, gameSummary, aiAnalysis } = {}) {
     if (typeof score !== "number" || !Number.isFinite(score) || score <= 0) return false;
-    /** @param {LeaderboardEntry} a @param {LeaderboardEntry} b */
-    const compareEntries = (a, b) => b.score - a.score || a.id.localeCompare(b.id);
-    const entries = await LeaderboardManager.load({ remote });
-    const id = userId && /^[A-Z]{1,3}$/.test(userId) ? userId : "???";
+    if (!isAllowedInitials(userId)) return false;
     const now = new Date();
     const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    /** @type {LeaderboardEntry} */
-    const newEntry = { id, score: Math.floor(score), date };
-    if (typeof accuracy === "number" && !isNaN(accuracy)) {
-      newEntry.accuracy = accuracy;
-    }
-    if (gameSummary !== undefined && gameSummary !== null) {
-      try {
-        newEntry["game-summary"] =
-          typeof gameSummary === "string" ? gameSummary : JSON.stringify(gameSummary);
-      } catch {
-        // If serialization fails, skip this field
-      }
-    }
-    if (aiAnalysis !== undefined && aiAnalysis !== null) {
-      try {
-        newEntry["ai-analysis"] =
-          typeof aiAnalysis === "string" ? aiAnalysis : JSON.stringify(aiAnalysis);
-      } catch {
-        // If serialization fails, skip this field
-      }
-    }
+    const newEntry = toStoredEntry({
+      id: userId,
+      score: Math.floor(score),
+      date,
+      ...(typeof accuracy === "number" ? { accuracy } : {}),
+      "game-summary": gameSummary,
+      "ai-analysis": aiAnalysis,
+    });
 
-    const existingIndex = entries.findIndex((e) => e.id === id);
+    const entries = await LeaderboardManager.load({ remote });
+    const existing = entries.find((e) => e.id === newEntry.id);
+    const merged = (
+      existing && existing.score >= newEntry.score
+        ? entries
+        : entries.filter((e) => e.id !== newEntry.id).concat(newEntry)
+    )
+      .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+      .slice(0, LeaderboardManager.MAX_ENTRIES);
+    if (!remote) return LeaderboardManager.save(merged);
 
-    if (existingIndex !== -1) {
-      if (newEntry.score > entries[existingIndex].score) {
-        entries[existingIndex] = newEntry;
-      }
-    } else {
-      entries.push(newEntry);
+    LeaderboardManager._cacheEntries = merged.slice();
+    LeaderboardManager._renderList(merged);
+    const repo = await LeaderboardManager._createRepository();
+    const result = await repo.submitRemote(newEntry);
+    if (result.ok) {
+      LeaderboardManager._lastRemoteSync =
+        (typeof performance !== "undefined" && performance.now()) || Date.now();
     }
+    LeaderboardManager._publish(result.entries || merged);
+    return result.ok;
+  }
 
-    entries.sort(compareEntries);
-    return LeaderboardManager.save(entries.slice(0, LeaderboardManager.MAX_ENTRIES), { remote });
+  /**
+   * Internal: replace the cache, emit `leaderboard:updated` and re-render `#leaderboardList`.
+   * @param {LeaderboardEntry[]} entries
+   */
+  static _publish(entries) {
+    LeaderboardManager._cacheEntries = entries.slice();
+    try {
+      if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+        const CE = typeof window.CustomEvent === "function" ? window.CustomEvent : CustomEvent;
+        if (CE) window.dispatchEvent(new CE("leaderboard:updated", { detail: entries.slice() }));
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    LeaderboardManager._renderList(entries);
+  }
+
+  /**
+   * Internal: render entries into `#leaderboardList` when present.
+   * @param {LeaderboardEntry[]} entries
+   */
+  static _renderList(entries) {
+    try {
+      const listEl =
+        typeof document !== "undefined" ? document.getElementById("leaderboardList") : null;
+      if (listEl) LeaderboardManager.render(listEl, entries);
+    } catch (_) {
+      /* ignore */
+    }
   }
 
   /**
