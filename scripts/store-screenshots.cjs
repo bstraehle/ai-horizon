@@ -31,7 +31,7 @@ const path = require("node:path");
 const { capture } = require("./screenshot.cjs");
 
 const TARGETS = [
-  { w: 1440, h: 2880, css: [360, 720], scale: 4, seed: 8 }, // phone (2:1)
+  { w: 1440, h: 2880, css: [360, 720], scale: 4, seed: 17 }, // phone (2:1)
   { w: 1000, h: 1600, css: [500, 800], scale: 2, seed: 2024 }, // 7-inch tablet
   { w: 1500, h: 2400, css: [750, 1200], scale: 2, seed: 314 }, // 10-inch tablet
 ];
