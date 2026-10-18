@@ -1,6 +1,6 @@
 # AI HORIZON
 
-![AI HORIZON architecture](docs/architecture.svg)
+**Architecture:** [watch the architecture video on YouTube](https://www.youtube.com/watch?v=zHNJO3Quy4g&list=PLJk1nicp9M5s)
 
 An arcade-style space shooter for the browser: collect stars, blast asteroids, and beat the 90-second clock. Built with vanilla JavaScript and HTML5 Canvas, installable as a PWA, and backed by an optional serverless AWS leaderboard with AI run analysis. Controls and scoring are described on the [About page](https://www.agentmode.dev/about.html).
 
