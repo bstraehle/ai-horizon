@@ -26,6 +26,11 @@ With `npm run serve` running:
 3. `python store-video/narrate.py --raw store-video/_raw-1920x1080.mp4 --size 1920x1080 --out store-video/ai-horizon-1920x1080.mp4 --sfx store-video/_sfx-1920x1080.wav`
    (needs AWS credentials for Polly; `--sfx-lu` sets how far the game sits under the voice-over).
 
+4K: same steps with `--scale=4` and `3840x2160` in the file names/`--size`. The layout (960x540
+CSS) and seed are unchanged, so the run, sound timeline and narration timing match the 1080p cut.
+Frames are piped to ffmpeg (no temp PNGs); the render takes about 4x as long. The 4K MP4 exceeds
+GitHub's 100 MB file limit, so it is gitignored; upload it to YouTube instead of committing it.
+
 ## Testing against production
 
 - Running the game locally talks to the production AWS leaderboard. In automated runs, block
