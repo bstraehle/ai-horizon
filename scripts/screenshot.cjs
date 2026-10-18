@@ -47,6 +47,23 @@ function findChrome(explicit) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** Characters JSON.stringify leaves as-is that could still break out of generated script code. */
+const UNSAFE_JS_CHARS = {
+  "<": "\\u003C",
+  ">": "\\u003E",
+  "/": "\\u002F",
+  "\u2028": "\\u2028",
+  "\u2029": "\\u2029",
+};
+
+/**
+ * Serialize a value as a JavaScript string literal that is safe to splice into generated code.
+ * @param {string} value
+ */
+function jsString(value) {
+  return JSON.stringify(String(value)).replace(/[<>/\u2028\u2029]/g, (c) => UNSAFE_JS_CHARS[c]);
+}
+
 async function waitForDebugger(port) {
   for (let i = 0; i < 100; i++) {
     try {
@@ -221,7 +238,7 @@ async function capture(options) {
         console.error(`[${verb}] ${file}`);
       } else if (verb === "click") {
         const value = await evaluate(
-          `(() => { const el = document.querySelector(${JSON.stringify(arg)}); if (!el) return "missing"; el.click(); return "clicked"; })()`
+          `(() => { const el = document.querySelector(${jsString(arg)}); if (!el) return "missing"; el.click(); return "clicked"; })()`
         );
         console.error(`[click] ${arg}: ${value}`);
       } else if (verb === "eval") {
