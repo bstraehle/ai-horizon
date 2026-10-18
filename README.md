@@ -28,9 +28,7 @@ npm run serve   # http://localhost:8000
 
 ## Deploy
 
-Copy the contents of `dist/` to static HTTPS hosting (production uses Amazon S3 behind CloudFront). The Lambda functions for the leaderboard and run analysis live in `server/lambda/`; the client's AWS endpoints are configured in `js/adapters/awsConfig.js`. The analysis Lambda's role needs `polly:SynthesizeSpeech` (in addition to Bedrock access) for the spoken headline; without it the debrief still works, just silently.
-
-Link previews (Open Graph / Twitter card tags in `index.prod.html` and `about.html`) point at `https://www.agentmode.dev/og-image.png`, which the build copies from `store-screenshots/ai-horizon-1024x500.png`. Update those URLs, and `CONFIG.SHARE.URL` in `js/constants.js`, if the game moves to another domain.
+Copy the contents of `dist/` to static HTTPS hosting (production uses Amazon S3 behind CloudFront). The Lambda functions for the leaderboard and run analysis live in `server/lambda/`; the client's AWS endpoints are configured in `js/adapters/awsConfig.js`.
 
 ## URL flags
 
