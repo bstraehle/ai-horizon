@@ -5,7 +5,7 @@ const client = new DynamoDBClient({ region: "us-west-2" });
 const docClient = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = "ai-horizon-leaderboard";
-const MAX_LEADERBOARD_ENTRIES = 25;
+const MAX_LEADERBOARD_ENTRIES = 10;
 
 /**
  * Normalize leaderboard payloads so persisted data never exceeds the supported top-N size.

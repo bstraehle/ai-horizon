@@ -56,8 +56,8 @@ describe("leaderboard Lambda persistence", () => {
     const storedScores = params.ExpressionAttributeValues[":val0"];
 
     expect(Array.isArray(storedScores)).toBe(true);
-    expect(storedScores).toHaveLength(25);
+    expect(storedScores).toHaveLength(10);
     expect(storedScores[0]).toMatchObject({ id: "A0", score: 1000 });
-    expect(storedScores[24]).toMatchObject({ id: "A24", score: 976 });
+    expect(storedScores[9]).toMatchObject({ id: "A9", score: 991 });
   });
 });

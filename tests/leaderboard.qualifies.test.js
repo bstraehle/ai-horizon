@@ -23,7 +23,7 @@ describe("LeaderboardManager.qualifiesForInitials", () => {
       { id: "CCC", score: 700 },
       { id: "DDD", score: 600 },
     ];
-    // MAX_ENTRIES default is 25 so still not full
+    // MAX_ENTRIES default is 10 so still not full
     expect(LeaderboardManager.qualifiesForInitials(10, entries)).toBe(true);
   });
 
