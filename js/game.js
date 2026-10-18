@@ -53,6 +53,7 @@ import { PerformanceMonitor } from "./core/PerformanceMonitor.js";
 import { applyPerformanceProfile } from "./ui/PerformanceProfiles.js";
 import { warmUpPools } from "./ui/PoolWarmup.js";
 import { attachDevTools } from "./ui/DevTools.js";
+import { initShareLink } from "./ui/Share.js";
 import { detectMobilePlatform } from "./utils/mobilePlatform.js";
 import { updateGame } from "./systems/GameUpdate.js";
 import { drawGame, drawFrame, samplePerformance } from "./systems/GameRender.js";
@@ -318,6 +319,7 @@ class AIHorizon {
 
     InputBindings.bind(this);
     InputBindings.setup(this);
+    initShareLink(document.getElementById("shareLink"), () => this.score);
     this._unsubscribeEvents = EventHandlers.register(this);
 
     // Global capture listener to intercept the first post-game synthetic click.

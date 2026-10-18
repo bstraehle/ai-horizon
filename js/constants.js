@@ -413,6 +413,11 @@ export const CONFIG = deepFreeze({
   RNG: {
     SEED_PARAM: "seed",
   },
+  SHARE: {
+    URL: "https://www.agentmode.dev/",
+    TITLE: "AI HORIZON",
+    FEEDBACK_MS: 2000,
+  },
   NEBULA: {
     COUNT_DESKTOP: 6,
     COUNT_MOBILE: 2,
