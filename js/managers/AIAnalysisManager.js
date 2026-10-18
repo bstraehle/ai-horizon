@@ -12,6 +12,15 @@ import { FocusManager } from "./FocusManager.js";
 export class AIAnalysisManager {
   static IS_REMOTE = true;
 
+  /**
+   * Sound engine used to narrate the Game Over headline (set by the game). Speech is requested
+   * from the server – which invokes Amazon Polly – only when this is set, supported, unmuted and
+   * remote mode is on.
+   * @type {{ supported: boolean, muted: boolean, takeNarratorVoice: () => string,
+   *   playSpeech: (base64: string) => Promise<boolean> }|null}
+   */
+  static audio = null;
+
   /** @type {Promise<{title:string,bullets:string[],isRemote:boolean,rawResponse?:any}>|null} */
   static _pending = null;
   /** @type {{title:string,bullets:string[],isRemote:boolean,rawResponse?:any}|null} */
@@ -48,8 +57,20 @@ export class AIAnalysisManager {
   }
 
   /**
+   * Speech request for this debrief, or null when sound is off/unsupported or not remote (so
+   * Polly is never invoked). Alternates the narrator gender only when speech is requested.
+   * @returns {{ voice: string }|null}
+   */
+  static _speechRequest() {
+    const audio = AIAnalysisManager.audio;
+    if (!AIAnalysisManager.IS_REMOTE || !audio || !audio.supported || audio.muted) return null;
+    return { voice: audio.takeNarratorVoice() };
+  }
+
+  /**
    * Kick off an asynchronous analysis. Returns a promise and caches result.
    * Never rejects; resolves to a default suggestion payload on failure.
+   * When the server returns a narration clip it is played immediately and not kept in the result.
    * @param {object} stats See AIAnalysisAdapter.analyze JSDoc for shape.
    * @returns {Promise<{title:string,bullets:string[],isRemote:boolean,rawResponse?:any}>}
    */
@@ -58,7 +79,13 @@ export class AIAnalysisManager {
     const p = (async () => {
       try {
         const adapter = await AIAnalysisManager._createAdapter();
-        const result = await adapter.analyze(stats);
+        const speech = AIAnalysisManager._speechRequest();
+        const { speech: clip, ...result } = await adapter.analyze(
+          speech ? { ...stats, speech } : stats
+        );
+        if (clip && AIAnalysisManager.audio) {
+          AIAnalysisManager.audio.playSpeech(clip.audio).catch(() => {});
+        }
         AIAnalysisManager._cache = result;
         return { ...result };
       } finally {

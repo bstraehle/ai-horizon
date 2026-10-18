@@ -55,6 +55,9 @@ function makeFakeContext({ stereo = true } = {}) {
         this.state = "suspended";
         return Promise.resolve();
       });
+      this.decodeAudioData = vi.fn(async (/** @type {ArrayBuffer} */ buf) => ({
+        decodedFrom: new Uint8Array(buf),
+      }));
       if (stereo) {
         /** @type {any} */ (this).createStereoPanner = () => {
           const p = { connect: vi.fn(), pan: makeParam() };
@@ -313,6 +316,49 @@ describe("AudioManager", () => {
     expect(fatal.osc).toBeGreaterThan(0);
     expect(fatal.shapers).toBeGreaterThan(0);
     expect(created(ctx, () => audio.playFatal()).osc).toBe(0);
+  });
+
+  it("alternates the narrator voice, starting female, and persists it", () => {
+    const { audio, storage } = setup();
+    expect([
+      audio.takeNarratorVoice(),
+      audio.takeNarratorVoice(),
+      audio.takeNarratorVoice(),
+    ]).toEqual(["female", "male", "female"]);
+    expect(storage.data[CONFIG.AUDIO.NARRATOR_STORAGE_KEY]).toBe("female");
+  });
+
+  it("decodes and plays narration after the crash's loud part, through the master bus", async () => {
+    const { audio, ctx } = unlocked();
+    ctx.currentTime = 10;
+    audio.playFatal();
+    const clip = Buffer.from([7, 8, 9]).toString("base64");
+    await expect(audio.playSpeech(clip)).resolves.toBe(true);
+    const src = ctx.sources.at(-1);
+    expect(src.buffer.decodedFrom).toEqual(new Uint8Array([7, 8, 9]));
+    expect(src.start.mock.calls[0][0]).toBeCloseTo(10 + CONFIG.AUDIO.SPEECH_AFTER_FATAL_S);
+  });
+
+  it("skips narration when muted, locked, or invalid, and stopSpeech cancels it", async () => {
+    const clip = Buffer.from([1]).toString("base64");
+    const locked = setup();
+    await expect(locked.audio.playSpeech(clip)).resolves.toBe(false);
+
+    const muted = unlocked({ muted: true });
+    await expect(muted.audio.playSpeech(clip)).resolves.toBe(false);
+    expect(muted.ctx.decodeAudioData).not.toHaveBeenCalled();
+
+    const { audio, ctx } = unlocked();
+    await expect(audio.playSpeech("")).resolves.toBe(false);
+    const pending = audio.playSpeech(clip);
+    audio.stopSpeech();
+    await expect(pending).resolves.toBe(false);
+
+    await audio.playSpeech(clip);
+    const playing = ctx.sources.at(-1);
+    audio.stopSpeech();
+    expect(playing.stop).toHaveBeenCalledTimes(1);
+    expect(() => audio.stopSpeech()).not.toThrow();
   });
 
   it("plays the upgrade cue once per throttle window without double-stopping nodes", () => {

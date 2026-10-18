@@ -27,6 +27,11 @@ const STAR_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
  *  - playFatal(): the player's ship is hit – hull crack, distorted crunch, descending metal
  *    screech, huge sub drop, long rumble and debris. Bypasses the voice cap so it always plays.
  *
+ * Narration (Game Over headline spoken by Amazon Polly, synthesized server-side)
+ *  - takeNarratorVoice(): alternates "female" / "male" (persisted) for each spoken debrief.
+ *  - playSpeech(base64Mp3): decodes and plays the clip through the master bus (so mute applies),
+ *    starting after the loud part of a fatal crash; stopSpeech() cancels it (new run).
+ *
  * Lifecycle & policy
  *  - The AudioContext is created lazily by `unlock()`, which callers invoke from a user gesture
  *    (Launch Mission / sound toggle) to satisfy browser autoplay rules. Until then every play
@@ -70,6 +75,12 @@ export class AudioManager {
     this._starStep = 0;
     /** @type {number|null} Context time of the last regular star pickup (streak tracking). */
     this._lastStarAt = null;
+    /** Context time before which narration should not start (end of a crash's loud part). */
+    this._fatalEndsAt = 0;
+    /** @type {AudioBufferSourceNode|null} */
+    this._speech = null;
+    /** Incremented to invalidate in-flight narration decodes. */
+    this._speechToken = 0;
     /** @type {Set<(muted: boolean) => void>} */
     this._listeners = new Set();
   }
@@ -295,6 +306,7 @@ export class AudioManager {
   playFatal() {
     const t = this._begin("fatal", CONFIG.AUDIO.MIN_INTERVAL_MS.FATAL, true);
     if (t === null) return;
+    this._fatalEndsAt = t + CONFIG.AUDIO.SPEECH_AFTER_FATAL_S;
     const ctx = /** @type {AudioContext} */ (this._ctx);
     const bus = this._bus(0, 0.6);
     this._noiseBurst(t, 0.08, "highpass", 1200, 1200, 0.7, this._env(t, 0.8, 0.001, 0.08, bus));
@@ -324,6 +336,69 @@ export class AudioManager {
         2,
         this._env(at, 0.1 + this._random() * 0.15, 0.001, decay, bus)
       );
+    }
+  }
+
+  /**
+   * Next narrator gender for a spoken debrief; alternates female → male → female (persisted).
+   * Call only when speech will actually be requested.
+   * @returns {"female"|"male"}
+   */
+  takeNarratorVoice() {
+    const key = CONFIG.AUDIO.NARRATOR_STORAGE_KEY;
+    const next =
+      this._storage.getJSON(key, /** @type {string|null} */ (null)) === "female"
+        ? "male"
+        : "female";
+    this._storage.setJSON(key, next);
+    return next;
+  }
+
+  /**
+   * Decode and play a narration clip (base64 MP3) through the master bus. Skipped when muted,
+   * locked, suspended, or superseded by stopSpeech() while decoding.
+   * @param {string} base64
+   * @returns {Promise<boolean>} Whether playback was scheduled.
+   */
+  async playSpeech(base64) {
+    const ctx = this._ctx;
+    if (this._muted || !ctx || typeof base64 !== "string" || !base64) return false;
+    this.stopSpeech();
+    const token = this._speechToken;
+    try {
+      const bin = atob(base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const buffer = await ctx.decodeAudioData(bytes.buffer);
+      if (token !== this._speechToken || this._muted || ctx.state !== "running") return false;
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      const gain = ctx.createGain();
+      gain.gain.value = CONFIG.AUDIO.SPEECH_GAIN;
+      src.connect(gain);
+      gain.connect(/** @type {GainNode} */ (this._master));
+      src.onended = () => {
+        if (this._speech === src) this._speech = null;
+      };
+      src.start(Math.max(ctx.currentTime + 0.05, this._fatalEndsAt));
+      this._speech = src;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Stop current narration and cancel any clip still decoding. */
+  stopSpeech() {
+    this._speechToken++;
+    const src = this._speech;
+    this._speech = null;
+    if (src) {
+      try {
+        src.stop();
+      } catch {
+        /* already stopped */
+      }
     }
   }
 

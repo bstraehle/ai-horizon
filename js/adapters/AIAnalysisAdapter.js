@@ -7,6 +7,8 @@ const TIMER_SECONDS = CONFIG?.GAME?.TIMER_SECONDS ?? 90;
 const FINALE_SECONDS = CONFIG?.GAME?.FINALE_BONUS_WINDOW_SECONDS ?? 15;
 const BONUS_ASTEROID_COUNT = CONFIG?.GAME?.BONUS_ASTEROID_COUNT ?? 8;
 
+/** @typedef {{ audio: string, voice: string, gender: string }} SpeechClip Base64 MP3 narration. */
+
 export class AIAnalysisAdapter {
   /**
    * Create an AIAnalysisAdapter.
@@ -21,9 +23,12 @@ export class AIAnalysisAdapter {
 
   /**
    * Analyze a run and return actionable suggestions.
-   * Accepts either a plain stats object or a payload { stats, runSummary }.
+   * Accepts either a plain stats object or a payload { stats, runSummary, speech }.
+   * When `speech: { voice }` is given, it is sent with the run summary so the server can return
+   * the headline spoken by Amazon Polly. The audio is returned as `speech` and removed from
+   * `rawResponse`, which is persisted with leaderboard entries.
    * @param {object} input
-   * @returns {Promise<{title:string, bullets:string[], isRemote:boolean, rawResponse?:any}>}
+   * @returns {Promise<{title:string, bullets:string[], isRemote:boolean, rawResponse?:any, speech?:SpeechClip}>}
    */
   async analyze(input) {
     /** @type {any} */
@@ -31,15 +36,25 @@ export class AIAnalysisAdapter {
 
     if (this._remoteAdapter && this._endpoint) {
       try {
-        const response = await this._remoteAdapter.postJSON(this._endpoint, payload.runSummary);
+        const body =
+          payload.speech && payload.runSummary
+            ? { ...payload.runSummary, speech: payload.speech }
+            : payload.runSummary;
+        const response = await this._remoteAdapter.postJSON(this._endpoint, body);
         if (response) {
-          var transformedResponse = this._transformRemoteResponse(response);
+          const { analysis, speech } = this._extractSpeech(response);
+          var transformedResponse = this._transformRemoteResponse(analysis);
           if (
             transformedResponse.title &&
             transformedResponse.bullets &&
             transformedResponse.bullets.length > 0
           ) {
-            return { ...transformedResponse, isRemote: true, rawResponse: response };
+            return {
+              ...transformedResponse,
+              isRemote: true,
+              rawResponse: analysis,
+              ...(speech ? { speech } : {}),
+            };
           }
         }
       } catch {
@@ -48,6 +63,35 @@ export class AIAnalysisAdapter {
     }
 
     return { ...this._deterministicAnalysis(payload), isRemote: false };
+  }
+
+  /**
+   * Split the optional `speech` clip from a remote response.
+   * @param {any} response Parsed JSON or a JSON string from the analysis endpoint.
+   * @returns {{ analysis: any, speech: SpeechClip|null }} `analysis` without `speech`.
+   */
+  _extractSpeech(response) {
+    let parsed = response;
+    if (typeof response === "string") {
+      try {
+        parsed = JSON.parse(response);
+      } catch {
+        return { analysis: response, speech: null };
+      }
+    }
+    if (!parsed || typeof parsed !== "object" || !("speech" in parsed)) {
+      return { analysis: response, speech: null };
+    }
+    const { speech, ...analysis } = parsed;
+    const clip =
+      speech && typeof speech.audio === "string" && speech.audio
+        ? {
+            audio: speech.audio,
+            voice: String(speech.voice || ""),
+            gender: String(speech.gender || ""),
+          }
+        : null;
+    return { analysis, speech: clip };
   }
 
   /**

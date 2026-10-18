@@ -167,6 +167,7 @@ class AIHorizon {
     this.events = new EventBus();
     /** Synthesized sound effects; unlocked on Launch Mission, muted state persisted. */
     this.audio = new AudioManager();
+    AIAnalysisManager.audio = this.audio;
 
     // Guard to prevent an accidental 'click' on the Game Over / Restart UI that
     // can be synthesized when the user lifts the finger they were using for
@@ -1071,6 +1072,7 @@ class AIHorizon {
     this.resetGameState(wasGameOver);
     // Launch / restart is a user gesture, so this is where browsers allow audio to start.
     this.audio.unlock();
+    this.audio.stopSpeech();
     // Forget the previous run's pointer position so the ship starts level at its spawn point
     // instead of dashing (and banking) toward a stale target; steering resumes on the next
     // pointer move / touch / key press.
