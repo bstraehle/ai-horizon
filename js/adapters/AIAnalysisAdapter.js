@@ -1,7 +1,7 @@
 /**
  * AIAnalysisAdapter – provides AI analysis of gameplay runs via REST API or mock fallback.
  * Sends run summaries (with the game's verdict and insights) to the analysis endpoint and
- * transforms responses into a headline plus a strength and ranked improvement tips.
+ * builds a headline plus Well done / Next mission sections from the response and exact facts.
  */
 import { CONFIG } from "../constants.js";
 const TIMER_SECONDS = CONFIG?.GAME?.TIMER_SECONDS ?? 90;
@@ -39,104 +39,280 @@ export function missionVerdict(runSummary) {
   return survived >= total && strong ? "commendation" : "satisfactory";
 }
 
-/** Most weaknesses (improvement tips) a debrief lists. */
+/** Most weaknesses (Next mission items) a debrief lists. */
 export const MAX_WEAKNESSES = 3;
-/** Weaknesses with a smaller estimated cost (points) are not worth a tip. */
+/** Weaknesses with a smaller estimated cost (points) are not worth an item. */
 const MIN_COST = 50;
 /** Point rate assumed for seconds never flown when the pilot's own pace is lower (early ejects). */
 const MIN_PACE = 30;
 
 /**
- * @typedef {"survival"|"finale"|"redPlanets"|"redStars"|"grayPlanets"|"accuracy"|"whiteStars"|"asteroids"} InsightTopic
- * @typedef {{ topic: InsightTopic, emoji: string, done: number, total: number, points?: number }} Insight
+ * @typedef {"survival"|"finale"|"bonusAsteroids"|"bonusStars"|"hardenedAsteroids"|"accuracy"|"stars"|"asteroids"} InsightTopic
+ * @typedef {{ topic: InsightTopic, done: number, total: number, points?: number }} Insight
  *   Exact facts only: done/total are seconds flown of the mission (survival), seconds flown of
  *   the finale (finale, with `points` scored in it, already doubled), hits of shots (accuracy),
  *   or destroyed/collected of seen.
  * @typedef {{ strength: Insight|null, weaknesses: Insight[] }} MissionInsights
+ * @typedef {{ kind: "done"|"next", heading: string, items: string[] }} DebriefSection
+ *   "done": the Well done section (the strength); "next": the Next mission section.
  */
 
 /**
  * Debrief topics in priority order (ties rank earlier topics first). `par` is the realistic share
  * of a target a strong pilot gets (nobody collects every star), calibrated on top real runs; it
- * only ranks topics and is never shown. Emojis match the game's look: red planets, red stars,
- * gray planets. Offline debrief lines (`tip`, `good`) mirror what the prompt in
- * server/lambda/analysis.js asks for: an exact fact, then a technique.
- * @type {Record<InsightTopic, { emoji: string, par: number, points?: number,
- *   tip: (i: Insight) => string, good: (i: Insight) => string }>}
+ * only ranks topics and is never shown. `technique` is the offline (English) advice; the prompt in
+ * server/lambda/analysis.js lists the same techniques for the model.
+ * @type {Record<InsightTopic, { par: number, points?: number, technique: string }>}
  */
 const TOPICS = {
-  survival: {
-    emoji: "🚀",
-    par: 1,
-    tip: (i) => `You ejected after ${i.done} of ${i.total} seconds. Dodge first, shoot second.`,
-    good: (i) =>
-      i.done >= i.total
-        ? `Full ${i.total} seconds flown, no ejection.`
-        : `${i.done} of ${i.total} seconds flown.`,
-  },
-  finale: {
-    emoji: "🔥",
-    par: 1,
-    tip: (i) =>
-      `${i.points} points in the ${i.total}-second finale. Points count double: push hardest then.`,
-    good: (i) => `Strong finale: ${i.points} points in the last ${i.total} seconds.`,
-  },
-  redPlanets: {
-    emoji: "🔴",
+  survival: { par: 1, technique: "Dodge first, shoot second." },
+  finale: { par: 1, technique: "Points count double: push hardest then." },
+  bonusAsteroids: {
     par: 1,
     points: G.ASTEROID_SCORE_BONUS,
-    tip: (i) =>
-      `${i.done} of ${i.total} red planets destroyed. One appears every ${G.BONUS_INTERVAL_SECONDS} seconds: hit it at once.`,
-    good: (i) => `${i.done} of ${i.total} red planets destroyed.`,
+    technique: `One appears every ${G.BONUS_INTERVAL_SECONDS} seconds; hit each one at once.`,
   },
-  redStars: {
-    emoji: "🌟",
+  bonusStars: {
     par: 0.75,
     points: G.STAR_SCORE_BONUS,
-    tip: (i) => `${i.done} of ${i.total} red stars collected. Steer through them, they pay double.`,
-    good: (i) => `${i.done} of ${i.total} red stars collected.`,
+    technique: "Steer through them; they pay double.",
   },
-  grayPlanets: {
-    emoji: "🪐",
+  hardenedAsteroids: {
     par: 0.5,
     points: G.ASTEROID_SCORE_HARDENED,
-    tip: (i) =>
-      `${i.done} of ${i.total} gray planets destroyed. Reach ${G.BULLET_UPGRADE_SCORE} points early: they take half the hits.`,
-    good: (i) => `${i.done} of ${i.total} gray planets destroyed.`,
+    technique: `Reach ${G.BULLET_UPGRADE_SCORE} points early to upgrade your bullets.`,
   },
-  accuracy: {
-    emoji: "🎯",
-    par: 0.75,
-    tip: (i) => `${i.done} of ${i.total} shots hit. Fire short bursts at targets.`,
-    good: (i) => `${Math.round((100 * i.done) / i.total)}% of shots on target.`,
+  accuracy: { par: 0.75, technique: "Fire short bursts at targets." },
+  stars: { par: 0.35, points: G.STAR_SCORE, technique: "Grab stars between attacks." },
+  asteroids: { par: 0.2, points: G.ASTEROID_SCORE, technique: "Shoot the asteroids in your path." },
+};
+
+/**
+ * @typedef {{ wellDone: string, nextMission: string, seconds: (done: number, total: number) => string,
+ *   points: (n: number) => string, topics: Record<InsightTopic, string> }} DebriefLabels
+ */
+
+/**
+ * Section headings and topic names per language (the languages with a narrator voice in
+ * server/lambda/analysis.js); topic names follow the About page and scoring rules, never colours
+ * (bonus items are red or blue depending on the run). Other languages use English.
+ * @type {Record<string, DebriefLabels>}
+ */
+export const DEBRIEF_LABELS = {
+  en: {
+    wellDone: "Well done",
+    nextMission: "Next mission",
+    seconds: (d, t) => `${d} / ${t} s`,
+    points: (n) => `${n} points`,
+    topics: {
+      survival: "Survival",
+      finale: "Finale",
+      bonusAsteroids: "Bonus asteroids",
+      bonusStars: "Bonus stars",
+      hardenedAsteroids: "Hardened asteroids",
+      accuracy: "Accuracy",
+      stars: "Stars",
+      asteroids: "Asteroids",
+    },
   },
-  whiteStars: {
-    emoji: "⭐",
-    par: 0.35,
-    points: G.STAR_SCORE,
-    tip: (i) => `${i.done} of ${i.total} stars collected. Grab stars between attacks.`,
-    good: (i) => `${i.done} of ${i.total} stars collected.`,
+  nl: {
+    wellDone: "Goed gedaan",
+    nextMission: "Volgende missie",
+    seconds: (d, t) => `${d} / ${t} s`,
+    points: (n) => `${n} punten`,
+    topics: {
+      survival: "Overleven",
+      finale: "Finale",
+      bonusAsteroids: "Bonusasteroïden",
+      bonusStars: "Bonussterren",
+      hardenedAsteroids: "Geharde asteroïden",
+      accuracy: "Nauwkeurigheid",
+      stars: "Sterren",
+      asteroids: "Asteroïden",
+    },
   },
-  asteroids: {
-    emoji: "☄️",
-    par: 0.2,
-    points: G.ASTEROID_SCORE,
-    tip: (i) => `${i.done} of ${i.total} asteroids destroyed. Shoot the rocks in your path.`,
-    good: (i) => `${i.done} of ${i.total} asteroids destroyed.`,
+  fr: {
+    wellDone: "Bien joué",
+    nextMission: "Prochaine mission",
+    seconds: (d, t) => `${d} / ${t} s`,
+    points: (n) => `${n} points`,
+    topics: {
+      survival: "Survie",
+      finale: "Finale",
+      bonusAsteroids: "Astéroïdes bonus",
+      bonusStars: "Étoiles bonus",
+      hardenedAsteroids: "Astéroïdes renforcés",
+      accuracy: "Précision",
+      stars: "Étoiles",
+      asteroids: "Astéroïdes",
+    },
+  },
+  de: {
+    wellDone: "Gut gemacht",
+    nextMission: "Nächste Mission",
+    seconds: (d, t) => `${d} / ${t} s`,
+    points: (n) => `${n} Punkte`,
+    topics: {
+      survival: "Überleben",
+      finale: "Finale",
+      bonusAsteroids: "Bonus-Asteroiden",
+      bonusStars: "Bonus-Sterne",
+      hardenedAsteroids: "Gehärtete Asteroiden",
+      accuracy: "Treffsicherheit",
+      stars: "Sterne",
+      asteroids: "Asteroiden",
+    },
+  },
+  it: {
+    wellDone: "Ben fatto",
+    nextMission: "Prossima missione",
+    seconds: (d, t) => `${d} / ${t} s`,
+    points: (n) => `${n} punti`,
+    topics: {
+      survival: "Sopravvivenza",
+      finale: "Finale",
+      bonusAsteroids: "Asteroidi bonus",
+      bonusStars: "Stelle bonus",
+      hardenedAsteroids: "Asteroidi corazzati",
+      accuracy: "Precisione",
+      stars: "Stelle",
+      asteroids: "Asteroidi",
+    },
+  },
+  ko: {
+    wellDone: "잘한 점",
+    nextMission: "다음 임무",
+    seconds: (d, t) => `${d} / ${t}초`,
+    points: (n) => `${n}점`,
+    topics: {
+      survival: "생존",
+      finale: "피날레",
+      bonusAsteroids: "보너스 소행성",
+      bonusStars: "보너스 별",
+      hardenedAsteroids: "강화 소행성",
+      accuracy: "명중률",
+      stars: "별",
+      asteroids: "소행성",
+    },
+  },
+  pl: {
+    wellDone: "Dobra robota",
+    nextMission: "Następna misja",
+    seconds: (d, t) => `${d} / ${t} s`,
+    points: (n) => `${n} pkt`,
+    topics: {
+      survival: "Przetrwanie",
+      finale: "Finał",
+      bonusAsteroids: "Asteroidy bonusowe",
+      bonusStars: "Gwiazdy bonusowe",
+      hardenedAsteroids: "Utwardzone asteroidy",
+      accuracy: "Celność",
+      stars: "Gwiazdy",
+      asteroids: "Asteroidy",
+    },
+  },
+  pt: {
+    wellDone: "Muito bem",
+    nextMission: "Próxima missão",
+    seconds: (d, t) => `${d} / ${t} s`,
+    points: (n) => `${n} pontos`,
+    topics: {
+      survival: "Sobrevivência",
+      finale: "Final",
+      bonusAsteroids: "Asteroides bônus",
+      bonusStars: "Estrelas bônus",
+      hardenedAsteroids: "Asteroides reforçados",
+      accuracy: "Precisão",
+      stars: "Estrelas",
+      asteroids: "Asteroides",
+    },
+  },
+  es: {
+    wellDone: "Bien hecho",
+    nextMission: "Próxima misión",
+    seconds: (d, t) => `${d} / ${t} s`,
+    points: (n) => `${n} puntos`,
+    topics: {
+      survival: "Supervivencia",
+      finale: "Final",
+      bonusAsteroids: "Asteroides bonus",
+      bonusStars: "Estrellas bonus",
+      hardenedAsteroids: "Asteroides reforzados",
+      accuracy: "Precisión",
+      stars: "Estrellas",
+      asteroids: "Asteroides",
+    },
   },
 };
 
 /**
- * Pick what this mission did well and its biggest levers, so tips focus on what matters most
- * instead of listing every stat. Topics are ranked by an internal cost estimate in points that is
- * never shown (only exact facts are returned):
+ * Labels for a BCP 47 locale's language, English when missing or unsupported.
+ * @param {unknown} locale
+ * @returns {DebriefLabels}
+ */
+export function debriefLabels(locale) {
+  const lang = typeof locale === "string" ? locale.split(/[-_]/)[0].toLowerCase() : "";
+  return DEBRIEF_LABELS[lang] || DEBRIEF_LABELS.en;
+}
+
+/**
+ * The exact fact shown for an insight, e.g. "Bonus asteroids: 1 / 8" or "Accuracy: 40% (173 / 434)".
+ * @param {Insight} insight
+ * @param {DebriefLabels} labels
+ * @returns {string}
+ */
+export function insightFact(insight, labels) {
+  const { topic, done, total } = insight;
+  const name = labels.topics[topic];
+  if (topic === "survival") return `${name}: ${labels.seconds(done, total)}`;
+  if (topic === "finale") return `${name}: ${labels.points(insight.points ?? 0)}`;
+  if (topic === "accuracy")
+    return `${name}: ${Math.round((100 * done) / total)}% (${done} / ${total})`;
+  return `${name}: ${done} / ${total}`;
+}
+
+/**
+ * Well done / Next mission sections: the strength as a fact, then each weakness as its fact
+ * followed by its technique (`techniques[i]` for weakness i; omitted when missing), normalised to
+ * a sentence (leading emoji dropped, capitalised, ending punctuation added).
+ * @param {MissionInsights} insights
+ * @param {DebriefLabels} labels
+ * @param {(string|undefined)[]} techniques
+ * @returns {DebriefSection[]} Only sections that have items.
+ */
+export function debriefSections(insights, labels, techniques) {
+  /** @type {DebriefSection[]} */
+  const sections = [];
+  if (insights.strength) {
+    sections.push({
+      kind: "done",
+      heading: labels.wellDone,
+      items: [insightFact(insights.strength, labels)],
+    });
+  }
+  const next = insights.weaknesses.map((w, i) => {
+    const text = String(techniques[i] ?? "")
+      .replace(/^(?:\p{Extended_Pictographic}|\u200d|\uFE0F|\s)+/u, "")
+      .trim();
+    if (!text) return insightFact(w, labels);
+    const sentence = text.charAt(0).toLocaleUpperCase() + text.slice(1);
+    return `${insightFact(w, labels)}. ${sentence}${/[.!?。！？]$/u.test(sentence) ? "" : "."}`;
+  });
+  if (next.length) sections.push({ kind: "next", heading: labels.nextMission, items: next });
+  return sections;
+}
+
+/**
+ * Pick what this mission did well and its biggest levers, so the debrief focuses on what matters
+ * most instead of listing every stat. Topics are ranked by an internal cost estimate in points
+ * that is never shown (only exact facts are returned):
  * - survival: seconds never flown (mission length minus seconds survived) at the pilot's
  *   item-point pace (at least MIN_PACE), the missed finale seconds counted twice;
  * - finale: shortfall of finale points against the pre-finale pace, doubled;
  * - targets: shortfall against the topic's `par` share times its points;
  * - accuracy: base score times the shortfall against par accuracy (the accuracy bonus).
- * Counters in the summary include their variants (stars include red stars, asteroids include
- * planets, hardened include red planets), so each topic counts only its own kind.
+ * Counters in the summary include their variants (stars include bonus stars, asteroids include
+ * hardened ones, hardened include bonus asteroids), so each topic counts only its own kind.
  * @param {any} runSummary Run summary built by `AIHorizon._logRunSummary`.
  * @returns {MissionInsights|null} null without timer or stats. The strength is the topic most
  *   above par that is not a weakness; weaknesses (at most MAX_WEAKNESSES, highest cost first)
@@ -153,15 +329,15 @@ export function missionInsights(runSummary) {
   const finaleSurvived = n(timer.survivedSecondsFinale);
   const finaleBase = n(score.playerBaseScoreFinale);
 
-  /** @type {Record<"redPlanets"|"redStars"|"grayPlanets"|"whiteStars"|"asteroids", [number, number]>} */
+  /** @type {Record<"bonusAsteroids"|"bonusStars"|"hardenedAsteroids"|"stars"|"asteroids", [number, number]>} */
   const targets = {
-    redPlanets: [n(s.bonusAsteroidsKilled), n(s.bonusAsteroidsEncountered)],
-    redStars: [n(s.bonusStarsCollected), n(s.bonusStarsEncountered)],
-    grayPlanets: [
+    bonusAsteroids: [n(s.bonusAsteroidsKilled), n(s.bonusAsteroidsEncountered)],
+    bonusStars: [n(s.bonusStarsCollected), n(s.bonusStarsEncountered)],
+    hardenedAsteroids: [
       n(s.hardenedAsteroidsKilled) - n(s.bonusAsteroidsKilled),
       n(s.hardenedAsteroidsEncountered) - n(s.bonusAsteroidsEncountered),
     ],
-    whiteStars: [
+    stars: [
       n(s.regularStarsCollected) - n(s.bonusStarsCollected),
       n(s.regularStarsEncountered) - n(s.bonusStarsEncountered),
     ],
@@ -185,30 +361,31 @@ export function missionInsights(runSummary) {
   const add = (insight, cost, ratio = insight.done / insight.total / TOPICS[insight.topic].par) => {
     if (insight.total > 0) all.push({ insight, cost: Math.max(0, cost), ratio });
   };
-  /** @param {InsightTopic} topic @param {number} done @param {number} of */
-  const fact = (topic, done, of) => ({ topic, emoji: TOPICS[topic].emoji, done, total: of });
 
   const pace = Math.max(MIN_PACE, itemPoints / Math.max(1, survived));
   const missed = Math.max(0, total - survived);
-  add(fact("survival", survived, total), pace * (missed + Math.min(FINALE_SECONDS, missed)));
+  add(
+    { topic: "survival", done: survived, total },
+    pace * (missed + Math.min(FINALE_SECONDS, missed))
+  );
   if (finaleSurvived > 0) {
     const preFinalePace = (itemPoints - finaleBase) / Math.max(1, survived - finaleSurvived);
     const expected = preFinalePace * finaleSurvived;
     add(
-      { ...fact("finale", finaleSurvived, FINALE_SECONDS), points: 2 * finaleBase },
+      { topic: "finale", done: finaleSurvived, total: FINALE_SECONDS, points: 2 * finaleBase },
       2 * (expected - finaleBase),
       expected > 0 ? finaleBase / expected : 1
     );
   }
   for (const [key, [done, seen]] of Object.entries(targets)) {
     const topic = /** @type {InsightTopic} */ (key);
-    add(fact(topic, done, seen), (TOPICS[topic].par * seen - done) * n(TOPICS[topic].points));
+    add({ topic, done, total: seen }, (TOPICS[topic].par * seen - done) * n(TOPICS[topic].points));
   }
   const shots = n(s.shotsFiredTotal);
   const hits = Math.min(shots, n(s.shotsFiredHitTarget));
   if (shots > 0) {
     add(
-      fact("accuracy", hits, shots),
+      { topic: "accuracy", done: hits, total: shots },
       n(score.playerBaseScore) * (TOPICS.accuracy.par - hits / shots)
     );
   }
@@ -242,15 +419,17 @@ export class AIAnalysisAdapter {
   }
 
   /**
-   * Analyze a run and return actionable suggestions.
+   * Analyze a run and return the debrief: a headline plus Well done / Next mission sections.
    * Accepts either a plain stats object or a payload { stats, runSummary, speech }.
    * The run summary is sent with its {@link missionVerdict} as `verdict`, which sets the tone of
-   * the headline, and its {@link missionInsights} as `insights`, which the tips are written from.
-   * When `speech: { voice }` is given, it is sent too so the server can return the headline
-   * spoken by Amazon Polly. The audio is returned as `speech` and removed from `rawResponse`,
-   * which is persisted with leaderboard entries.
+   * the headline, and its {@link missionInsights} as `insights`; the model returns the headline
+   * and one technique per weakness, and the sections are built here from the insights' exact
+   * facts with {@link debriefLabels} for the player's locale. When `speech: { voice }` is given,
+   * it is sent too so the server can return the headline spoken by Amazon Polly. The audio is
+   * returned as `speech` and removed from `rawResponse`, which is persisted with leaderboard
+   * entries.
    * @param {object} input
-   * @returns {Promise<{title:string, bullets:string[], isRemote:boolean, rawResponse?:any, speech?:SpeechClip}>}
+   * @returns {Promise<{title:string, sections:DebriefSection[], isRemote:boolean, rawResponse?:any, speech?:SpeechClip}>}
    */
   async analyze(input) {
     /** @type {any} */
@@ -270,16 +449,13 @@ export class AIAnalysisAdapter {
             }
           : summary;
         const response = await this._remoteAdapter.postJSON(this._endpoint, body);
-        if (response) {
+        if (response && insights) {
           const { analysis, speech } = this._extractSpeech(response);
-          var transformedResponse = this._transformRemoteResponse(analysis);
-          if (
-            transformedResponse.title &&
-            transformedResponse.bullets &&
-            transformedResponse.bullets.length > 0
-          ) {
+          const labels = debriefLabels(summary && summary.device && summary.device.locale);
+          const transformed = this._transformRemoteResponse(analysis, insights, labels);
+          if (transformed.title && transformed.sections.length > 0) {
             return {
-              ...transformedResponse,
+              ...transformed,
               isRemote: true,
               rawResponse: analysis,
               ...(speech ? { speech } : {}),
@@ -324,59 +500,54 @@ export class AIAnalysisAdapter {
   }
 
   /**
-   * Transform the remote API response format to internal format: the `strength` line first,
-   * then the `improvement-tip-*` lines in order.
-   * @param {any} response API response with feedback, strength and improvement-tip-* fields
-   * @returns {{title:string, bullets:string[]}}
+   * Build the debrief from the remote response: its `feedback` headline, and sections from the
+   * insights that were sent, with `technique-N` as the advice for weakness N.
+   * @param {any} response API response (JSON string or object) with feedback and technique-* fields
+   * @param {MissionInsights} insights
+   * @param {DebriefLabels} labels
+   * @returns {{title:string, sections:DebriefSection[]}}
    */
-  _transformRemoteResponse(response) {
-    let parsedResponse = response;
-
+  _transformRemoteResponse(response, insights, labels) {
+    let parsed = response;
     if (typeof response === "string") {
       try {
-        parsedResponse = JSON.parse(response);
+        parsed = JSON.parse(response);
       } catch {
-        parsedResponse = response;
+        parsed = {};
       }
     }
-
-    const bullets = [];
-    const keys = ["strength", ...Array.from({ length: 8 }, (_, i) => `improvement-tip-${i + 1}`)];
-
-    for (const key of keys) {
-      const value = parsedResponse[key];
-
-      if (value && String(value).trim() !== "") {
-        bullets.push(String(value));
-      }
-    }
-
+    const techniques = insights.weaknesses.map((_, i) => parsed && parsed[`technique-${i + 1}`]);
     return {
-      title: parsedResponse.feedback,
-      bullets,
+      title: parsed && parsed.feedback,
+      sections: debriefSections(insights, labels, techniques),
     };
   }
 
   /**
-   * Offline debrief from the run's {@link missionInsights}: the strength line, then one tip per
-   * weakness (biggest points lost first), in the same style the prompt asks the model for.
+   * Offline (English) debrief from the run's {@link missionInsights}, laid out like the remote one.
    * @param {any} payload
-   * @returns {{title:string, bullets:string[]}}
+   * @returns {{title:string, sections:DebriefSection[]}}
    */
   _deterministicAnalysis(payload) {
     const insights = missionInsights(payload.runSummary);
-    const bullets = insights
-      ? [
-          ...(insights.strength
-            ? [`✅ ${TOPICS[insights.strength.topic].good(insights.strength)}`]
-            : []),
-          ...insights.weaknesses.map((i) => `${i.emoji} ${TOPICS[i.topic].tip(i)}`),
-        ]
+    const labels = DEBRIEF_LABELS.en;
+    const sections = insights
+      ? debriefSections(
+          insights,
+          labels,
+          insights.weaknesses.map((w) => TOPICS[w.topic].technique)
+        )
       : [
-          `🚀 Fly the full ${TIMER_SECONDS} seconds: one asteroid collision ends the run.`,
-          `🔥 Points count double in the last ${FINALE_SECONDS} seconds.`,
+          {
+            kind: /** @type {const} */ ("next"),
+            heading: labels.nextMission,
+            items: [
+              `Fly the full ${TIMER_SECONDS} seconds: one asteroid collision ends the run.`,
+              `Points count double in the last ${FINALE_SECONDS} seconds.`,
+            ],
+          },
         ];
-    return { title: this._verdictTitle(payload.runSummary), bullets };
+    return { title: this._verdictTitle(payload.runSummary), sections };
   }
 
   /**

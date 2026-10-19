@@ -10,21 +10,36 @@ describe("AIAnalysisManager.render", () => {
     globalThis.document = dom.window.document;
   });
 
-  it("shows the headline and an unnumbered list of emoji-led lines", async () => {
+  it("shows the headline, then labelled Well done / Next mission lists", async () => {
     const msg = /** @type {HTMLElement} */ (document.getElementById("msg"));
-    const done = new Promise((resolve) => {
-      AIAnalysisManager.render(
-        msg,
-        {},
-        { timer: { survivedSeconds: 41 }, stats: {} },
-        false,
-        resolve
-      );
+    const run = {
+      timer: { totalSeconds: 90, survivedSeconds: 41 },
+      stats: {
+        bonusAsteroidsEncountered: 4,
+        bonusAsteroidsKilled: 4,
+        hardenedAsteroidsEncountered: 4,
+      },
+    };
+    await new Promise((resolve) => {
+      AIAnalysisManager.render(msg, {}, run, false, resolve);
     });
-    await done;
     expect(msg.querySelector("p")?.textContent).toMatch(/^👨‍🚀 Reprimand, pilot\./);
-    expect(msg.querySelector("ol")).toBeNull();
-    const items = Array.from(msg.querySelectorAll("ul > li"), (li) => li.textContent);
-    expect(items[0]).toMatch(/^🚀 You ejected after 41 of 90 seconds\./);
+    const sections = Array.from(msg.querySelectorAll(".debrief > section"), (s) => ({
+      className: s.className,
+      heading: s.querySelector("h3")?.textContent,
+      items: Array.from(s.querySelectorAll("ul > li"), (li) => li.textContent),
+    }));
+    expect(sections).toEqual([
+      {
+        className: "debrief-section debrief-done",
+        heading: "Well done",
+        items: ["Bonus asteroids: 4 / 4"],
+      },
+      {
+        className: "debrief-section debrief-next",
+        heading: "Next mission",
+        items: ["Survival: 41 / 90 s. Dodge first, shoot second."],
+      },
+    ]);
   });
 });

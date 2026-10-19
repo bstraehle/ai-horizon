@@ -369,17 +369,49 @@ body {
 #gameOverScreen .game-over-content {
   max-width: 40rem;
 }
-.post-game-message ul,
-.post-game-message ol {
-  list-style: disc;
+.post-game-message .debrief {
   margin: 0 auto;
   max-width: 100%;
-  padding-left: 1.25em;
   text-align: left;
   width: fit-content;
 }
+.post-game-message .debrief-section + .debrief-section {
+  margin-top: var(--space-4);
+}
+.post-game-message h3 {
+  color: var(--color-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin-bottom: var(--space-2);
+  text-transform: uppercase;
+}
+.post-game-message ul,
+.post-game-message ol {
+  list-style: none;
+  margin: 0;
+  padding-left: 1.5em;
+}
+.post-game-message li {
+  position: relative;
+}
 .post-game-message li + li {
   margin-top: var(--space-1);
+}
+.post-game-message li::before {
+  font-weight: 700;
+  left: -1.5em;
+  position: absolute;
+}
+.post-game-message .debrief-done li::before {
+  color: #5fd38d;
+  content: "✓";
+  content: "✓" / "";
+}
+.post-game-message .debrief-next li::before {
+  color: var(--color-text);
+  content: "→";
+  content: "→" / "";
 }
 .initials-entry .initials-input {
   background: rgba(255, 255, 255, 0.01);

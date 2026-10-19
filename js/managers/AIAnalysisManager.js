@@ -21,9 +21,9 @@ export class AIAnalysisManager {
    */
   static audio = null;
 
-  /** @type {Promise<{title:string,bullets:string[],isRemote:boolean,rawResponse?:any}>|null} */
+  /** @type {Promise<{title:string,sections:import("../adapters/AIAnalysisAdapter.js").DebriefSection[],isRemote:boolean,rawResponse?:any}>|null} */
   static _pending = null;
-  /** @type {{title:string,bullets:string[],isRemote:boolean,rawResponse?:any}|null} */
+  /** @type {{title:string,sections:import("../adapters/AIAnalysisAdapter.js").DebriefSection[],isRemote:boolean,rawResponse?:any}|null} */
   static _cache = null;
 
   /**
@@ -72,7 +72,7 @@ export class AIAnalysisManager {
    * Never rejects; resolves to a default suggestion payload on failure.
    * When the server returns a narration clip it is played immediately and not kept in the result.
    * @param {object} stats See AIAnalysisAdapter.analyze JSDoc for shape.
-   * @returns {Promise<{title:string,bullets:string[],isRemote:boolean,rawResponse?:any}>}
+   * @returns {Promise<{title:string,sections:import("../adapters/AIAnalysisAdapter.js").DebriefSection[],isRemote:boolean,rawResponse?:any}>}
    */
   static async analyze(stats) {
     if (AIAnalysisManager._pending) return AIAnalysisManager._pending;
@@ -104,7 +104,7 @@ export class AIAnalysisManager {
    * @param {object} stats
    * @param {object|null} runSummary
    * @param {boolean} isRemote Whether remote mode is enabled
-   * @param {((result: {title:string,bullets:string[],isRemote:boolean,rawResponse?:any}) => void)|null} [onComplete] Optional callback when analysis completes
+   * @param {((result: {title:string,sections:import("../adapters/AIAnalysisAdapter.js").DebriefSection[],isRemote:boolean,rawResponse?:any}) => void)|null} [onComplete] Optional callback when analysis completes
    */
   static render(container, stats, runSummary = null, isRemote = true, onComplete = null) {
     if (!container) return;
@@ -123,16 +123,26 @@ export class AIAnalysisManager {
         /* non-critical creation of title paragraph */
       }
       try {
-        const ul = document.createElement("ul");
-        const items = Array.isArray(payload?.bullets) ? payload.bullets : [];
-        for (const text of items.slice(0, 8)) {
-          const li = document.createElement("li");
-          li.textContent = String(text);
-          ul.appendChild(li);
+        const debrief = document.createElement("div");
+        debrief.className = "debrief";
+        const sections = Array.isArray(payload?.sections) ? payload.sections : [];
+        for (const section of sections) {
+          const block = document.createElement("section");
+          block.className = `debrief-section debrief-${section.kind === "done" ? "done" : "next"}`;
+          const heading = document.createElement("h3");
+          heading.textContent = String(section.heading ?? "");
+          const ul = document.createElement("ul");
+          for (const text of (Array.isArray(section.items) ? section.items : []).slice(0, 8)) {
+            const li = document.createElement("li");
+            li.textContent = String(text);
+            ul.appendChild(li);
+          }
+          block.append(heading, ul);
+          debrief.appendChild(block);
         }
-        container.appendChild(ul);
+        container.appendChild(debrief);
       } catch {
-        /* non-critical creation of bullet list */
+        /* non-critical creation of debrief sections */
       }
       try {
         const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));

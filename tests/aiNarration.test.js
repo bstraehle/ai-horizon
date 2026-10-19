@@ -5,9 +5,11 @@ import { AIAnalysisManager } from "../js/managers/AIAnalysisManager.js";
 
 const ANALYSIS = {
   feedback: "👨‍🚀 Survive the full 90 seconds to score",
-  "improvement-tip-1": "🚀 Dodge earlier",
+  "technique-1": "Dodge earlier.",
 };
 const CLIP = { voice: "Ruth", gender: "female", format: "mp3", audio: "AQID" };
+/** A run the game can build insights for (ejected after 41 s). */
+const RUN = { timer: { totalSeconds: 90, survivedSeconds: 41 }, stats: {} };
 
 /** @param {any} response */
 function makeRemote(response) {
@@ -22,29 +24,29 @@ describe("AIAnalysisAdapter narration", () => {
       remoteAdapter: /** @type {any} */ (remote),
       endpoint: "/x",
     });
-    const result = await adapter.analyze({
-      runSummary: { score: { playerFinalScore: 10 } },
-      speech: { voice: "female" },
-    });
-    expect(remote.postJSON).toHaveBeenCalledWith("/x", {
-      score: { playerFinalScore: 10 },
-      speech: { voice: "female" },
-    });
+    const result = await adapter.analyze({ runSummary: RUN, speech: { voice: "female" } });
+    expect(remote.postJSON).toHaveBeenCalledWith(
+      "/x",
+      expect.objectContaining({ ...RUN, speech: { voice: "female" } })
+    );
     expect(result.title).toBe(ANALYSIS.feedback);
+    expect(result.sections).toEqual([
+      { kind: "next", heading: "Next mission", items: ["Survival: 41 / 90 s. Dodge earlier."] },
+    ]);
     expect(result.speech).toEqual({ audio: "AQID", voice: "Ruth", gender: "female" });
     expect(result.rawResponse).toEqual(ANALYSIS);
     expect(JSON.stringify(result.rawResponse)).not.toContain("AQID");
   });
 
-  it("sends the plain run summary and passes responses without speech through unchanged", async () => {
+  it("sends no speech request without one and passes responses without speech through", async () => {
     const raw = JSON.stringify(ANALYSIS);
     const remote = makeRemote(raw);
     const adapter = new AIAnalysisAdapter({
       remoteAdapter: /** @type {any} */ (remote),
       endpoint: "/x",
     });
-    const result = await adapter.analyze({ runSummary: { score: 1 } });
-    expect(remote.postJSON).toHaveBeenCalledWith("/x", { score: 1 });
+    const result = await adapter.analyze({ runSummary: RUN });
+    expect(/** @type {any} */ (remote.postJSON.mock.calls[0])[1]).not.toHaveProperty("speech");
     expect(result.speech).toBeUndefined();
     expect(result.rawResponse).toBe(raw);
   });
