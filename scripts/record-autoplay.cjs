@@ -28,6 +28,15 @@
  * `{ fps, duration, events: [{ at, method, args }] }`, where `at` is seconds into this video.
  * scripts/render-sfx.cjs turns it into a WAV with the game's own AudioManager.
  *
+ * Splice (--splice=<earlier raw MP4 of the same seed/size/fps/hold>): re-shoot only the post-run
+ * screens (debrief, initials, leaderboard) after a UI change, in minutes instead of a full render.
+ * The run is stepped exactly as before but captured only from the frame the game-over dialog
+ * appears (the dialog's content arrives over the network, so slow renders can show the earlier
+ * debrief before the run loop ends). The recorder checks that the run matches the earlier video
+ * (same total frame count, and the first game-over frame equal to the earlier one by PSNR) and
+ * writes --out as the earlier frames up to game over followed by the new ones. The run and its
+ * sound timeline are unchanged, so the earlier --sfx JSON/WAV stay valid.
+ *
  * Output: H.264 yuv420p (bt709, faststart) at --fps; 360x640 @3x = 1080x1920 (9:16). Each PNG is
  * piped straight into ffmpeg (image2pipe at the output rate; held screens are the same image
  * written repeatedly), so nothing is staged on disk – a 4K run would otherwise need tens of GB of
@@ -60,6 +69,9 @@ const fps = Number(opt("fps", "60")) || 60;
 const maxSec = Number(opt("max", "130")) || 130;
 const crf = Number(opt("crf", "16")) || 16;
 const sfxOut = opt("sfx", "") ? path.resolve(opt("sfx", "")) : "";
+const spliceFrom = opt("splice", "") ? path.resolve(opt("splice", "")) : "";
+/** Minimum PSNR (dB) between the re-stepped final run frame and the earlier video's frame. */
+const SPLICE_MIN_PSNR = 35;
 
 const FFMPEG_PIN = {
   url: "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.zip",
@@ -181,12 +193,125 @@ async function waitFor(evaluate, expression, timeoutMs) {
   return false;
 }
 
+/** Screenshot (RGB PNG) to the video's even-sized bt709 yuv420p frames. */
+const TO_YUV = "scale=trunc(iw/2)*2:trunc(ih/2)*2:out_color_matrix=bt709,format=yuv420p";
+
+/** H.264 settings shared by the capture encoder and the splice. */
+const ENCODE_ARGS = () => [
+  "-r",
+  String(fps),
+  "-vsync",
+  "cfr",
+  "-c:v",
+  "libx264",
+  "-preset",
+  "slow",
+  "-crf",
+  String(crf),
+  "-colorspace",
+  "bt709",
+  "-color_primaries",
+  "bt709",
+  "-color_trc",
+  "bt709",
+  "-movflags",
+  "+faststart",
+];
+
 /**
- * Start ffmpeg reading a constant-rate PNG stream on stdin and encoding it to `out`.
+ * Run ffmpeg/ffprobe to completion.
+ * @param {string} exe
+ * @param {string[]} argv
+ * @returns {{ stdout: string, stderr: string }}
+ */
+function run(exe, argv) {
+  const res = spawnSync(exe, argv, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  if (res.error || res.status !== 0) {
+    throw new Error(`${path.basename(exe)} failed: ${res.error || res.stderr.slice(-500)}`);
+  }
+  return { stdout: res.stdout, stderr: res.stderr };
+}
+
+/**
+ * Check the re-stepped run against the earlier video and write `out` as its first `cutFrame`
+ * frames followed by the new frames in `tail` (which start at that frame).
  * @param {string} ffmpeg
+ * @param {{ cutFrame: number, totalFrames: number, firstFrame: Buffer, tail: string }} take
+ */
+function splice(ffmpeg, { cutFrame, totalFrames, firstFrame, tail }) {
+  const ffprobe = ffmpeg.replace(/ffmpeg(\.exe)?$/i, "ffprobe$1");
+  const probe = run(ffprobe, [
+    "-v",
+    "error",
+    "-count_packets",
+    "-select_streams",
+    "v:0",
+    "-show_entries",
+    "stream=nb_read_packets",
+    "-of",
+    "csv=p=0",
+    spliceFrom,
+  ]);
+  const earlier = Number(probe.stdout.trim());
+  if (earlier !== totalFrames) {
+    throw new Error(
+      `splice: earlier video has ${earlier} frames, this run ${totalFrames} – ` +
+        "seed, size, fps or hold differ, or the run is no longer deterministic"
+    );
+  }
+  const firstPng = `${out}.first.png`;
+  fs.writeFileSync(firstPng, firstFrame);
+  const { stderr } = run(ffmpeg, [
+    "-hide_banner",
+    "-i",
+    spliceFrom,
+    "-i",
+    firstPng,
+    "-filter_complex",
+    `[0:v]select=eq(n\\,${cutFrame}),format=yuv420p[a];[1:v]${TO_YUV}[b];[a][b]psnr`,
+    "-frames:v",
+    "1",
+    "-f",
+    "null",
+    "-",
+  ]);
+  const m = /average:([\d.]+|inf)/.exec(stderr);
+  const psnr = m ? (m[1] === "inf" ? Infinity : Number(m[1])) : 0;
+  console.error(
+    `[splice] game-over frame ${cutFrame} vs earlier video: PSNR ${psnr.toFixed(1)} dB`
+  );
+  if (!(psnr >= SPLICE_MIN_PSNR)) {
+    throw new Error(
+      `splice: game-over frame differs from the earlier video (PSNR ${psnr} dB, see ${firstPng})`
+    );
+  }
+  fs.rmSync(firstPng, { force: true });
+  run(ffmpeg, [
+    "-y",
+    "-loglevel",
+    "error",
+    "-i",
+    spliceFrom,
+    "-i",
+    tail,
+    "-filter_complex",
+    `[0:v]trim=end_frame=${cutFrame},setpts=PTS-STARTPTS[a];[1:v]setpts=PTS-STARTPTS[b];` +
+      "[a][b]concat=n=2:v=1:a=0,format=yuv420p[v]",
+    "-map",
+    "[v]",
+    ...ENCODE_ARGS(),
+    out,
+  ]);
+  fs.rmSync(tail, { force: true });
+}
+
+/**
+ * Start ffmpeg reading a constant-rate PNG stream on stdin and encoding it to `file`.
+ * @param {string} ffmpeg
+ * @param {string} file
  * @returns {{ write: (png: Buffer) => Promise<void>, finish: () => Promise<void>, kill: () => void }}
  */
-function startEncoder(ffmpeg) {
+function startEncoder(ffmpeg, file) {
   const proc = spawn(
     ffmpeg,
     [
@@ -202,26 +327,9 @@ function startEncoder(ffmpeg) {
       "-i",
       "-",
       "-vf",
-      `scale=trunc(iw/2)*2:trunc(ih/2)*2:out_color_matrix=bt709,format=yuv420p`,
-      "-r",
-      String(fps),
-      "-vsync",
-      "cfr",
-      "-c:v",
-      "libx264",
-      "-preset",
-      "slow",
-      "-crf",
-      String(crf),
-      "-colorspace",
-      "bt709",
-      "-color_primaries",
-      "bt709",
-      "-color_trc",
-      "bt709",
-      "-movflags",
-      "+faststart",
-      out,
+      TO_YUV,
+      ...ENCODE_ARGS(),
+      file,
     ],
     { stdio: ["pipe", "inherit", "inherit"] }
   );
@@ -270,14 +378,25 @@ async function main() {
     chrome: opt("chrome", ""),
   });
   // One PNG per output frame on the encoder's stdin; a held screen is the same image repeated, so
-  // ffmpeg reads a plain constant-rate stream and never has to resample timestamps.
-  const encoder = startEncoder(ffmpeg);
+  // ffmpeg reads a plain constant-rate stream and never has to resample timestamps. When splicing,
+  // only frames from game over on are encoded (to a temporary file); earlier ones are counted.
+  const tailFile = `${out}.tail.mp4`;
+  const encoder = startEncoder(ffmpeg, spliceFrom ? tailFile : out);
   let encoded = false;
-  const grab = async (duration) => {
+  const shoot = async () => {
     const res = await send("Page.captureScreenshot", { format: "png", optimizeForSpeed: true });
     if (!res.result) throw new Error(`screenshot failed: ${JSON.stringify(res.error)}`);
-    const png = Buffer.from(res.result.data, "base64");
-    for (let i = 0, n = Math.max(1, Math.round(duration * fps)); i < n; i++) {
+    return Buffer.from(res.result.data, "base64");
+  };
+  const frames = (/** @type {number} */ duration) => Math.max(1, Math.round(duration * fps));
+  /** Splice only: index of the first game-over frame and its screenshot. */
+  let cutFrame = -1;
+  /** @type {Buffer|null} */
+  let firstFrame = null;
+  const grab = async (/** @type {number} */ duration) => {
+    const png = await shoot();
+    if (spliceFrom && cutFrame < 0) [cutFrame, firstFrame] = [frameCount, png];
+    for (let i = 0, n = frames(duration); i < n; i++) {
       await encoder.write(png);
       frameCount++;
     }
@@ -288,7 +407,8 @@ async function main() {
     await send("Page.navigate", { url });
     if (!(await waitFor(evaluate, START_READY, 20000))) throw new Error("page did not load");
     await sleep(500);
-    await grab(holdSec);
+    if (spliceFrom) frameCount += frames(holdSec);
+    else await grab(holdSec);
 
     // Take over the clock, launch, and step the run one output frame at a time.
     await evaluate("__frameClock.enable()");
@@ -299,7 +419,8 @@ async function main() {
     const t0 = Date.now();
     for (let i = 0; i < maxFrames && !over; i++) {
       await evaluate(`__frameClock.step(${frameMs})`);
-      await grab(1 / fps);
+      if (!spliceFrom || cutFrame >= 0 || (await evaluate(GAME_OVER))) await grab(1 / fps);
+      else frameCount++;
       if (i % 10 === 9) {
         over = !!(await evaluate(GAME_OVER));
         // Keep CSS animations (finale flash, death punch) in step with virtual time.
@@ -353,6 +474,10 @@ async function main() {
     );
     await encoder.finish();
     encoded = true;
+    if (spliceFrom && firstFrame) {
+      console.error(`[splice] joining ${cutFrame} earlier frames with the new game-over frames`);
+      splice(ffmpeg, { cutFrame, totalFrames: frameCount, firstFrame, tail: tailFile });
+    }
   } finally {
     close();
     if (!encoded) encoder.kill();

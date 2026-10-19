@@ -22,6 +22,9 @@
    The leaderboard Lambda mirrors scoring constants (`RULES`) and the initials blocklist; when
    changing `CONFIG.GAME` scoring/spawn values, update `RULES` and redeploy the Lambda (tests fail
    until they match). Alerts go to SNS topic `ai-horizon-alerts` via env var `ALERT_TOPIC_ARN`.
+   The analysis Lambda's Bedrock prompt is the `PROMPT` constant in `server/lambda/analysis.js`
+   (not an env var: Lambda caps all env vars at 4 KB), so prompt changes need a code redeploy. Its
+   only env var is `MODEL_ID`.
 
 ## Store video (16:9, with game sound)
 
@@ -32,6 +35,14 @@ With `npm run serve` running:
 2. `node --experimental-websocket scripts/render-sfx.cjs --events=store-video/_sfx-1920x1080.json`
 3. `python store-video/narrate.py --raw store-video/_raw-1920x1080.mp4 --size 1920x1080 --out store-video/ai-horizon-1920x1080.mp4 --sfx store-video/_sfx-1920x1080.wav`
    (needs AWS credentials for Polly; `--sfx-lu` sets how far the game sits under the voice-over).
+
+Only the game-over/debrief/leaderboard screens changed (UI tweak)? Run step 1 with
+`--splice=store-video/_raw-1920x1080.mp4 --out=store-video/_raw-1920x1080.new.mp4` added (a few
+minutes: it re-steps the run without capturing, verifies it matches the earlier raw video, and
+replaces only the frames from game over on), skip step 2 (the sound timeline is unchanged), run
+step 3 with `--raw` pointing at the new file, then move it over the old raw for next time. The 4K
+landscape screenshots (`store-screenshots/3840x2160`) are frames of the 4K raw video, e.g.
+`4-gameover.png` is frame 5850.
 
 4K: same steps with `--scale=4` and `3840x2160` in the file names/`--size`. The layout (960x540
 CSS) and seed are unchanged, so the run, sound timeline and narration timing match the 1080p cut.
