@@ -31,7 +31,12 @@ describe("AIAnalysisAdapter narration", () => {
     );
     expect(result.title).toBe(ANALYSIS.feedback);
     expect(result.sections).toEqual([
-      { kind: "next", heading: "Next mission", items: ["Survival: 41 / 90 s. Dodge earlier."] },
+      {
+        kind: "next",
+        heading: "Next mission",
+        items: ["Survival: 41 / 90 s. Dodge earlier."],
+        note: "Everything else is on target.",
+      },
     ]);
     expect(result.speech).toEqual({ audio: "AQID", voice: "Ruth", gender: "female" });
     expect(result.rawResponse).toEqual(ANALYSIS);

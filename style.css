@@ -408,6 +408,16 @@ body {
   content: "✓";
   content: "✓" / "";
 }
+.post-game-message .debrief-note {
+  color: var(--color-text-secondary);
+  font-size: inherit;
+  font-style: italic;
+  margin: var(--space-1) 0 0;
+  opacity: 0.8;
+}
+.post-game-message ul + .debrief-note {
+  padding-left: 1.5em;
+}
 .post-game-message .debrief-next li::before {
   color: var(--color-text);
   content: "→";

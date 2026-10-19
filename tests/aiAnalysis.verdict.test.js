@@ -4,6 +4,7 @@ import {
   AIAnalysisAdapter,
   DEBRIEF_LABELS,
   debriefLabels,
+  debriefSections,
   MAX_WEAKNESSES,
   missionInsights,
   missionVerdict,
@@ -136,11 +137,34 @@ describe("AIAnalysisAdapter verdict", () => {
     ]);
   });
 
+  it("notes that the rest is on target when Next mission has fewer than 3 items", () => {
+    const labels = debriefLabels("en-US");
+    const strength = { topic: /** @type {const} */ ("survival"), done: 90, total: 90 };
+    const accuracy = { topic: /** @type {const} */ ("accuracy"), done: 50, total: 100 };
+    const two = debriefSections({ strength, weaknesses: [accuracy, accuracy] }, labels, []);
+    expect(two[1].note).toBe("Everything else is on target.");
+    const none = debriefSections({ strength, weaknesses: [] }, labels, []);
+    expect(none[1]).toEqual({
+      kind: "next",
+      heading: "Next mission",
+      items: [],
+      note: "Everything is on target.",
+    });
+    const three = debriefSections(
+      { strength, weaknesses: [accuracy, accuracy, accuracy] },
+      labels,
+      []
+    );
+    expect(three[1].note).toBeUndefined();
+    expect(debriefLabels("de").onTargetRest).toBe("Alles andere liegt im Ziel.");
+  });
+
   it("labels every topic in every language and falls back to English", () => {
     const topics = Object.keys(DEBRIEF_LABELS.en.topics).sort();
     for (const labels of Object.values(DEBRIEF_LABELS)) {
       expect(Object.keys(labels.topics).sort()).toEqual(topics);
       expect(labels.wellDone && labels.nextMission).toBeTruthy();
+      expect(labels.onTargetRest && labels.onTargetAll).toBeTruthy();
     }
     expect(debriefLabels("ja-JP")).toBe(DEBRIEF_LABELS.en);
     expect(debriefLabels(undefined)).toBe(DEBRIEF_LABELS.en);

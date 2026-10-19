@@ -53,8 +53,9 @@ const MIN_PACE = 30;
  *   the finale (finale, with `points` scored in it, already doubled), hits of shots (accuracy),
  *   or destroyed/collected of seen.
  * @typedef {{ strength: Insight|null, weaknesses: Insight[] }} MissionInsights
- * @typedef {{ kind: "done"|"next", heading: string, items: string[] }} DebriefSection
- *   "done": the Well done section (the strength); "next": the Next mission section.
+ * @typedef {{ kind: "done"|"next", heading: string, items: string[], note?: string }} DebriefSection
+ *   "done": the Well done section (the strength); "next": the Next mission section, whose `note`
+ *   says the remaining topics are on target when it lists fewer than MAX_WEAKNESSES items.
  */
 
 /**
@@ -88,7 +89,8 @@ const TOPICS = {
 };
 
 /**
- * @typedef {{ wellDone: string, nextMission: string, seconds: (done: number, total: number) => string,
+ * @typedef {{ wellDone: string, nextMission: string, onTargetRest: string, onTargetAll: string,
+ *   seconds: (done: number, total: number) => string,
  *   points: (n: number) => string, topics: Record<InsightTopic, string> }} DebriefLabels
  */
 
@@ -102,6 +104,8 @@ export const DEBRIEF_LABELS = {
   en: {
     wellDone: "Well done",
     nextMission: "Next mission",
+    onTargetRest: "Everything else is on target.",
+    onTargetAll: "Everything is on target.",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} points`,
     topics: {
@@ -118,6 +122,8 @@ export const DEBRIEF_LABELS = {
   nl: {
     wellDone: "Goed gedaan",
     nextMission: "Volgende missie",
+    onTargetRest: "Al het andere zit op koers.",
+    onTargetAll: "Alles zit op koers.",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} punten`,
     topics: {
@@ -134,6 +140,8 @@ export const DEBRIEF_LABELS = {
   fr: {
     wellDone: "Bien joué",
     nextMission: "Prochaine mission",
+    onTargetRest: "Tout le reste est conforme à l’objectif.",
+    onTargetAll: "Tout est conforme à l’objectif.",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} points`,
     topics: {
@@ -150,6 +158,8 @@ export const DEBRIEF_LABELS = {
   de: {
     wellDone: "Gut gemacht",
     nextMission: "Nächste Mission",
+    onTargetRest: "Alles andere liegt im Ziel.",
+    onTargetAll: "Alles liegt im Ziel.",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} Punkte`,
     topics: {
@@ -166,6 +176,8 @@ export const DEBRIEF_LABELS = {
   it: {
     wellDone: "Ben fatto",
     nextMission: "Prossima missione",
+    onTargetRest: "Tutto il resto è in linea con l’obiettivo.",
+    onTargetAll: "Tutto è in linea con l’obiettivo.",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} punti`,
     topics: {
@@ -182,6 +194,8 @@ export const DEBRIEF_LABELS = {
   ko: {
     wellDone: "잘한 점",
     nextMission: "다음 임무",
+    onTargetRest: "나머지는 모두 목표 수준입니다.",
+    onTargetAll: "모두 목표 수준입니다.",
     seconds: (d, t) => `${d} / ${t}초`,
     points: (n) => `${n}점`,
     topics: {
@@ -198,6 +212,8 @@ export const DEBRIEF_LABELS = {
   pl: {
     wellDone: "Dobra robota",
     nextMission: "Następna misja",
+    onTargetRest: "Wszystko inne jest na poziomie celu.",
+    onTargetAll: "Wszystko jest na poziomie celu.",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} pkt`,
     topics: {
@@ -214,6 +230,8 @@ export const DEBRIEF_LABELS = {
   pt: {
     wellDone: "Muito bem",
     nextMission: "Próxima missão",
+    onTargetRest: "Todo o resto está dentro da meta.",
+    onTargetAll: "Tudo está dentro da meta.",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} pontos`,
     topics: {
@@ -230,6 +248,8 @@ export const DEBRIEF_LABELS = {
   es: {
     wellDone: "Bien hecho",
     nextMission: "Próxima misión",
+    onTargetRest: "Todo lo demás está en el objetivo.",
+    onTargetAll: "Todo está en el objetivo.",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} puntos`,
     topics: {
@@ -274,11 +294,12 @@ export function insightFact(insight, labels) {
 /**
  * Well done / Next mission sections: the strength as a fact, then each weakness as its fact
  * followed by its technique (`techniques[i]` for weakness i; omitted when missing), normalised to
- * a sentence (leading emoji dropped, capitalised, ending punctuation added).
+ * a sentence (leading emoji dropped, capitalised, ending punctuation added). With fewer than
+ * MAX_WEAKNESSES weaknesses, Next mission gets a note that the rest (or everything) is on target.
  * @param {MissionInsights} insights
  * @param {DebriefLabels} labels
  * @param {(string|undefined)[]} techniques
- * @returns {DebriefSection[]} Only sections that have items.
+ * @returns {DebriefSection[]} Well done (when there is a strength), then Next mission.
  */
 export function debriefSections(insights, labels, techniques) {
   /** @type {DebriefSection[]} */
@@ -298,7 +319,14 @@ export function debriefSections(insights, labels, techniques) {
     const sentence = text.charAt(0).toLocaleUpperCase() + text.slice(1);
     return `${insightFact(w, labels)}. ${sentence}${/[.!?。！？]$/u.test(sentence) ? "" : "."}`;
   });
-  if (next.length) sections.push({ kind: "next", heading: labels.nextMission, items: next });
+  const note =
+    next.length >= MAX_WEAKNESSES ? "" : next.length ? labels.onTargetRest : labels.onTargetAll;
+  sections.push({
+    kind: "next",
+    heading: labels.nextMission,
+    items: next,
+    ...(note ? { note } : {}),
+  });
   return sections;
 }
 
