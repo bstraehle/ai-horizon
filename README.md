@@ -6,8 +6,6 @@
 
 An arcade-style space shooter for the browser: collect stars, blast asteroids, and beat the 90-second clock. Built with vanilla JavaScript and HTML5 Canvas, installable as a PWA, and backed by an optional serverless AWS leaderboard with AI run analysis.
 
-After a run, **Share** on the leaderboard screen sends your score and the game link via the device's share sheet, or copies them to the clipboard where sharing isn't supported.
-
 ## Quick start
 
 Requires Node 24+ (see `.nvmrc`; CI uses the same version).
