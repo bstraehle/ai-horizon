@@ -366,11 +366,20 @@ body {
 .post-game-message p {
   margin-bottom: var(--space-4);
 }
+#gameOverScreen .game-over-content {
+  max-width: 40rem;
+}
 .post-game-message ul,
 .post-game-message ol {
+  list-style: disc;
   margin: 0 auto;
-  padding-left: var(--space-5);
+  max-width: 100%;
+  padding-left: 1.25em;
   text-align: left;
+  width: fit-content;
+}
+.post-game-message li + li {
+  margin-top: var(--space-1);
 }
 .initials-entry .initials-input {
   background: rgba(255, 255, 255, 0.01);

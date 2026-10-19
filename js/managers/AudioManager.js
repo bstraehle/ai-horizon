@@ -29,8 +29,9 @@ const STAR_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
  *
  * Narration (Game Over headline spoken by Amazon Polly, synthesized server-side)
  *  - takeNarratorVoice(): alternates "female" / "male" (persisted) for each spoken debrief.
- *  - playSpeech(base64Mp3): decodes and plays the clip through the master bus (so mute applies),
- *    starting after the loud part of a fatal crash; stopSpeech() cancels it (new run).
+ *  - playSpeech(base64Mp3): decodes and plays the clip through the master bus (so mute applies)
+ *    as a radio transmission (Quindar tones, squelch, band-limited voice, hiss), starting after
+ *    the loud part of a fatal crash; stopSpeech() cancels it (new run).
  *
  * Lifecycle & policy
  *  - The AudioContext is created lazily by `unlock()`, which callers invoke from a user gesture
@@ -77,7 +78,10 @@ export class AudioManager {
     this._lastStarAt = null;
     /** Context time before which narration should not start (end of a crash's loud part). */
     this._fatalEndsAt = 0;
-    /** @type {AudioBufferSourceNode|null} */
+    /**
+     * Current narration: the voice source and the gain all of its transmission nodes feed.
+     * @type {{ src: AudioBufferSourceNode, out: GainNode }|null}
+     */
     this._speech = null;
     /** Incremented to invalidate in-flight narration decodes. */
     this._speechToken = 0;
@@ -355,8 +359,10 @@ export class AudioManager {
   }
 
   /**
-   * Decode and play a narration clip (base64 MP3) through the master bus. Skipped when muted,
-   * locked, suspended, or superseded by stopSpeech() while decoding.
+   * Decode and play a narration clip (base64 MP3) through the master bus as a radio
+   * transmission from command (see {@link CONFIG.AUDIO.RADIO}): intro Quindar tone and squelch,
+   * the voice band-limited and lightly saturated over a faint hiss, then outro tone and squelch.
+   * Skipped when muted, locked, suspended, or superseded by stopSpeech() while decoding.
    * @param {string} base64
    * @returns {Promise<boolean>} Whether playback was scheduled.
    */
@@ -371,35 +377,108 @@ export class AudioManager {
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       const buffer = await ctx.decodeAudioData(bytes.buffer);
       if (token !== this._speechToken || this._muted || ctx.state !== "running") return false;
-      const src = ctx.createBufferSource();
-      src.buffer = buffer;
+      const R = CONFIG.AUDIO.RADIO;
+      const at = Math.max(ctx.currentTime + 0.05, this._fatalEndsAt);
+      const voiceAt = at + R.TONE_S + R.SQUELCH_S;
+      const voiceEnd = voiceAt + (Number.isFinite(buffer.duration) ? buffer.duration : 0);
+      const out = ctx.createGain();
+      out.connect(/** @type {GainNode} */ (this._master));
+      this._radioTone(R.INTRO_HZ, at, out);
+      this._squelch(at + R.TONE_S, out);
+      const hiss = ctx.createGain();
+      hiss.gain.value = R.HISS_GAIN;
+      hiss.connect(out);
+      this._noiseBurst(voiceAt, voiceEnd - voiceAt, "bandpass", 2500, 2500, 0.7, hiss);
+      this._radioTone(R.OUTRO_HZ, voiceEnd + 0.05, out);
+      this._squelch(voiceEnd + 0.05 + R.TONE_S, out);
       const gain = ctx.createGain();
       gain.gain.value = CONFIG.AUDIO.SPEECH_GAIN;
-      src.connect(gain);
-      gain.connect(/** @type {GainNode} */ (this._master));
-      src.onended = () => {
-        if (this._speech === src) this._speech = null;
-      };
-      src.start(Math.max(ctx.currentTime + 0.05, this._fatalEndsAt));
-      this._speech = src;
+      gain.connect(out);
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(this._radioBand(gain));
+      src.start(voiceAt);
+      this._speech = { src, out };
       return true;
     } catch {
       return false;
     }
   }
 
-  /** Stop current narration and cancel any clip still decoding. */
+  /** Stop current narration (voice and transmission sounds) and cancel any clip still decoding. */
   stopSpeech() {
     this._speechToken++;
-    const src = this._speech;
+    const speech = this._speech;
     this._speech = null;
-    if (src) {
-      try {
-        src.stop();
-      } catch {
-        /* already stopped */
-      }
+    if (!speech) return;
+    try {
+      speech.src.stop();
+    } catch {
+      /* already stopped */
     }
+    try {
+      speech.out.disconnect();
+    } catch {
+      /* already disconnected */
+    }
+  }
+
+  /**
+   * Voice band of a comms channel: high-pass + low-pass, then gentle saturation into `out`.
+   * @param {AudioNode} out
+   * @returns {BiquadFilterNode} Input of the chain.
+   * @private
+   */
+  _radioBand(out) {
+    const ctx = /** @type {AudioContext} */ (this._ctx);
+    const R = CONFIG.AUDIO.RADIO;
+    const high = ctx.createBiquadFilter();
+    high.type = "highpass";
+    high.frequency.value = R.LOW_HZ;
+    const low = ctx.createBiquadFilter();
+    low.type = "lowpass";
+    low.frequency.value = R.HIGH_HZ;
+    high.connect(low);
+    low.connect(this._shaper(R.DRIVE, out));
+    return high;
+  }
+
+  /**
+   * Steady sine beep (Quindar tone) of `CONFIG.AUDIO.RADIO.TONE_S` with click-free edges.
+   * @param {number} f
+   * @param {number} t
+   * @param {AudioNode} out
+   * @private
+   */
+  _radioTone(f, t, out) {
+    const ctx = /** @type {AudioContext} */ (this._ctx);
+    const { TONE_S, TONE_GAIN } = CONFIG.AUDIO.RADIO;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(TONE_GAIN, t + 0.01);
+    g.gain.setValueAtTime(TONE_GAIN, t + TONE_S - 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + TONE_S);
+    g.connect(out);
+    this._tone("sine", f, f, t, TONE_S, g);
+  }
+
+  /**
+   * Short burst of band-passed static, as when a radio channel opens or closes.
+   * @param {number} t
+   * @param {AudioNode} out
+   * @private
+   */
+  _squelch(t, out) {
+    const { SQUELCH_S, SQUELCH_GAIN } = CONFIG.AUDIO.RADIO;
+    this._noiseBurst(
+      t,
+      SQUELCH_S,
+      "bandpass",
+      3000,
+      1200,
+      0.8,
+      this._env(t, SQUELCH_GAIN, 0.003, SQUELCH_S, out)
+    );
   }
 
   /**

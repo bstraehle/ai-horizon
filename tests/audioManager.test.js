@@ -68,7 +68,7 @@ function makeFakeContext({ stereo = true } = {}) {
       instances.push(this);
     }
     createGain() {
-      const g = { connect: vi.fn(), gain: makeParam(1) };
+      const g = { connect: vi.fn(), disconnect: vi.fn(), gain: makeParam(1) };
       this.gains.push(g);
       return g;
     }
@@ -328,15 +328,24 @@ describe("AudioManager", () => {
     expect(storage.data[CONFIG.AUDIO.NARRATOR_STORAGE_KEY]).toBe("female");
   });
 
-  it("decodes and plays narration after the crash's loud part, through the master bus", async () => {
+  it("plays narration as a radio transmission after the crash's loud part", async () => {
     const { audio, ctx } = unlocked();
     ctx.currentTime = 10;
     audio.playFatal();
+    const before = ctx.oscillators.length;
     const clip = Buffer.from([7, 8, 9]).toString("base64");
     await expect(audio.playSpeech(clip)).resolves.toBe(true);
-    const src = ctx.sources.at(-1);
-    expect(src.buffer.decodedFrom).toEqual(new Uint8Array([7, 8, 9]));
-    expect(src.start.mock.calls[0][0]).toBeCloseTo(10 + CONFIG.AUDIO.SPEECH_AFTER_FATAL_S);
+    const R = CONFIG.AUDIO.RADIO;
+    const fatalEnd = 10 + CONFIG.AUDIO.SPEECH_AFTER_FATAL_S;
+    const voice = ctx.sources.find((/** @type {any} */ s) => s.buffer && s.buffer.decodedFrom);
+    expect(voice.buffer.decodedFrom).toEqual(new Uint8Array([7, 8, 9]));
+    expect(voice.start.mock.calls[0][0]).toBeCloseTo(fatalEnd + R.TONE_S + R.SQUELCH_S);
+    const tones = ctx.oscillators.slice(before);
+    expect(tones.map((/** @type {any} */ o) => o.frequency.set[0])).toEqual([
+      R.INTRO_HZ,
+      R.OUTRO_HZ,
+    ]);
+    expect(tones[0].start.mock.calls[0][0]).toBeCloseTo(fatalEnd);
   });
 
   it("skips narration when muted, locked, or invalid, and stopSpeech cancels it", async () => {
@@ -354,10 +363,14 @@ describe("AudioManager", () => {
     audio.stopSpeech();
     await expect(pending).resolves.toBe(false);
 
+    const gainsBefore = ctx.gains.length;
     await audio.playSpeech(clip);
-    const playing = ctx.sources.at(-1);
+    const playing = ctx.sources.find((/** @type {any} */ s) => s.buffer && s.buffer.decodedFrom);
+    const out = ctx.gains[gainsBefore];
     audio.stopSpeech();
     expect(playing.stop).toHaveBeenCalledTimes(1);
+    // Disconnecting the transmission bus also silences the scheduled tones, squelch and hiss.
+    expect(out.disconnect).toHaveBeenCalledTimes(1);
     expect(() => audio.stopSpeech()).not.toThrow();
   });
 

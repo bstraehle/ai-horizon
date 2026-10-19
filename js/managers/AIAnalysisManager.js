@@ -123,14 +123,14 @@ export class AIAnalysisManager {
         /* non-critical creation of title paragraph */
       }
       try {
-        const ol = document.createElement("ol");
+        const ul = document.createElement("ul");
         const items = Array.isArray(payload?.bullets) ? payload.bullets : [];
         for (const text of items.slice(0, 8)) {
           const li = document.createElement("li");
           li.textContent = String(text);
-          ol.appendChild(li);
+          ul.appendChild(li);
         }
-        container.appendChild(ol);
+        container.appendChild(ul);
       } catch {
         /* non-critical creation of bullet list */
       }

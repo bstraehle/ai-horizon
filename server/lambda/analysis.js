@@ -11,6 +11,76 @@ const pollyClient = new PollyClient({
   maxAttempts: 2,
 });
 
+/**
+ * Bedrock prompt; `%%prompt%%` is replaced with the run summary JSON, including the client's
+ * `verdict` and `insights` (see `missionVerdict` / `missionInsights` in
+ * js/adapters/AIAnalysisAdapter.js, whose offline debrief mirrors these rules and topic emojis).
+ * Kept in code rather than an environment variable because Lambda caps all environment variables
+ * at 4 KB combined.
+ */
+export const PROMPT = `You are a space force debrief officer for AI HORIZON, an arcade-style space shooter, in which a player has 90 seconds to collect stars and destroy asteroids without having to eject due to an imminent asteroid collision. Based on the provided scoring rules, tip rules, verdict rules, and mission details, provide your analysis to help the pilot improve. Respond in the provided answer format.
+<scoring rules - start>
+- Regular stars: +25
+- Bonus stars: +50
+- Regular asteroids: +10
+- Hardened asteroids (10 hits): +100
+- 8 bonus asteroids (10 hits): +250
+- Every 1000 points: +250
+- Bullet upgrade (after 2500 points): hardened and bonus asteroids take 50% fewer hits
+- Finale (last 15 seconds): all points double
+- End-of-run shots fired accuracy bonus (0-100%)
+<scoring rules - end>
+<tip rules - start>
+The mission details include insights computed by the game: a strength and up to 3 weaknesses, the most important first. Each has topic, emoji, done, and total (the finale also has points).
+- strength: start with ✅ only (no topic emoji), then what went well in that topic in plain words, e.g. "✅ 7 of 8 red planets destroyed." or "✅ Strong finale: 2450 points in 15 seconds."
+- improvement-tip-N for weakness N, in the given order: start with its emoji, then the fact (done of total) and one technique for the topic from the list below, e.g. "🎯 232 of 419 shots hit. Fire short bursts at targets."
+- Use done, total and points from the insights exactly as given (the stats count red planets and red stars inside hardened asteroids and stars); never estimate points lost or gained.
+- Call targets what the pilot sees: red planets, gray planets, red stars, white stars, asteroids.
+- Never ask for 100% of stars or asteroids; nobody gets them all.
+- Without insights, write the strength and up to 3 tips from the mission details the same way.
+Topics (what done/total mean; techniques):
+- survival 🚀: seconds flown of the mission. Dodge first, shoot second; one collision ends the run; keep room to maneuver.
+- finale 🔥: seconds flown of the 15-second finale; points scored in it (already doubled). Every point counts double in the last 15 seconds; push hardest then.
+- redPlanets 🔴 (bonus asteroids, 250 points): destroyed of seen. One appears every 10 seconds, 8 per mission; focus fire on it at once.
+- redStars 🌟 (bonus stars, 50 points): collected of seen. Every 5th star is red; steer through them.
+- grayPlanets 🪐 (hardened asteroids, 100 points): destroyed of seen. Reach 2500 points early: your bullets upgrade and gray planets take half the hits.
+- accuracy 🎯: hits of shots fired. The end-of-run bonus is the base score times accuracy; fire short bursts at targets instead of holding fire.
+- whiteStars ⭐ (regular stars, 25 points): collected of seen. Grab stars on the way between attacks.
+- asteroids ☄️ (regular asteroids, 10 points): destroyed of seen. Shoot the rocks in your path.
+<tip rules - end>
+<verdict rules - start>
+The mission details include a verdict decided by the game. The game puts the rating (e.g. "Commendation, pilot.") in front of the feedback headline, so do not write a rating yourself. The headline is read aloud by a text-to-speech voice, so write it for listening, as a strict but fair space force officer: 2 short plain sentences, first the most important fact of this mission (e.g. survivedSeconds, bonusAsteroidsKilled, shotsFiredAccuracy, playerFinaleBonus), then a brief remark or order matching the verdict. No questions, irony, sarcasm, jokes, or metaphors; avoid generic phrases such as "Great job" or "Keep it up".
+- commendation: sincere praise, e.g. "7 of 8 red planets destroyed. Outstanding shooting."
+- satisfactory: acknowledge, then push, e.g. "Full 90 seconds flown. Now hit the red planets."
+- reprimand: firm criticism, e.g. "You ejected after 41 seconds. Stay in the fight."
+- no verdict: choose the tone from survivedSeconds.
+The examples only show the structure: use the facts of this mission.
+<verdict rules - end>
+<mission details - start>
+%%prompt%%
+<mission details - end>
+<answer format - start>
+Write in the language of device.locale, with numbers as digits. The headline and the strength have less than 10 words, each tip less than 16 words. Include one improvement tip per weakness and leave out the rest.
+{
+"feedback": "👨‍🚀 <headline without the rating, see verdict rules>",
+"strength": "✅ <strength, see tip rules>",
+"improvement-tip-1": "<emoji> <weakness 1, see tip rules>",
+"improvement-tip-2": "<emoji> <weakness 2>",
+"improvement-tip-3": "<emoji> <weakness 3>"
+}
+<answer format - end>
+Your answer:`;
+
+/**
+ * Fill {@link PROMPT} with the run summary. A replacer function keeps `$` sequences in the
+ * summary literal.
+ * @param {string} summary Run summary JSON (without the `speech` request).
+ * @returns {string}
+ */
+export function buildPrompt(summary) {
+  return PROMPT.replace("%%prompt%%", () => summary);
+}
+
 /** Longest headline (after emoji removal) sent to Polly; Bedrock is asked for < 10 words. */
 const MAX_SPEECH_CHARS = 160;
 
@@ -80,6 +150,127 @@ export function selectVoice(locale, preferred) {
   return gender && voiceId ? { voiceId, gender } : null;
 }
 
+/** Verdicts the client may send (see `missionVerdict` in js/adapters/AIAnalysisAdapter.js). */
+const VERDICTS = ["commendation", "satisfactory", "reprimand"];
+
+/**
+ * Rating the officer opens the debrief with, per language of {@link LANGUAGE_DEFAULTS}. Written
+ * here rather than by the model so the spoken and displayed rating always matches the verdict.
+ * @type {Record<string, Record<string, string>>}
+ */
+export const VERDICT_RATINGS = {
+  en: {
+    commendation: "Commendation, pilot.",
+    satisfactory: "Satisfactory, pilot.",
+    reprimand: "Reprimand, pilot.",
+  },
+  nl: {
+    commendation: "Eervolle vermelding, piloot.",
+    satisfactory: "Voldoende, piloot.",
+    reprimand: "Berisping, piloot.",
+  },
+  fr: {
+    commendation: "Félicitations, pilote.",
+    satisfactory: "Satisfaisant, pilote.",
+    reprimand: "Blâme, pilote.",
+  },
+  de: {
+    commendation: "Belobigung, Pilot.",
+    satisfactory: "Zufriedenstellend, Pilot.",
+    reprimand: "Verweis, Pilot.",
+  },
+  it: {
+    commendation: "Encomio, pilota.",
+    satisfactory: "Soddisfacente, pilota.",
+    reprimand: "Richiamo, pilota.",
+  },
+  ko: {
+    commendation: "표창입니다, 조종사님.",
+    satisfactory: "보통입니다, 조종사님.",
+    reprimand: "경고입니다, 조종사님.",
+  },
+  pl: {
+    commendation: "Pochwała, pilocie.",
+    satisfactory: "Zadowalająco, pilocie.",
+    reprimand: "Nagana, pilocie.",
+  },
+  pt: {
+    commendation: "Elogio, piloto.",
+    satisfactory: "Satisfatório, piloto.",
+    reprimand: "Repreensão, piloto.",
+  },
+  es: {
+    commendation: "Felicitación, piloto.",
+    satisfactory: "Satisfactorio, piloto.",
+    reprimand: "Amonestación, piloto.",
+  },
+};
+
+/**
+ * Rating for the verdict in the player's language (missing locale → English, like the voice).
+ * @param {string|null|undefined} verdict
+ * @param {string|null|undefined} locale
+ * @returns {string|null} null for an unknown verdict or a language without ratings.
+ */
+export function verdictRating(verdict, locale) {
+  if (!verdict || !VERDICTS.includes(verdict)) return null;
+  const tag = typeof locale === "string" && locale.trim() ? locale.trim() : "en";
+  const lang = tag.replace(/_/g, "-").split("-")[0].toLowerCase();
+  const ratings = VERDICT_RATINGS[lang];
+  return ratings ? ratings[verdict] : null;
+}
+
+/** Officer emoji every rated headline starts with (the model sometimes drops it). */
+const HEADLINE_EMOJI = "👨‍🚀";
+
+/**
+ * Put the rating in front of the model's `feedback` headline, after the officer emoji, so the
+ * screen shows what the officer says. Any emoji the model led with is replaced by
+ * {@link HEADLINE_EMOJI}, and a rating the model already wrote is not repeated. Returns the
+ * analysis unchanged when it is not JSON with feedback.
+ * @param {string} analysisText Analysis JSON string from Bedrock.
+ * @param {string} rating
+ * @returns {string}
+ */
+export function withRating(analysisText, rating) {
+  try {
+    const parsed = JSON.parse(analysisText);
+    if (!parsed || typeof parsed.feedback !== "string") return analysisText;
+    const text = parsed.feedback
+      .replace(/^(?:\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}]|\u200d|\uFE0F|\s)+/u, "")
+      .trim();
+    const rated = text.toLowerCase().startsWith(rating.toLowerCase()) ? text : `${rating} ${text}`;
+    parsed.feedback = `${HEADLINE_EMOJI} ${rated.trim()}`;
+    return JSON.stringify(parsed);
+  } catch {
+    return analysisText;
+  }
+}
+
+/** @type {Record<string, string>} */
+const XML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" };
+
+/** @param {string} text @returns {string} */
+const escapeXml = (text) => text.replace(/[&<>"']/g, (c) => XML_ESCAPES[c]);
+
+/**
+ * SSML for the spoken headline: the rating slightly slower, then a pause, then the rest, so the
+ * verdict frames the line even though generative voices cannot act out tone. Uses only tags the
+ * generative engine supports (`prosody rate` around a full sentence, `break`).
+ * @param {string} text Speakable headline (see {@link speakableText}).
+ * @param {string|null} rating
+ * @returns {{ Text: string, TextType?: "ssml" }} Plain text when the headline has no rating.
+ */
+export function speechInput(text, rating) {
+  if (!rating || !text.startsWith(rating)) return { Text: text };
+  const rest = text.slice(rating.length).trim();
+  const lead = `<prosody rate="90%">${escapeXml(rating)}</prosody>`;
+  return {
+    Text: `<speak>${lead}${rest ? `<break time="400ms"/>${escapeXml(rest)}` : ""}</speak>`,
+    TextType: "ssml",
+  };
+}
+
 /**
  * Headline text suitable for speech: emoji removed, whitespace collapsed, length capped.
  * @param {unknown} text
@@ -94,36 +285,42 @@ export function speakableText(text) {
 }
 
 /**
- * Separate the optional `speech` request from the run summary so it never reaches the prompt.
- * @param {string} body Raw POST body (JSON run summary, optionally with `speech: { voice }`).
- * @returns {{ prompt: string, voice: string|null, locale: string|null }}
+ * Separate the optional `speech` request from the run summary so it never reaches the prompt,
+ * and read the player's locale and the client's `verdict` (which stays in the prompt).
+ * @param {string} body Raw POST body (JSON run summary, optionally with `verdict` and
+ *   `speech: { voice }`).
+ * @returns {{ prompt: string, voice: string|null, locale: string|null, verdict: string|null }}
  */
 export function splitRequest(body) {
   try {
     const parsed = JSON.parse(body);
-    if (!parsed || typeof parsed !== "object" || !("speech" in parsed)) {
-      return { prompt: body, voice: null, locale: null };
+    if (!parsed || typeof parsed !== "object") {
+      return { prompt: body, voice: null, locale: null, verdict: null };
     }
     const { speech, ...summary } = parsed;
     const voice = speech && typeof speech.voice === "string" ? speech.voice : null;
     const locale =
       summary.device && typeof summary.device.locale === "string" ? summary.device.locale : null;
-    return { prompt: JSON.stringify(summary), voice, locale };
+    const verdict = VERDICTS.includes(summary.verdict) ? summary.verdict : null;
+    const prompt = "speech" in parsed ? JSON.stringify(summary) : body;
+    return { prompt, voice, locale, verdict };
   } catch {
-    return { prompt: body, voice: null, locale: null };
+    return { prompt: body, voice: null, locale: null, verdict: null };
   }
 }
 
 /**
  * Add `speech: { voice, gender, format, audio }` (base64 MP3 of the spoken `feedback`) to the
- * analysis JSON. Returns the analysis unchanged when there is no feedback, no voice for the
- * locale, or Polly fails – speech is optional and must never break the debrief.
- * @param {string} analysisText Analysis JSON string from Bedrock.
+ * analysis JSON. A headline that starts with `rating` is spoken as SSML (see {@link speechInput}).
+ * Returns the analysis unchanged when there is no feedback, no voice for the locale, or Polly
+ * fails – speech is optional and must never break the debrief.
+ * @param {string} analysisText Analysis JSON string (after {@link withRating}).
  * @param {string} voice Requested gender ("female" | "male").
  * @param {string|null} locale
+ * @param {string|null} [rating] Rating at the start of the headline, if any.
  * @returns {Promise<string>}
  */
-export async function withSpeech(analysisText, voice, locale) {
+export async function withSpeech(analysisText, voice, locale, rating = null) {
   try {
     const parsed = JSON.parse(analysisText);
     const text = speakableText(parsed && parsed.feedback);
@@ -134,7 +331,7 @@ export async function withSpeech(analysisText, voice, locale) {
         Engine: "generative",
         OutputFormat: "mp3",
         SampleRate: "24000",
-        Text: text,
+        ...speechInput(text, rating),
         VoiceId: selected.voiceId,
       })
     );
@@ -165,11 +362,13 @@ export const handler = async (event) => {
     switch (httpMethod) {
       case "POST":
         if (body) {
-          const { prompt, voice, locale } = splitRequest(body);
+          const { prompt, voice, locale, verdict } = splitRequest(body);
           console.log("Bedrock request: ", prompt);
           response = await analysis(prompt);
           console.log("Bedrock response: ", response);
-          if (voice) response = await withSpeech(response, voice, locale);
+          const rating = verdictRating(verdict, locale);
+          if (rating) response = withRating(response, rating);
+          if (voice) response = await withSpeech(response, voice, locale, rating);
         } else {
           return { statusCode: 400, body: JSON.stringify({ message: "Missing request body" }) };
         }
@@ -216,8 +415,7 @@ export const handler = async (event) => {
  * @param {string} body - The game summary / prompt to analyze
  */
 async function analysis(body) {
-  var prompt = process.env.PROMPT;
-  prompt = prompt.replace("%%prompt%%", body);
+  const prompt = buildPrompt(body);
 
   const requestBody = {
     messages: [
@@ -248,7 +446,10 @@ async function analysis(body) {
 
   let responseText = responseBody.output.message.content[0].text;
 
-  responseText = responseText.replace(/^```json\s*/i, "").replace(/```\s*$/, "");
+  responseText = responseText
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/, "");
 
   return responseText;
 }
