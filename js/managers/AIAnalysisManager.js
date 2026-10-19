@@ -131,23 +131,13 @@ export class AIAnalysisManager {
           block.className = `debrief-section debrief-${section.kind === "done" ? "done" : "next"}`;
           const heading = document.createElement("h3");
           heading.textContent = String(section.heading ?? "");
-          block.appendChild(heading);
-          const items = Array.isArray(section.items) ? section.items : [];
-          if (items.length) {
-            const ul = document.createElement("ul");
-            for (const text of items.slice(0, 8)) {
-              const li = document.createElement("li");
-              li.textContent = String(text);
-              ul.appendChild(li);
-            }
-            block.appendChild(ul);
+          const ul = document.createElement("ul");
+          for (const text of (Array.isArray(section.items) ? section.items : []).slice(0, 8)) {
+            const li = document.createElement("li");
+            li.textContent = String(text);
+            ul.appendChild(li);
           }
-          if (section.note) {
-            const note = document.createElement("p");
-            note.className = "debrief-note";
-            note.textContent = String(section.note);
-            block.appendChild(note);
-          }
+          block.append(heading, ul);
           debrief.appendChild(block);
         }
         container.appendChild(debrief);

@@ -28,20 +28,17 @@ describe("AIAnalysisManager.render", () => {
       className: s.className,
       heading: s.querySelector("h3")?.textContent,
       items: Array.from(s.querySelectorAll("ul > li"), (li) => li.textContent),
-      note: s.querySelector(".debrief-note")?.textContent,
     }));
     expect(sections).toEqual([
       {
         className: "debrief-section debrief-done",
         heading: "Well done",
         items: ["Bonus asteroids: 4 / 4"],
-        note: undefined,
       },
       {
         className: "debrief-section debrief-next",
         heading: "Next mission",
         items: ["Survival: 41 / 90 s. Dodge first, shoot second."],
-        note: "Everything else is on target.",
       },
     ]);
   });
