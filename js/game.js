@@ -24,6 +24,7 @@ import { CONFIG } from "./constants.js";
 import { GameLoop } from "./core/GameLoop.js";
 import { getGameContext } from "./core/GameContext.js";
 import { InputState } from "./core/InputState.js";
+import { TouchControls } from "./core/TouchControls.js";
 
 import { Asteroid } from "./entities/Asteroid.js";
 import { Bullet } from "./entities/Bullet.js";
@@ -164,6 +165,8 @@ class AIHorizon {
     }
 
     this.input = new InputState();
+    /** Touch gestures (drag to steer, second finger / tap to fire) feeding `input`. */
+    this.touch = new TouchControls(() => this.input);
     this.events = new EventBus();
     /** Synthesized sound effects; unlocked on Launch Mission, muted state persisted. */
     this.audio = new AudioManager();
@@ -789,34 +792,33 @@ class AIHorizon {
   }
 
   /**
-   * Track touch position (mobile).
+   * Drag the ship by the steering finger's travel (mobile); see TouchControls.
    * @param {TouchEvent} e - The touch event.
    */
   handleTouchMove(e) {
     e.preventDefault();
-    if (!this.canvasRect) this.canvasRect = this.canvas.getBoundingClientRect();
-    const touch = e.touches[0];
-    this.input.mouse.x = touch.clientX - this.canvasRect.left;
-    this.input.mouse.y = touch.clientY - this.canvasRect.top;
+    this.touch.move(e.changedTouches, this.player, this.view);
   }
 
   /**
-   * Handle touch start event (mobile).
+   * Touch down (mobile): the first finger steers without firing; any further finger starts
+   * continuous fire.
    * @param {TouchEvent} e - The touch event.
    */
   handleTouchStart(e) {
     e.preventDefault();
     if (!this.state.isRunning()) return;
-    this.input.fireHeld = true;
-    this.shoot();
+    if (this.touch.start(e.changedTouches, this.player, e.timeStamp, e.touches)) this.shoot();
   }
 
-  /** End touch (lift/cancel) -> stop continuous fire.
+  /** Touch lift/cancel: a quick, still tap of the steering finger fires one shot; fire stops
+   * once no firing finger remains.
    * @param {TouchEvent} [e]
    */
   handleTouchEnd(e) {
-    if (e && e.cancelable) e.preventDefault();
-    this.input.fireHeld = false;
+    if (!e) return;
+    if (e.cancelable) e.preventDefault();
+    if (this.touch.end(e.changedTouches, e.timeStamp, e.type === "touchcancel")) this.shoot();
   }
 
   /**
@@ -1077,6 +1079,7 @@ class AIHorizon {
     // instead of dashing (and banking) toward a stale target; steering resumes on the next
     // pointer move / touch / key press.
     this.input.clearMouse();
+    this.touch.reset();
     this.resizeCanvas();
     GameUI.hideGameInfo(this);
     this.state.start();

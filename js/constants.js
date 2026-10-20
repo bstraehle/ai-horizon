@@ -409,6 +409,8 @@ export const CONFIG = deepFreeze({
     ],
     PAUSE_CODES: ["Escape"],
     PAUSE_KEYS: ["Esc", "Escape"],
+    /** Touch steering: ship travel per finger pixel, and the longest / furthest touch that is a tap. */
+    TOUCH: { DRAG_GAIN: 1.5, TAP_MAX_MS: 250, TAP_SLOP_PX: 10 },
   },
   RNG: {
     SEED_PARAM: "seed",
