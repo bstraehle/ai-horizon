@@ -1,5 +1,6 @@
 import { UIManager } from "../managers/UIManager.js";
 import { AIAnalysisManager } from "../managers/AIAnalysisManager.js";
+import { gameOverHeadline } from "./GameOverHeadline.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
 /**
@@ -31,11 +32,18 @@ export const GameUI = {
     UIManager.hidePause(game.pauseScreen || null);
   },
   /**
-   * Present the game over screen and populate score elements.
+   * Present the game over screen and populate score elements; the headline reflects the run's
+   * outcome (see `gameOverHeadline`).
    * @param {AIHorizon} game
    * @param {boolean} submittedScore Whether a leaderboard submission just occurred.
    */
   showGameOver(game, submittedScore) {
+    try {
+      const title = document.getElementById("gameOverTitle");
+      if (title) title.textContent = gameOverHeadline(game._lastRunSummary);
+    } catch {
+      /* headline optional */
+    }
     try {
       const scoreEl = game.currentScoreEl || null;
       if (scoreEl) {
