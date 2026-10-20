@@ -71,6 +71,25 @@ export class InputState {
     this.mouse.y = aimAxis(clientY - rect.top, view.height, ship.height / 2, margin);
   }
 
+  /**
+   * Move the pointer target by a relative mouse motion (captured mouse), clamped to the ship's
+   * reach: pushing past an edge keeps the ship there, and moving along it slides at once. With no
+   * target yet (0, 0), the motion starts from the ship's centre.
+   * @param {number} dx
+   * @param {number} dy
+   * @param {{ ship:{ x:number, y:number, width:number, height:number }, view:{ width:number, height:number } }} frame
+   */
+  nudge(dx, dy, { ship, view }) {
+    const halfW = ship.width / 2;
+    const halfH = ship.height / 2;
+    if (this.mouse.x <= 0 && this.mouse.y <= 0) {
+      this.mouse.x = ship.x + halfW;
+      this.mouse.y = ship.y + halfH;
+    }
+    this.mouse.x = clamp(this.mouse.x + dx, halfW, Math.max(halfW, view.width - halfW));
+    this.mouse.y = clamp(this.mouse.y + dy, halfH, Math.max(halfH, view.height - halfH));
+  }
+
   /** Reset mouse position. */
   clearMouse() {
     this.mouse.x = 0;

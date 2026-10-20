@@ -59,6 +59,7 @@ import { warmUpPools } from "./ui/PoolWarmup.js";
 import { attachDevTools } from "./ui/DevTools.js";
 import { initShareLink } from "./ui/Share.js";
 import { initSoundToggles } from "./ui/SoundToggle.js";
+import { MouseCapture, isMouseEvent } from "./ui/MouseCapture.js";
 import { detectMobilePlatform } from "./utils/mobilePlatform.js";
 import { updateGame } from "./systems/GameUpdate.js";
 import { drawGame, drawFrame, samplePerformance } from "./systems/GameRender.js";
@@ -167,6 +168,12 @@ class AIHorizon {
     this.input = new InputState();
     /** Touch gestures (drag to steer, second finger / tap to fire) feeding `input`. */
     this.touch = new TouchControls(() => this.input);
+    /** Pointer Lock for desktop mouse steering (captured on a mouse click during a run). */
+    this.mouseCapture = new MouseCapture(this.canvas, (locked) =>
+      this.handleMouseCaptureChange(locked)
+    );
+    /** performance.now() when a lost capture last paused the run (see handlePauseKeyDown). */
+    this._capturePausedAt = -Infinity;
     this.events = new EventBus();
     /** Synthesized sound effects; unlocked on Launch Mission, muted state persisted. */
     this.audio = new AudioManager();
@@ -506,6 +513,8 @@ class AIHorizon {
    * @param {KeyboardEvent} e
    */
   handlePauseKeyDown(e) {
+    // The Esc that released a captured mouse already paused the run; don't let it also resume.
+    if (performance.now() - this._capturePausedAt < CONFIG.INPUT.CAPTURE_PAUSE_GUARD_MS) return;
     if (this.shouldTogglePause(e)) {
       e.preventDefault();
       this.togglePause();
@@ -763,18 +772,51 @@ class AIHorizon {
   }
 
   /**
-   * Track the mouse anywhere in the window (not just over the canvas, which the HUD strip covers
-   * at the top), clamped to the ship's reach so steering keeps working along every edge. The edge
-   * margin lets the ship reach an edge before the cursor leaves the window.
+   * Steer with the mouse. Captured (pointer lock): the ship target moves by the mouse motion,
+   * clamped to the screen, so pushing past an edge and moving along it keeps steering. Free
+   * cursor: tracked anywhere in the window (not just over the canvas, which the HUD strip covers
+   * at the top) with an edge margin so the ship reaches an edge before the cursor leaves.
    * @param {MouseEvent} e - The mouse event.
    */
   handleMouseMove(e) {
+    if (this.mouseCapture.locked) {
+      const speed = CONFIG.INPUT.MOUSE_LOCK_SPEED;
+      this.input.nudge(e.movementX * speed, e.movementY * speed, {
+        ship: this.player,
+        view: this.view,
+      });
+      return;
+    }
     this.input.aimAt(e.clientX, e.clientY, this.pointerFrame(), CONFIG.INPUT.MOUSE_EDGE_PX);
   }
 
-  /** Begin continuous fire (mouse). */
+  /**
+   * Capture gained: start steering from the ship so it doesn't jump. Capture lost while running
+   * (Esc, tab switch): pause, so Esc still means pause.
+   * @param {boolean} locked
+   */
+  handleMouseCaptureChange(locked) {
+    if (locked) {
+      this.input.mouse.x = this.player.x + this.player.width / 2;
+      this.input.mouse.y = this.player.y + this.player.height / 2;
+      return;
+    }
+    if (!this.state.isRunning()) return;
+    this._capturePausedAt = performance.now();
+    this.togglePause();
+  }
+
+  /** Clicking the pause overlay resumes and captures the mouse again. */
+  handlePauseScreenClick() {
+    if (!this.state.isPaused()) return;
+    this.togglePause();
+    this.mouseCapture.request();
+  }
+
+  /** Begin continuous fire (mouse), capturing the mouse if it isn't already. */
   handleMouseDown() {
     if (!this.state.isRunning()) return;
+    this.mouseCapture.request();
     this._mouseDown = true;
     this.input.fireHeld = true;
     this.shoot();
@@ -830,17 +872,20 @@ class AIHorizon {
   }
 
   /**
-   * Start the game when start button is clicked.
+   * Start the game when start button is clicked; a mouse click also captures the mouse.
+   * @param {Event} [e]
    */
-  handleStartClick() {
+  handleStartClick(e) {
     this.startGame();
     this.startBtn.focus();
+    if (isMouseEvent(e)) this.mouseCapture.request();
   }
 
   /**
-   * Restart the game when restart button is clicked.
+   * Restart the game when restart button is clicked; a mouse click also captures the mouse.
+   * @param {Event} [e]
    */
-  handleRestartClick() {
+  handleRestartClick(e) {
     if (this.restartBtn && this.restartBtn.dataset && this.restartBtn.dataset.cooldown === "1")
       return;
 
@@ -862,6 +907,7 @@ class AIHorizon {
     } catch (_) {
       /* intentionally ignored: focus may fail if button not yet in DOM or not focusable */
     }
+    if (isMouseEvent(e)) this.mouseCapture.request();
   }
 
   /** Dismiss the post-game overlay and return focus to restart. */
@@ -1104,7 +1150,7 @@ class AIHorizon {
   }
 
   /**
-   * Toggle pause state.
+   * Toggle pause state. Pausing gives a captured mouse back so the pause overlay can be clicked.
    */
   togglePause() {
     if (this.state.isPaused()) {
@@ -1113,6 +1159,7 @@ class AIHorizon {
       this.audio.resume();
     } else if (this.state.isRunning()) {
       this.state.pause();
+      this.mouseCapture.release();
       GameUI.showPause(this);
       this.audio.suspend();
     }
@@ -1149,6 +1196,7 @@ class AIHorizon {
       /* optional bonus application */
     }
     this.state.end();
+    this.mouseCapture.release();
     const oldHighScore = this.highScore;
     this.updateHighScore();
     GameUI.hidePause(this);
@@ -1409,6 +1457,7 @@ class AIHorizon {
 
   /** Fully reset the game to menu state. */
   fullReset() {
+    this.mouseCapture.release();
     resetFull(this);
   }
 

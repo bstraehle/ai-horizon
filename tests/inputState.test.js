@@ -86,6 +86,22 @@ describe("InputState", () => {
     expect(input.mouse).toEqual({ x: 20, y: 380 });
   });
 
+  it("nudge moves the target by relative motion and slides along a clamped edge", () => {
+    const input = new InputState();
+    const frame = {
+      ship: { x: 380, y: 300, width: 40, height: 40 },
+      view: { width: 800, height: 400 },
+    };
+    input.nudge(10, -20, frame);
+    expect(input.mouse).toEqual({ x: 410, y: 300 });
+    input.nudge(0, 500, frame);
+    expect(input.mouse).toEqual({ x: 410, y: 380 });
+    input.nudge(-100, 50, frame);
+    expect(input.mouse).toEqual({ x: 310, y: 380 });
+    input.nudge(-1000, 0, frame);
+    expect(input.mouse).toEqual({ x: 20, y: 380 });
+  });
+
   it("fireHeld can be set directly", () => {
     const input = new InputState();
     input.fireHeld = true;
