@@ -1,5 +1,6 @@
 /**
- * SoundToggle – binds every `.sound-toggle` control and the M key to AudioManager mute state.
+ * SoundToggle – binds every `.sound-toggle` control and the M key (see `isMuteKey`) to
+ * AudioManager mute state.
  *
  * The controls are links (`<a role="button">`) because the start and leaderboard overlays'
  * focus locks only let links take focus besides their primary button. Labels read "Sound: On" /
@@ -20,6 +21,23 @@ function isTextEntry(el) {
     tag === "TEXTAREA" ||
     /** @type {HTMLElement} */ (el).isContentEditable === true
   );
+}
+
+const LETTER = /^\p{L}$/u;
+const LATIN = /^\p{Script=Latin}$/u;
+
+/**
+ * Whether `e` is the mute shortcut: the key that types M on the active layout (so it follows the
+ * label on AZERTY and other Latin layouts). Layouts that type a non-Latin letter there (Cyrillic,
+ * Greek, Hangul), or report no character, fall back to the physical M key position.
+ * @param {KeyboardEvent} e
+ * @returns {boolean}
+ */
+export function isMuteKey(e) {
+  const key = e.key || "";
+  if (key === "m" || key === "M") return true;
+  const nonLatinLetter = LETTER.test(key) && !LATIN.test(key);
+  return (nonLatinLetter || key.length !== 1) && e.code === "KeyM";
 }
 
 /**
@@ -56,7 +74,7 @@ export function initSoundToggles(audio, doc = document) {
   };
   /** @param {KeyboardEvent} e */
   const onWindowKey = (e) => {
-    if (e.code !== "KeyM" || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (!isMuteKey(e) || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     if (isTextEntry(/** @type {Element|null} */ (e.target))) return;
     toggle();
   };

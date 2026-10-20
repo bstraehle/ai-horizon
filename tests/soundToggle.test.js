@@ -77,6 +77,22 @@ describe("initSoundToggles", () => {
     expect(audio.muted).toBe(false);
   });
 
+  it("follows the M label on AZERTY and the M position on non-Latin layouts", () => {
+    const audio = makeAudio();
+    initSoundToggles(/** @type {any} */ (audio), doc);
+    key(doc.body, { code: "Semicolon", key: "m" });
+    expect(audio.muted).toBe(true);
+    key(doc.body, { code: "KeyM", key: "," });
+    expect(audio.muted).toBe(true);
+    key(doc.body, { code: "KeyM", key: "ь" });
+    expect(audio.muted).toBe(false);
+    key(doc.body, { code: "KeyM", key: "Unidentified" });
+    expect(audio.muted).toBe(true);
+    key(doc.body, { code: "Semicolon", key: "ñ" });
+    key(doc.body, { code: "KeyS", key: "s" });
+    expect(audio.muted).toBe(true);
+  });
+
   it("hides the toggles and ignores M when Web Audio is unsupported", () => {
     const audio = makeAudio(false);
     initSoundToggles(/** @type {any} */ (audio), doc);
