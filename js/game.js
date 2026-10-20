@@ -791,24 +791,30 @@ class AIHorizon {
     this.input.fireHeld = false;
   }
 
+  /** @returns {import('./core/TouchControls.js').TouchFrame} Where touches land (see TouchControls). */
+  touchFrame() {
+    if (!this.canvasRect) this.canvasRect = this.canvas.getBoundingClientRect();
+    return { rect: this.canvasRect, ship: this.player, view: this.view };
+  }
+
   /**
-   * Drag the ship by the steering finger's travel (mobile); see TouchControls.
+   * The ship follows the steering finger (mobile); see TouchControls.
    * @param {TouchEvent} e - The touch event.
    */
   handleTouchMove(e) {
     e.preventDefault();
-    this.touch.move(e.changedTouches, this.player, this.view);
+    this.touch.move(e.changedTouches, this.touchFrame());
   }
 
   /**
-   * Touch down (mobile): the first finger steers without firing; any further finger starts
-   * continuous fire.
+   * Touch down (mobile): the first finger steers (the ship heads to it) without firing; any
+   * further finger starts continuous fire.
    * @param {TouchEvent} e - The touch event.
    */
   handleTouchStart(e) {
     e.preventDefault();
     if (!this.state.isRunning()) return;
-    if (this.touch.start(e.changedTouches, this.player, e.timeStamp, e.touches)) this.shoot();
+    if (this.touch.start(e.changedTouches, this.touchFrame(), e.timeStamp, e.touches)) this.shoot();
   }
 
   /** Touch lift/cancel: a quick, still tap of the steering finger fires one shot; fire stops
