@@ -411,6 +411,8 @@ export const CONFIG = deepFreeze({
     PAUSE_KEYS: ["Esc", "Escape"],
     /** Touch steering: the longest / furthest steering touch that still counts as a tap (one shot). */
     TOUCH: { TAP_MAX_MS: 250, TAP_SLOP_PX: 10 },
+    /** Mouse steering: the ship meets a screen edge while the cursor is this far inside it. */
+    MOUSE_EDGE_PX: 60,
   },
   RNG: {
     SEED_PARAM: "seed",

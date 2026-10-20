@@ -69,6 +69,23 @@ describe("InputState", () => {
     expect(input.mouse).toEqual({ x: 780, y: 380 });
   });
 
+  it("aimAt with an edge margin reaches each edge while the pointer is still inside", () => {
+    const input = new InputState();
+    const frame = {
+      rect: { left: 0, top: 0 },
+      ship: { width: 40, height: 40 },
+      view: { width: 800, height: 400 },
+    };
+    input.aimAt(60, 340, frame, 60);
+    expect(input.mouse).toEqual({ x: 20, y: 380 });
+    input.aimAt(740, 60, frame, 60);
+    expect(input.mouse).toEqual({ x: 780, y: 20 });
+    input.aimAt(400, 200, frame, 60);
+    expect(input.mouse).toEqual({ x: 400, y: 200 });
+    input.aimAt(-100, 1000, frame, 60);
+    expect(input.mouse).toEqual({ x: 20, y: 380 });
+  });
+
   it("fireHeld can be set directly", () => {
     const input = new InputState();
     input.fireHeld = true;

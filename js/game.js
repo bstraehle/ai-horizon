@@ -764,11 +764,12 @@ class AIHorizon {
 
   /**
    * Track the mouse anywhere in the window (not just over the canvas, which the HUD strip covers
-   * at the top), clamped to the ship's reach so steering keeps working along every edge.
+   * at the top), clamped to the ship's reach so steering keeps working along every edge. The edge
+   * margin lets the ship reach an edge before the cursor leaves the window.
    * @param {MouseEvent} e - The mouse event.
    */
   handleMouseMove(e) {
-    this.input.aimAt(e.clientX, e.clientY, this.pointerFrame());
+    this.input.aimAt(e.clientX, e.clientY, this.pointerFrame(), CONFIG.INPUT.MOUSE_EDGE_PX);
   }
 
   /** Begin continuous fire (mouse). */

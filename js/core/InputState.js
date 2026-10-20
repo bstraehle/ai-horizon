@@ -7,6 +7,22 @@ import { clamp } from "../constants.js";
  */
 
 /**
+ * @private Map a pointer coordinate on one axis to the ship-centre target (see `aimAt`).
+ * @param {number} p Pointer position on the axis (canvas px).
+ * @param {number} size Playable size on the axis.
+ * @param {number} half Half the ship's size on the axis.
+ * @param {number} margin Edge margin in px.
+ * @returns {number}
+ */
+function aimAxis(p, size, half, margin) {
+  const reach = Math.max(0, size - 2 * half);
+  const m = Math.max(half, margin);
+  const band = size - 2 * m;
+  const target = band > 0 ? half + ((p - m) * reach) / band : p;
+  return clamp(target, half, half + reach);
+}
+
+/**
  * InputState – mutable snapshot of current user input (keys, pointer, fire hold).
  *
  * Design:
@@ -41,15 +57,18 @@ export class InputState {
    * Point the ship at a mouse / touch position, clamped to where the ship's centre can go. The
    * clamp keeps steering alive when the pointer sits on or beyond a canvas edge (or over the HUD),
    * and keeps the target positive, since Player treats (0, 0) as "no pointer".
+   *
+   * With an edge margin, the band [margin, size - margin] is stretched over the ship's reach, so
+   * the ship meets each edge while the pointer is still `margin` px inside (a mouse cursor that
+   * leaves the window stops sending events). The centre maps to itself.
    * @param {number} clientX Pointer position in client (viewport) coordinates.
    * @param {number} clientY
    * @param {PointerFrame} frame
+   * @param {number} [margin=0] Edge margin in px; 0 puts the ship's centre exactly on the pointer.
    */
-  aimAt(clientX, clientY, { rect, ship, view }) {
-    const halfW = ship.width / 2;
-    const halfH = ship.height / 2;
-    this.mouse.x = clamp(clientX - rect.left, halfW, Math.max(halfW, view.width - halfW));
-    this.mouse.y = clamp(clientY - rect.top, halfH, Math.max(halfH, view.height - halfH));
+  aimAt(clientX, clientY, { rect, ship, view }, margin = 0) {
+    this.mouse.x = aimAxis(clientX - rect.left, view.width, ship.width / 2, margin);
+    this.mouse.y = aimAxis(clientY - rect.top, view.height, ship.height / 2, margin);
   }
 
   /** Reset mouse position. */
