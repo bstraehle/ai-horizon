@@ -43,6 +43,32 @@ describe("InputState", () => {
     expect(input.mouse).toEqual({ x: 0, y: 0 });
   });
 
+  it("aimAt converts client coords to canvas coords", () => {
+    const input = new InputState();
+    const frame = {
+      rect: { left: 10, top: 20 },
+      ship: { width: 40, height: 40 },
+      view: { width: 800, height: 400 },
+    };
+    input.aimAt(310, 220, frame);
+    expect(input.mouse).toEqual({ x: 300, y: 200 });
+  });
+
+  it("aimAt clamps edge and off-canvas pointers to the ship's reach (never 0)", () => {
+    const input = new InputState();
+    const frame = {
+      rect: { left: 0, top: 0 },
+      ship: { width: 40, height: 40 },
+      view: { width: 800, height: 400 },
+    };
+    input.aimAt(0, 0, frame);
+    expect(input.mouse).toEqual({ x: 20, y: 20 });
+    input.aimAt(-50, 900, frame);
+    expect(input.mouse).toEqual({ x: 20, y: 380 });
+    input.aimAt(799, 399, frame);
+    expect(input.mouse).toEqual({ x: 780, y: 380 });
+  });
+
   it("fireHeld can be set directly", () => {
     const input = new InputState();
     input.fireHeld = true;

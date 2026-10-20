@@ -1,11 +1,7 @@
-import { clamp, CONFIG } from "../constants.js";
+import { CONFIG } from "../constants.js";
 
 /** @typedef {{ identifier:number, clientX:number, clientY:number }} TouchPoint */
-/**
- * Where a touch lands in the game: the canvas position on screen (client coords), the ship's
- * bounds (its size limits where its centre can go) and the playable area.
- * @typedef {{ rect:{ left:number, top:number }, ship:{ width:number, height:number }, view:{ width:number, height:number } }} TouchFrame
- */
+/** @typedef {import('./InputState.js').PointerFrame} TouchFrame */
 
 /**
  * TouchControls – multi-touch steering and firing, written into an InputState.
@@ -17,8 +13,7 @@ import { clamp, CONFIG } from "../constants.js";
  *    reports it so the caller fires one shot.
  *  - Every other finger fires: `fireHeld` stays true while at least one is down.
  *
- * The target is clamped to where the ship's centre can go, which also keeps it positive (Player
- * treats (0, 0) as "no pointer") when a finger slides off the canvas.
+ * Aiming goes through `InputState.aimAt`, which clamps the target to the ship's reach.
  */
 export class TouchControls {
   /**
@@ -69,7 +64,7 @@ export class TouchControls {
           startMs: nowMs,
           moved: false,
         };
-        this._aim(t, frame);
+        this.getInput().aimAt(t.clientX, t.clientY, frame);
       } else {
         this.fireIds.add(t.identifier);
         fired = true;
@@ -89,7 +84,7 @@ export class TouchControls {
     if (!s) return;
     const t = Array.from(touches).find((p) => p.identifier === s.id);
     if (!t) return;
-    this._aim(t, frame);
+    this.getInput().aimAt(t.clientX, t.clientY, frame);
     if (Math.hypot(t.clientX - s.startX, t.clientY - s.startY) > this.opts.TAP_SLOP_PX)
       s.moved = true;
   }
@@ -114,18 +109,5 @@ export class TouchControls {
     }
     this.getInput().fireHeld = this.fireIds.size > 0;
     return tap;
-  }
-
-  /**
-   * @private Set the pointer target to the finger's canvas position, clamped to the ship's reach.
-   * @param {TouchPoint} t
-   * @param {TouchFrame} frame
-   */
-  _aim(t, { rect, ship, view }) {
-    const halfW = ship.width / 2;
-    const halfH = ship.height / 2;
-    const mouse = this.getInput().mouse;
-    mouse.x = clamp(t.clientX - rect.left, halfW, Math.max(halfW, view.width - halfW));
-    mouse.y = clamp(t.clientY - rect.top, halfH, Math.max(halfH, view.height - halfH));
   }
 }

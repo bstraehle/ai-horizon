@@ -763,12 +763,12 @@ class AIHorizon {
   }
 
   /**
-   * Track mouse position.
+   * Track the mouse anywhere in the window (not just over the canvas, which the HUD strip covers
+   * at the top), clamped to the ship's reach so steering keeps working along every edge.
    * @param {MouseEvent} e - The mouse event.
    */
   handleMouseMove(e) {
-    this.input.mouse.x = e.offsetX;
-    this.input.mouse.y = e.offsetY;
+    this.input.aimAt(e.clientX, e.clientY, this.pointerFrame());
   }
 
   /** Begin continuous fire (mouse). */
@@ -791,8 +791,8 @@ class AIHorizon {
     this.input.fireHeld = false;
   }
 
-  /** @returns {import('./core/TouchControls.js').TouchFrame} Where touches land (see TouchControls). */
-  touchFrame() {
+  /** @returns {import('./core/InputState.js').PointerFrame} Where mouse / touch input lands. */
+  pointerFrame() {
     if (!this.canvasRect) this.canvasRect = this.canvas.getBoundingClientRect();
     return { rect: this.canvasRect, ship: this.player, view: this.view };
   }
@@ -803,7 +803,7 @@ class AIHorizon {
    */
   handleTouchMove(e) {
     e.preventDefault();
-    this.touch.move(e.changedTouches, this.touchFrame());
+    this.touch.move(e.changedTouches, this.pointerFrame());
   }
 
   /**
@@ -814,7 +814,8 @@ class AIHorizon {
   handleTouchStart(e) {
     e.preventDefault();
     if (!this.state.isRunning()) return;
-    if (this.touch.start(e.changedTouches, this.touchFrame(), e.timeStamp, e.touches)) this.shoot();
+    if (this.touch.start(e.changedTouches, this.pointerFrame(), e.timeStamp, e.touches))
+      this.shoot();
   }
 
   /** Touch lift/cancel: a quick, still tap of the steering finger fires one shot; fire stops
