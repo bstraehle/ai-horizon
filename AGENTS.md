@@ -51,7 +51,8 @@ step 3 with `--raw` pointing at the new file, then move it over the old raw for 
 only works when the game-over dialog's first frame and the sounds are unchanged (the splice checks
 that frame against the old video); otherwise do the full render. The 4K
 landscape screenshots (`store-screenshots/3840x2160`) are frames of the 4K raw video, e.g.
-`4-gameover.png` is frame 5850.
+`4-gameover.png` is frame 5850 and `5-leaderboard.png` frame 6150 (extract with
+`-vf "select=eq(n\,5850)" -frames:v 1 -pix_fmt rgb24`: 24-bit, no alpha).
 
 4K: same steps with `--scale=4` and `3840x2160` in the file names/`--size`. The layout (960x540
 CSS) and seed are unchanged, so the run, sound timeline and narration timing match the 1080p cut.
