@@ -19,9 +19,10 @@
  * scaled to the measured capture speed via the Animation domain.
  *
  * Sequence: title screen (held --hold s, with the remote high score loaded) → the run, stepped
- * frame by frame → game-over dialog (1.2s) → AI debrief once rendered (4s) → Ok → initials prompt
- * (2s) → leaderboard (3s). No score is submitted (initials left empty). The default seed survived
- * ~50s on the 360x640 viewport; other seeds mostly die within 15s there.
+ * frame by frame → game-over dialog with the "incoming transmission" (1.2s) → AI debrief once its
+ * headline has typed out (4s) → Ok → initials prompt (2s) → leaderboard (3s). No score is
+ * submitted (initials left empty). The default seed survived ~50s on the 360x640 viewport; other
+ * seeds mostly die within 15s there.
  *
  * Sound: screenshots carry no audio, so with --sfx the page runs with `soundlog=1` and every
  * sound-effect call made during the stepped run is written to that JSON as
@@ -35,7 +36,9 @@
  * debrief before the run loop ends). The recorder checks that the run matches the earlier video
  * (same total frame count, and the first game-over frame equal to the earlier one by PSNR) and
  * writes --out as the earlier frames up to game over followed by the new ones. The run and its
- * sound timeline are unchanged, so the earlier --sfx JSON/WAV stay valid.
+ * sound timeline are unchanged, so the earlier --sfx JSON/WAV stay valid – unless the change adds
+ * sounds or alters the dialog's first frame (both true of the transmission reveal), which needs a
+ * full render.
  *
  * Output: H.264 yuv420p (bt709, faststart) at --fps; 360x640 @3x = 1080x1920 (9:16). Each PNG is
  * piped straight into ffmpeg (image2pipe at the output rate; held screens are the same image
@@ -128,7 +131,9 @@ const CLOCK_SHIM = `(() => {
 const START_READY =
   "performance.now() > 15000 || Number(document.getElementById('highScore').textContent) > 0";
 const GAME_OVER = "!document.getElementById('gameOverScreen').hidden";
-const DEBRIEF_READY = `${GAME_OVER} && !document.getElementById('okBtn').disabled`;
+/** Debrief rendered and its headline fully typed out (the sections fade in once it is). */
+const DEBRIEF_READY = `${GAME_OVER} && !document.getElementById('okBtn').disabled &&
+  !!document.querySelector('#postGameMessage .debrief:not(.pending)')`;
 const SKIP_INITIALS = `(() => {
   const screen = document.getElementById('initialsScreen');
   if (!screen || screen.hidden) return 'no-initials';

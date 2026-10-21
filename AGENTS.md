@@ -36,7 +36,9 @@
 With `npm run serve` running:
 
 1. `node --experimental-websocket scripts/record-autoplay.cjs --width=960 --height=540 --scale=2 --seed=2024 --out=store-video/_raw-1920x1080.mp4 --sfx=store-video/_sfx-1920x1080.json`
-   (about 25 min; frame-stepped, so audio is captured as a sound-event log, not recorded).
+   (about 20-25 min; frame-stepped, so audio is captured as a sound-event log, not recorded). The
+   post-run screens are real time and call the production analysis Lambda (a real AI debrief,
+   never an initials submission); the debrief is captured once its headline has typed out.
 2. `node --experimental-websocket scripts/render-sfx.cjs --events=store-video/_sfx-1920x1080.json`
 3. `python store-video/narrate.py --raw store-video/_raw-1920x1080.mp4 --size 1920x1080 --out store-video/ai-horizon-1920x1080.mp4 --sfx store-video/_sfx-1920x1080.wav`
    (needs AWS credentials for Polly; `--sfx-lu` sets how far the game sits under the voice-over).
@@ -45,7 +47,9 @@ Only the game-over/debrief/leaderboard screens changed (UI tweak)? Run step 1 wi
 `--splice=store-video/_raw-1920x1080.mp4 --out=store-video/_raw-1920x1080.new.mp4` added (a few
 minutes: it re-steps the run without capturing, verifies it matches the earlier raw video, and
 replaces only the frames from game over on), skip step 2 (the sound timeline is unchanged), run
-step 3 with `--raw` pointing at the new file, then move it over the old raw for next time. The 4K
+step 3 with `--raw` pointing at the new file, then move it over the old raw for next time. This
+only works when the game-over dialog's first frame and the sounds are unchanged (the splice checks
+that frame against the old video); otherwise do the full render. The 4K
 landscape screenshots (`store-screenshots/3840x2160`) are frames of the 4K raw video, e.g.
 `4-gameover.png` is frame 5850.
 
