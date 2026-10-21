@@ -29,6 +29,9 @@
   --color-btn-gradient-hover-end: #777;
   --color-btn-gradient-hover-start: #555;
   --color-btn-gradient-start: #333;
+  /* Debrief commanders' names: Vega a blue-white star, Altair a warm gold. */
+  --color-commander-altair: #ffd27a;
+  --color-commander-vega: #9fd4ff;
   --color-connection-online: var(--color-text);
   --color-connection-offline: var(--color-text);
   --color-text: #fff;
@@ -395,6 +398,12 @@ body {
 }
 .post-game-message .transmission-from {
   flex-basis: 100%;
+}
+.post-game-message.commander-vega :is(.transmission-from, .debrief-from) {
+  color: var(--color-commander-vega);
+}
+.post-game-message.commander-altair :is(.transmission-from, .debrief-from) {
+  color: var(--color-commander-altair);
 }
 /* While the transmission is incoming it is the panel's only content, so the space above
    "Incoming transmission" equals the space below "Commander Vega": equal panel padding, no trailing

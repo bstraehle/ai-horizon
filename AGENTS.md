@@ -22,10 +22,15 @@
    The leaderboard Lambda mirrors scoring constants (`RULES`) and the initials blocklist; when
    changing `CONFIG.GAME` scoring/spawn values, update `RULES` and redeploy the Lambda (tests fail
    until they match). Alerts go to SNS topic `ai-horizon-alerts` via env var `ALERT_TOPIC_ARN`.
-   The analysis Lambda's Bedrock prompts are the `SYSTEM_PROMPT` / `PROMPT` constants in
-   `server/lambda/analysis.js` (not env vars: Lambda caps all env vars at 4 KB), so prompt changes
-   need a code redeploy. Its only env var is `MODEL_ID`: it calls the Converse API with a forced
-   tool call, so any Converse model with tool use works (`us.anthropic.claude-haiku-4-5-20251001-v1:0`).
+   The analysis Lambda's Bedrock prompts are the `PERSONAS` (one system prompt per debrief
+   commander, Vega and Altair) / `PROMPT` constants in `server/lambda/analysis.js` (not env vars:
+   Lambda caps all env vars at 4 KB), so prompt changes need a code redeploy. The client picks the
+   commander (`js/managers/Commanders.js`) and sends it as `commander`; each persona has a fixed
+   Polly voice gender and its own headline shape (Vega 2 sentences, Altair 3-4, enforced by
+   `tidyHeadline`), and languages without a male generative voice (nl, pl) keep Vega. The model
+   writes a `draft` and then the proofread `feedback`; the draft is dropped before responding. The
+   Lambda's only env var is `MODEL_ID`: it calls the Converse API with a forced tool call, so any
+   Converse model with tool use works (`us.anthropic.claude-haiku-4-5-20251001-v1:0`).
    The function role's inline policy must allow `bedrock:InvokeModel` on that model in every region
    its cross-region profile routes to. To try prompt changes before deploying, run the exported
    prompt helpers against `aws bedrock-runtime converse` (Windows CLI: pass `file://` JSON with

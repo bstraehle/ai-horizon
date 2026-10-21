@@ -322,12 +322,17 @@ describe("AudioManager", () => {
     const { audio, ctx } = unlocked();
     ctx.currentTime = 10;
     audio.playFatal();
-    const first = created(ctx, () => audio.playTransmission());
+    const fatalEnd = 10 + CONFIG.AUDIO.SPEECH_AFTER_FATAL_S;
+    const first = created(ctx, () => audio.playTransmission("altair"));
     expect(first.src).toBeGreaterThan(1);
+    // The caller's call tone, then squelch and crackle.
+    const tone = ctx.oscillators[ctx.oscillators.length - 1];
+    expect(tone.frequency.set[0]).toBe(CONFIG.AUDIO.COMMANDERS.altair.introHz);
+    expect(tone.start.mock.calls[0][0]).toBeCloseTo(fatalEnd);
     const starts = ctx.sources
       .slice(-first.src)
       .map((/** @type {any} */ s) => s.start.mock.calls[0][0]);
-    expect(Math.min(...starts)).toBeCloseTo(10 + CONFIG.AUDIO.SPEECH_AFTER_FATAL_S);
+    expect(Math.min(...starts)).toBeCloseTo(fatalEnd + CONFIG.AUDIO.RADIO.TONE_S);
     expect(created(ctx, () => audio.playTransmission()).src).toBe(0);
     const muted = unlocked({ muted: true });
     expect(created(muted.ctx, () => muted.audio.playTransmission()).src).toBe(0);
@@ -348,11 +353,20 @@ describe("AudioManager", () => {
     expect(voice.buffer.decodedFrom).toEqual(new Uint8Array([7, 8, 9]));
     expect(voice.start.mock.calls[0][0]).toBeCloseTo(fatalEnd + R.TONE_S + R.SQUELCH_S);
     const tones = ctx.oscillators.slice(before);
+    const { vega, altair } = CONFIG.AUDIO.COMMANDERS;
     expect(tones.map((/** @type {any} */ o) => o.frequency.set[0])).toEqual([
-      R.INTRO_HZ,
-      R.OUTRO_HZ,
+      vega.introHz,
+      vega.outroHz,
     ]);
     expect(tones[0].start.mock.calls[0][0]).toBeCloseTo(fatalEnd);
+
+    // Captain Altair's transmissions are framed by his own, lower tones.
+    const next = ctx.oscillators.length;
+    await audio.playSpeech(clip, "altair");
+    expect(ctx.oscillators.slice(next).map((/** @type {any} */ o) => o.frequency.set[0])).toEqual([
+      altair.introHz,
+      altair.outroHz,
+    ]);
   });
 
   it("skips narration when muted, locked, or invalid, and stopSpeech cancels it", async () => {

@@ -1,6 +1,16 @@
 import { CONFIG } from "../constants.js";
 import { LocalStorageAdapter } from "../adapters/LocalStorageAdapter.js";
 
+/**
+ * Quindar tone pitches of a debrief commander; Commander Vega's for unknown names.
+ * @param {string} commander
+ * @returns {{ introHz: number, outroHz: number }}
+ */
+function commanderTones(commander) {
+  const { vega, altair } = CONFIG.AUDIO.COMMANDERS;
+  return commander === "altair" ? altair : vega;
+}
+
 /** Major-pentatonic steps (semitones above C6) climbed by consecutive star pickups. */
 const STAR_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
 
@@ -28,7 +38,8 @@ const STAR_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
  *    screech, huge sub drop, long rumble and debris. Bypasses the voice cap so it always plays.
  *
  * Narration (Game Over headline spoken by Amazon Polly, synthesized server-side)
- *  - playTransmission(): a radio channel opening (squelch and crackle) while the debrief loads.
+ *  - playTransmission(commander): a radio channel opening (the commander's call tone, squelch
+ *    and crackle) while the debrief loads.
  *  - playSpeech(base64Mp3): decodes and plays the clip through the master bus (so mute applies)
  *    as a radio transmission (Quindar tones, squelch, band-limited voice, hiss), starting after
  *    the loud part of a fatal crash, and reports when the voice starts and how long it lasts
@@ -345,18 +356,22 @@ export class AudioManager {
   }
 
   /**
-   * A radio channel opening while the debrief is on its way: squelch, then a few crackles of
-   * static. Starts after the loud part of a fatal crash, like the narration.
+   * A radio channel opening while the debrief is on its way: the calling commander's call tone,
+   * squelch, then a few crackles of static. Starts after the loud part of a fatal crash, like the
+   * narration.
+   * @param {string} [commander] "vega" or "altair" (see CONFIG.AUDIO.COMMANDERS).
    */
-  playTransmission() {
+  playTransmission(commander = "vega") {
     const now = this._begin("transmission", CONFIG.AUDIO.MIN_INTERVAL_MS.TRANSMISSION, true);
     if (now === null) return;
     const t = Math.max(now, this._fatalEndsAt);
     const bus = this._bus(0, 0.05);
-    this._squelch(t, bus);
+    this._radioTone(commanderTones(commander).introHz, t, bus);
+    const open = t + CONFIG.AUDIO.RADIO.TONE_S;
+    this._squelch(open, bus);
     const crackles = 5 + Math.floor(this._random() * 4);
     for (let i = 0; i < crackles; i++) {
-      const at = t + CONFIG.AUDIO.RADIO.SQUELCH_S + this._random() * 0.6;
+      const at = open + CONFIG.AUDIO.RADIO.SQUELCH_S + this._random() * 0.6;
       const f = 1800 + this._random() * 3500;
       const decay = 0.015 + this._random() * 0.03;
       this._noiseBurst(at, decay, "bandpass", f, f, 1.5, this._env(at, 0.12, 0.001, decay, bus));
@@ -367,12 +382,14 @@ export class AudioManager {
    * Decode and play a narration clip (base64 MP3) through the master bus as a radio
    * transmission from command (see {@link CONFIG.AUDIO.RADIO}): intro Quindar tone and squelch,
    * the voice band-limited and lightly saturated over a faint hiss, then outro tone and squelch.
-   * Skipped when muted, locked, suspended, or superseded by stopSpeech() while decoding.
+   * The tones are pitched per commander. Skipped when muted, locked, suspended, or superseded by
+   * stopSpeech() while decoding.
    * @param {string} base64
+   * @param {string} [commander] "vega" or "altair" (see CONFIG.AUDIO.COMMANDERS).
    * @returns {Promise<{ delay: number, duration: number }|null>} When playback is scheduled:
    *   seconds from now until the voice starts, and the voice's length; otherwise null.
    */
-  async playSpeech(base64) {
+  async playSpeech(base64, commander = "vega") {
     const ctx = this._ctx;
     if (this._muted || !ctx || typeof base64 !== "string" || !base64) return null;
     this.stopSpeech();
@@ -389,13 +406,14 @@ export class AudioManager {
       const voiceEnd = voiceAt + (Number.isFinite(buffer.duration) ? buffer.duration : 0);
       const out = ctx.createGain();
       out.connect(/** @type {GainNode} */ (this._master));
-      this._radioTone(R.INTRO_HZ, at, out);
+      const tones = commanderTones(commander);
+      this._radioTone(tones.introHz, at, out);
       this._squelch(at + R.TONE_S, out);
       const hiss = ctx.createGain();
       hiss.gain.value = R.HISS_GAIN;
       hiss.connect(out);
       this._noiseBurst(voiceAt, voiceEnd - voiceAt, "bandpass", 2500, 2500, 0.7, hiss);
-      this._radioTone(R.OUTRO_HZ, voiceEnd + 0.05, out);
+      this._radioTone(tones.outroHz, voiceEnd + 0.05, out);
       this._squelch(voiceEnd + 0.05 + R.TONE_S, out);
       const gain = ctx.createGain();
       gain.gain.value = CONFIG.AUDIO.SPEECH_GAIN;

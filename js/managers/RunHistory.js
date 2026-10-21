@@ -1,16 +1,23 @@
 import { LocalStorageAdapter } from "../adapters/LocalStorageAdapter.js";
 import { missionVerdict } from "../adapters/AIAnalysisAdapter.js";
 import { CONFIG } from "../constants.js";
+import { commanderHooks, isCommander, pickCommander } from "./Commanders.js";
 
 /**
  * @typedef {{ t: number, score: number, survived: number, total: number,
  *   verdict: "commendation"|"satisfactory"|"reprimand"|null, accuracy: number, bonus: number }} RunEntry
  *   One finished mission as remembered on this device.
- * @typedef {{ count: number, runs: RunEntry[] }} RunHistoryData
- *   `count` is every mission recorded; `runs` keeps only the most recent ones.
- * @typedef {{ mission: number, hooks: string[] }} DebriefHistory
- *   Sent with the debrief request: the mission's number and its story hooks.
+ * @typedef {import("./Commanders.js").CastMemory} CastMemory
+ * @typedef {import("./Commanders.js").CommanderId} CommanderId
+ * @typedef {{ count: number, runs: RunEntry[], cast: CastMemory }} RunHistoryData
+ *   `count` is every mission recorded; `runs` keeps only the most recent ones; `cast` remembers
+ *   the debrief commanders (see Commanders.js).
+ * @typedef {{ mission: number, hooks: string[], commander: CommanderId }} DebriefHistory
+ *   Sent with the debrief request: the mission's number, its story hooks, and who debriefs it.
  */
+
+/** Most story hooks about the run and the commanders' debut / star-crossed day together. */
+const MAX_LEAD_AND_RUN_HOOKS = 3;
 
 /**
  * The parts of a run summary (see `AIHorizon._logRunSummary`) worth remembering.
@@ -127,10 +134,23 @@ export function storyHooks(entry, previous, mission, max = 3) {
 const isEntry = (e) =>
   !!e && typeof e === "object" && [e.t, e.score, e.survived, e.total].every(Number.isFinite);
 
+/** @param {any} cast @returns {CastMemory} The valid parts of a stored cast memory. */
+function readCast(cast) {
+  if (!cast || typeof cast !== "object") return {};
+  return {
+    ...(isCommander(cast.last) ? { last: cast.last } : {}),
+    ...(cast.altairMet === true ? { altairMet: true } : {}),
+    ...(typeof cast.line === "string" && isCommander(cast.lineBy)
+      ? { line: cast.line, lineBy: cast.lineBy }
+      : {}),
+  };
+}
+
 /**
  * RunHistory – the pilot's recent missions on this device (localStorage only), so the debrief
- * commander can remember them: personal bests, streaks, improvements. Never sent anywhere as a
- * whole; only the derived story hooks go out with a debrief request.
+ * commanders can remember them: personal bests, streaks, improvements, and what was said last
+ * time. Never sent anywhere as a whole; only the derived story hooks go out with a debrief
+ * request.
  */
 export class RunHistory {
   /**
@@ -148,22 +168,48 @@ export class RunHistory {
     const runs = data && Array.isArray(data.runs) ? data.runs.filter(isEntry) : [];
     const count =
       data && Number.isFinite(data.count) ? Math.max(data.count, runs.length) : runs.length;
-    return { count, runs };
+    return { count, runs, cast: readCast(data && data.cast) };
   }
 
   /**
-   * Debrief history for a mission that just ended (compared with the stored missions), then
-   * remember it unless `record` is false (e.g. autopilot runs).
+   * Debrief history for a mission that just ended (compared with the stored missions) and the
+   * commander who debriefs it (see Commanders.js), then remember both unless `record` is false
+   * (e.g. autopilot runs).
    * @param {RunEntry} entry
-   * @param {{ record?: boolean }} [opts]
+   * @param {{ record?: boolean, locale?: string|null }} [opts]
    * @returns {DebriefHistory}
    */
-  debrief(entry, { record = true } = {}) {
-    const { count, runs } = this.read();
+  debrief(entry, { record = true, locale = null } = {}) {
+    const { count, runs, cast } = this.read();
     const mission = count + 1;
-    const history = { mission, hooks: storyHooks(entry, runs, mission) };
-    if (record)
-      this.storage.setJSON(this.key, { count: mission, runs: [...runs, entry].slice(-this.max) });
-    return history;
+    const pick = pickCommander(entry, runs, cast, locale);
+    const { lead, tail } = commanderHooks(pick, entry, cast);
+    const hooks = [...lead, ...storyHooks(entry, runs, mission)]
+      .slice(0, MAX_LEAD_AND_RUN_HOOKS)
+      .concat(tail);
+    if (record) {
+      // The quoted line belongs to the mission before; rememberDebrief() stores this one's.
+      const altairMet = cast.altairMet || pick.debut;
+      this.storage.setJSON(this.key, {
+        count: mission,
+        runs: [...runs, entry].slice(-this.max),
+        cast: { last: pick.commander, ...(altairMet ? { altairMet: true } : {}) },
+      });
+    }
+    return { mission, hooks, commander: pick.commander };
+  }
+
+  /**
+   * Remember the headline a commander just radioed, so the next debrief can refer back to it.
+   * @param {CommanderId} commander
+   * @param {string} line
+   */
+  rememberDebrief(commander, line) {
+    const text = typeof line === "string" ? line.trim() : "";
+    if (!isCommander(commander) || !text) return;
+    const data = /** @type {any} */ (this.storage.getJSON(this.key, null));
+    if (!data || typeof data !== "object") return;
+    const cast = { ...readCast(data.cast), line: text, lineBy: commander };
+    this.storage.setJSON(this.key, { ...data, cast });
   }
 }

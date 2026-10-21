@@ -122,6 +122,11 @@ export const GameUI = {
             } else {
               game._lastAIAnalysis = "";
             }
+            // The next debrief can refer back to what this commander said.
+            const { _lastHistory: history, runHistory } = game;
+            if (result.isRemote && history && runHistory && !game.devTools?.autopilot) {
+              runHistory.rememberDebrief(history.commander, result.title);
+            }
           },
           game._lastHistory || null
         );

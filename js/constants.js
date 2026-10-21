@@ -427,8 +427,14 @@ export const CONFIG = deepFreeze({
       TRANSMISSION: 1000,
     },
     STAR_STREAK_WINDOW_MS: 700,
-    /** Polly voice gender for Commander Vega, the debrief persona (one consistent voice). */
-    NARRATOR_VOICE: "female",
+    /**
+     * The two debrief commanders (see managers/Commanders.js): each keeps one Polly voice gender
+     * and its own Quindar tone pitch, so players hear who is calling before the voice starts.
+     */
+    COMMANDERS: {
+      vega: { voice: "female", introHz: 2525, outroHz: 2475 },
+      altair: { voice: "male", introHz: 1950, outroHz: 1900 },
+    },
     SPEECH_GAIN: 1.6,
     SPEECH_AFTER_FATAL_S: 1.4,
     /** Narration as a comms transmission: band-limited voice framed by Quindar tones + squelch. */
@@ -437,8 +443,6 @@ export const CONFIG = deepFreeze({
       HIGH_HZ: 3400,
       DRIVE: 2,
       HISS_GAIN: 0.025,
-      INTRO_HZ: 2525,
-      OUTRO_HZ: 2475,
       TONE_S: 0.25,
       TONE_GAIN: 0.05,
       SQUELCH_S: 0.12,

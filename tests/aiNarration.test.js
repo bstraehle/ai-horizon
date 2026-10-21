@@ -24,10 +24,20 @@ describe("AIAnalysisAdapter narration", () => {
       remoteAdapter: /** @type {any} */ (remote),
       endpoint: "/x",
     });
-    const result = await adapter.analyze({ runSummary: RUN, speech: { voice: "female" } });
+    const result = await adapter.analyze({
+      runSummary: RUN,
+      speech: { voice: "female" },
+      history: { mission: 3, hooks: ["h"], commander: "altair" },
+    });
+    // The commander travels as its own field, next to the mission number and hooks.
     expect(remote.postJSON).toHaveBeenCalledWith(
       "/x",
-      expect.objectContaining({ ...RUN, speech: { voice: "female" } })
+      expect.objectContaining({
+        ...RUN,
+        speech: { voice: "female" },
+        history: { mission: 3, hooks: ["h"] },
+        commander: "altair",
+      })
     );
     expect(result.title).toBe(ANALYSIS.feedback);
     expect(result.sections).toEqual([
@@ -96,9 +106,21 @@ describe("AIAnalysisManager narration", () => {
       history: { mission: 2, hooks: [] },
       speech: { voice: "female" },
     });
-    expect(audio.playSpeech).toHaveBeenCalledWith("AQID");
+    expect(audio.playSpeech).toHaveBeenCalledWith("AQID", "vega");
     expect(result.speech).toBeUndefined();
     await expect(result.speechTiming).resolves.toEqual({ delay: 0.4, duration: 2.5 });
+  });
+
+  it("requests Captain Altair's voice and call tone when he debriefs", async () => {
+    const { audio, adapter } = setup();
+    const history = { mission: 5, hooks: [], commander: "altair" };
+    await AIAnalysisManager.analyze({ runSummary: { score: 1 }, history });
+    expect(adapter.analyze).toHaveBeenCalledWith({
+      runSummary: { score: 1 },
+      history,
+      speech: { voice: "male" },
+    });
+    expect(audio.playSpeech).toHaveBeenCalledWith("AQID", "altair");
   });
 
   it("never requests speech (no Polly call) when sound is off, unsupported, or offline", async () => {

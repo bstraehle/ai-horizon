@@ -12,7 +12,8 @@
  *  - Owns synthesized sound effects (`managers/AudioManager.js`), unlocked on launch and
  *    suspended while the tab is hidden; mute via the Sound toggles or the M key
  *  - Remembers recent missions on this device (`managers/RunHistory.js`) for the debrief's
- *    story hooks
+ *    story hooks, and picks who debriefs: Commander Vega or Captain Altair
+ *    (`managers/Commanders.js`)
  *
  * Design highlights:
  *  - Object pools pre-warmed to avoid first-interaction jank
@@ -167,7 +168,7 @@ class AIHorizon {
     this.input = new InputState();
     /** Touch gestures (drag to steer, second finger / tap to fire) feeding `input`. */
     this.touch = new TouchControls(() => this.input);
-    /** Recent missions on this device, for the debrief commander's story hooks. */
+    /** Recent missions on this device, for the debrief commanders' story hooks. */
     this.runHistory = new RunHistory();
     /** @type {import('./managers/RunHistory.js').DebriefHistory|null} */
     this._lastHistory = null;
@@ -1131,12 +1132,16 @@ class AIHorizon {
     } catch (_e) {
       this._lastRunSummary = null;
     }
-    // Story hooks for the debrief commander, compared with earlier missions on this device;
-    // autopilot runs (recordings, profiling) are not remembered.
+    // Story hooks and the debrief commander (Vega or Altair), from earlier missions on this
+    // device; autopilot runs (recordings, profiling) are not remembered.
     try {
       const entry = runEntry(this._lastRunSummary);
+      const device = this._lastRunSummary && this._lastRunSummary.device;
       this._lastHistory = entry
-        ? this.runHistory.debrief(entry, { record: !(this.devTools && this.devTools.autopilot) })
+        ? this.runHistory.debrief(entry, {
+            record: !(this.devTools && this.devTools.autopilot),
+            locale: (device && device.locale) || null,
+          })
         : null;
     } catch (_e) {
       this._lastHistory = null;

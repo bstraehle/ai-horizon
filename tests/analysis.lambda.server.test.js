@@ -34,6 +34,7 @@ process.env.MODEL_ID = "test-model";
 const {
   DEBRIEF_TOOL,
   HEADLINE_IMAGERY,
+  PERSONAS,
   PROMPT,
   SYSTEM_PROMPT,
   VERDICT_RATINGS,
@@ -86,9 +87,15 @@ describe("analysis Lambda – Polly narration", () => {
     expect(selectVoice("en-US", "female")).toEqual({ voiceId: "Ruth", gender: "female" });
     expect(selectVoice("en-US", "male")).toEqual({ voiceId: "Matthew", gender: "male" });
     expect(selectVoice("de-DE", "male")).toEqual({ voiceId: "Daniel", gender: "male" });
-    // Only a female voice exists → female even when male is requested.
-    expect(selectVoice("en-AU", "male")).toEqual({ voiceId: "Olivia", gender: "female" });
-    expect(selectVoice("pt-BR", "male")?.voiceId).toBe("Camila");
+    expect(selectVoice("ko-KR", "male")?.voiceId).toBe("Hyunduk");
+    expect(selectVoice("pt-BR", "male")?.voiceId).toBe("Leo");
+    // No male voice for the region → the language default's male voice keeps the gender.
+    expect(selectVoice("en-IE", "male")).toEqual({ voiceId: "Matthew", gender: "male" });
+    expect(selectVoice("de-AT", "male")?.voiceId).toBe("Daniel");
+    expect(selectVoice("en-IE", "female")?.voiceId).toBe("Niamh");
+    // No male voice for the language at all → female even when male is requested.
+    expect(selectVoice("nl-NL", "male")).toEqual({ voiceId: "Laura", gender: "female" });
+    expect(selectVoice("pl-PL", "male")?.voiceId).toBe("Ola");
     // Language-only / unknown region → language default.
     expect(selectVoice("en-CA", "male")?.voiceId).toBe("Matthew");
     expect(selectVoice("fr", "female")?.voiceId).toBe("Lea");
@@ -103,16 +110,17 @@ describe("analysis Lambda – Polly narration", () => {
 
   it("strips emoji and caps the spoken text", () => {
     expect(speakableText("👨‍🚀 Survive  90s 🔥")).toBe("Survive 90s");
-    expect(speakableText("x".repeat(500))).toHaveLength(200);
+    expect(speakableText("x".repeat(500))).toHaveLength(340);
     expect(speakableText(undefined)).toBe("");
   });
 
-  it("keeps the speech and history requests out of the mission details", () => {
+  it("keeps the speech, history and commander requests out of the mission details", () => {
     const body = JSON.stringify({
       score: 1,
       device: { locale: "de-DE" },
       speech: { voice: "male" },
       history: { mission: 4, hooks: ["New personal best: 900 points."] },
+      commander: "altair",
     });
     expect(splitRequest(body)).toEqual({
       prompt: JSON.stringify({ score: 1, device: { locale: "de-DE" } }),
@@ -120,6 +128,7 @@ describe("analysis Lambda – Polly narration", () => {
       locale: "de-DE",
       verdict: null,
       hooks: ["New personal best: 900 points."],
+      commander: "altair",
     });
     expect(splitRequest('{"score":1,"verdict":"reprimand"}')).toEqual({
       prompt: '{"score":1,"verdict":"reprimand"}',
@@ -127,8 +136,12 @@ describe("analysis Lambda – Polly narration", () => {
       locale: null,
       verdict: "reprimand",
       hooks: [],
+      commander: "vega",
     });
     expect(splitRequest('{"verdict":"promoted"}').verdict).toBeNull();
+    // Unknown commanders (including inherited property names) fall back to Vega.
+    expect(splitRequest('{"commander":"zorg"}').commander).toBe("vega");
+    expect(splitRequest('{"commander":"constructor"}').commander).toBe("vega");
     expect(splitRequest("not json")).toEqual({
       prompt: "not json",
       voice: null,
@@ -138,8 +151,30 @@ describe("analysis Lambda – Polly narration", () => {
     });
   });
 
+  it("speaks as the requested commander, each with a consistent voice gender", async () => {
+    await post({
+      score: 1,
+      device: { locale: "en-US" },
+      commander: "altair",
+      speech: { voice: "female" },
+    });
+    await post({ score: 1, device: { locale: "en-US" }, speech: { voice: "male" } });
+    const system = (/** @type {number} */ n) => bedrockSend.mock.calls[n][0].params.system[0].text;
+    expect(system(0)).toBe(PERSONAS.altair.system);
+    expect(system(0)).toMatch(/^You are Captain Altair/);
+    expect(system(1)).toBe(PERSONAS.vega.system);
+    expect(system(1)).toBe(SYSTEM_PROMPT);
+    expect(sentPrompt()).not.toContain("altair");
+    expect(pollySend.mock.calls.map((c) => c[0].params.VoiceId)).toEqual(["Matthew", "Ruth"]);
+  });
+
   it("limits the client's story hooks in count and length", () => {
-    expect(storyHooks({ hooks: ["  a  ", 5, "", "b", "c", "d"] })).toEqual(["a", "b", "c"]);
+    expect(storyHooks({ hooks: ["  a  ", 5, "", "b", "c", "d", "e"] })).toEqual([
+      "a",
+      "b",
+      "c",
+      "d",
+    ]);
     expect(storyHooks({ hooks: ["x".repeat(500)] })[0]).toHaveLength(200);
     expect(storyHooks(null)).toEqual([]);
     expect(storyHooks({ hooks: "nope" })).toEqual([]);
@@ -149,6 +184,7 @@ describe("analysis Lambda – Polly narration", () => {
     const { status, analysis } = await post({
       score: 1,
       device: { locale: "en-US" },
+      commander: "altair",
       speech: { voice: "male" },
     });
     expect(status).toBe(200);
@@ -283,6 +319,16 @@ describe("analysis Lambda – prompt", () => {
     );
   });
 
+  it("shapes the headline per commander: Vega clipped, Altair longer with swagger", () => {
+    const vega = buildPrompt("{}", "f", "r", []);
+    expect(vega).toContain(`The headline is ${PERSONAS.vega.headline.shape}:`);
+    expect(vega).toContain(`2. r\n${PERSONAS.vega.headline.style}\n`);
+    const altair = buildPrompt("{}", "f", "r", [], "English", PERSONAS.altair.headline);
+    expect(altair).toContain("The headline is 3 or 4 short, punchy sentences");
+    expect(altair).toContain("\n3-4. Then 1 or 2 sentences of pure swagger");
+    expect(altair).not.toMatch(/%%\w+%%/);
+  });
+
   it("states the verdict's key fact for the headline", () => {
     /** @param {number} survivedSeconds @param {any} [stats] */
     const run = (survivedSeconds, stats = {}) => ({
@@ -339,6 +385,12 @@ describe("analysis Lambda – prompt", () => {
     const long = tidyHeadline(`${"word ".repeat(60)}end.`);
     expect(long.length).toBeLessThanOrEqual(181);
     expect(long.endsWith("word…")).toBe(true);
+    // Captain Altair's headline may run to 4 sentences and 300 characters.
+    const altair = PERSONAS.altair.headline;
+    expect(tidyHeadline("A. B! C. D? E.", altair)).toBe("A. B! C. D?");
+    const longer = tidyHeadline(`${"word ".repeat(80)}end.`, altair);
+    expect(longer.length).toBeGreaterThan(181);
+    expect(longer.length).toBeLessThanOrEqual(301);
   });
 
   it("asks every model for the debrief through a forced tool call with the commander persona", async () => {
@@ -390,6 +442,19 @@ describe("analysis Lambda – prompt", () => {
     bedrockSend.mockResolvedValue({ output: { message: { content: [tool] } } });
     const { analysis } = await post({ score: 1 });
     expect(analysis).toEqual({ feedback: "A. B." });
+  });
+
+  it("asks for a draft, then sends only the proofread headline in the commander's shape", async () => {
+    expect(DEBRIEF_TOOL.toolSpec.inputSchema.json.required).toEqual(["draft", "feedback"]);
+    const input = { draft: "Draft one. Two.", feedback: "A. B. C. D. E." };
+    bedrockSend.mockReset();
+    bedrockSend.mockResolvedValue({
+      output: { message: { content: [{ toolUse: { name: "debrief", input } }] } },
+    });
+    expect((await post({ score: 1, commander: "altair" })).analysis).toEqual({
+      feedback: "A. B. C. D.",
+    });
+    expect((await post({ score: 1 })).analysis).toEqual({ feedback: "A. B." });
   });
 
   it("strips Markdown code fences with or without a json tag", async () => {

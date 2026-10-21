@@ -88,12 +88,22 @@ const TOPICS = {
 };
 
 /**
- * @typedef {{ wellDone: string, nextMission: string, transmission: string, commander: string,
- *   seconds: (done: number, total: number) => string, points: (n: number) => string,
- *   topics: Record<InsightTopic, string> }} DebriefLabels
- *   `transmission` / `commander` label the "incoming transmission" while the debrief loads and
- *   name its sender, Commander Vega (the persona in server/lambda/analysis.js).
+ * @typedef {{ wellDone: string, nextMission: string, transmission: string, vega: string,
+ *   altair: string, seconds: (done: number, total: number) => string,
+ *   points: (n: number) => string, topics: Record<InsightTopic, string> }} DebriefLabels
+ *   `transmission` labels the "incoming transmission" while the debrief loads; `vega` / `altair`
+ *   name its sender, Commander Vega or Captain Altair (the personas in server/lambda/analysis.js).
  */
+
+/**
+ * Request fields for the device's debrief history: the mission number and story hooks as
+ * `history`, and the commander who speaks as `commander`.
+ * @param {{ mission?: number, hooks?: string[], commander?: string }} history
+ * @returns {{ history: { mission?: number, hooks?: string[] }, commander?: string }}
+ */
+function historyFields({ commander, ...rest }) {
+  return { history: rest, ...(commander ? { commander } : {}) };
+}
 
 /**
  * Section headings and topic names per language (the languages with a narrator voice in
@@ -106,7 +116,8 @@ export const DEBRIEF_LABELS = {
     wellDone: "Well done",
     nextMission: "Next mission",
     transmission: "Incoming transmission",
-    commander: "Commander Vega",
+    vega: "Commander Vega",
+    altair: "Captain Altair",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} points`,
     topics: {
@@ -124,7 +135,8 @@ export const DEBRIEF_LABELS = {
     wellDone: "Goed gedaan",
     nextMission: "Volgende missie",
     transmission: "Inkomende transmissie",
-    commander: "Commandant Vega",
+    vega: "Commandant Vega",
+    altair: "Kapitein Altair",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} punten`,
     topics: {
@@ -142,7 +154,8 @@ export const DEBRIEF_LABELS = {
     wellDone: "Bien joué",
     nextMission: "Prochaine mission",
     transmission: "Transmission entrante",
-    commander: "Commandante Vega",
+    vega: "Commandante Vega",
+    altair: "Capitaine Altair",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} points`,
     topics: {
@@ -160,7 +173,8 @@ export const DEBRIEF_LABELS = {
     wellDone: "Gut gemacht",
     nextMission: "Nächste Mission",
     transmission: "Eingehende Übertragung",
-    commander: "Kommandantin Vega",
+    vega: "Kommandantin Vega",
+    altair: "Kapitän Altair",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} Punkte`,
     topics: {
@@ -178,7 +192,8 @@ export const DEBRIEF_LABELS = {
     wellDone: "Ben fatto",
     nextMission: "Prossima missione",
     transmission: "Trasmissione in arrivo",
-    commander: "Comandante Vega",
+    vega: "Comandante Vega",
+    altair: "Capitano Altair",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} punti`,
     topics: {
@@ -196,7 +211,8 @@ export const DEBRIEF_LABELS = {
     wellDone: "잘한 점",
     nextMission: "다음 임무",
     transmission: "교신 수신 중",
-    commander: "베가 사령관",
+    vega: "베가 사령관",
+    altair: "알타이르 대위",
     seconds: (d, t) => `${d} / ${t}초`,
     points: (n) => `${n}점`,
     topics: {
@@ -214,7 +230,8 @@ export const DEBRIEF_LABELS = {
     wellDone: "Dobra robota",
     nextMission: "Następna misja",
     transmission: "Transmisja przychodząca",
-    commander: "Komandor Vega",
+    vega: "Komandor Vega",
+    altair: "Kapitan Altair",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} pkt`,
     topics: {
@@ -232,7 +249,8 @@ export const DEBRIEF_LABELS = {
     wellDone: "Muito bem",
     nextMission: "Próxima missão",
     transmission: "Recebendo transmissão",
-    commander: "Comandante Vega",
+    vega: "Comandante Vega",
+    altair: "Capitão Altair",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} pontos`,
     topics: {
@@ -250,7 +268,8 @@ export const DEBRIEF_LABELS = {
     wellDone: "Bien hecho",
     nextMission: "Próxima misión",
     transmission: "Transmisión entrante",
-    commander: "Comandante Vega",
+    vega: "Comandante Vega",
+    altair: "Capitán Altair",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} puntos`,
     topics: {
@@ -444,7 +463,8 @@ export class AIAnalysisAdapter {
    * Accepts either a plain stats object or a payload { stats, runSummary, speech, history }.
    * The run summary is sent with its {@link missionVerdict} as `verdict`, which sets the tone of
    * the headline, its {@link missionInsights} as `insights`, and the device's `history`
-   * (mission number and story hooks, see managers/RunHistory.js) when given; the model returns the headline
+   * (mission number and story hooks, see managers/RunHistory.js; its commander is sent as
+   * `commander`) when given; the model returns the headline
    * and one technique per weakness, and the sections are built here from the insights' exact
    * facts with {@link debriefLabels} for the player's locale. When `speech: { voice }` is given,
    * it is sent too so the server can return the headline spoken by Amazon Polly. The audio is
@@ -467,7 +487,7 @@ export class AIAnalysisAdapter {
               ...summary,
               ...(verdict ? { verdict } : {}),
               ...(insights ? { insights } : {}),
-              ...(payload.history ? { history: payload.history } : {}),
+              ...(payload.history ? historyFields(payload.history) : {}),
               ...(payload.speech ? { speech: payload.speech } : {}),
             }
           : summary;

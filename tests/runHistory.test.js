@@ -144,6 +144,7 @@ describe("RunHistory", () => {
     expect(history.debrief(e({ score: 100 }))).toEqual({
       mission: 1,
       hooks: ["This is the pilot's first mission."],
+      commander: "vega",
     });
     expect(history.debrief(e({ score: 200 })).hooks[0]).toMatch(/^New personal best: 200/);
     const third = history.debrief(e({ score: 150 }));
@@ -153,12 +154,74 @@ describe("RunHistory", () => {
     expect(stored.runs.map((r) => r.score)).toEqual([200, 150]);
   });
 
+  it("introduces Altair after the first full mission, then the commanders take turns", () => {
+    const history = new RunHistory({
+      storage: new LocalStorageAdapter({ storage: memoryStorage() }),
+    });
+    expect(history.debrief(e({ score: 500 })).commander).toBe("vega");
+    expect(history.debrief(e({ score: 400 })).commander).toBe("vega");
+    const debut = history.debrief(full({ score: 300 }));
+    expect(debut.commander).toBe("altair");
+    expect(debut.hooks[0]).toMatch(/^Captain Altair's first debrief with this pilot/);
+    expect(history.read().cast).toEqual({ last: "altair", altairMet: true });
+    const next = history.debrief(e({ score: 200 }));
+    expect(next.commander).toBe("vega");
+    expect(next.hooks.join(" ")).not.toMatch(/first debrief/);
+    expect(history.debrief(e({ score: 100 })).commander).toBe("altair");
+  });
+
+  it("quotes the last debrief once, and only after it was remembered", () => {
+    const history = new RunHistory({
+      storage: new LocalStorageAdapter({ storage: memoryStorage() }),
+    });
+    history.rememberDebrief("vega", "ignored: nothing recorded yet");
+    expect(history.read().cast).toEqual({});
+    const first = history.debrief(e({ score: 100 }));
+    history.rememberDebrief(first.commander, "  Reprimand, pilot. Survived 40 seconds.  ");
+    const second = history.debrief(e({ score: 50 }));
+    expect(second.hooks[second.hooks.length - 1]).toBe(
+      'Last mission, Commander Vega told the pilot: "Reprimand, pilot. Survived 40 seconds."'
+    );
+    // No debrief arrived for the second mission (offline), so the third quotes nothing.
+    expect(history.debrief(e({ score: 60 })).hooks.join(" ")).not.toMatch(/Last mission/);
+    history.rememberDebrief(/** @type {any} */ ("zorg"), "x");
+    history.rememberDebrief("vega", "   ");
+    expect(history.read().cast.line).toBeUndefined();
+  });
+
+  it("keeps the run hooks to 3 next to the commander hooks, and the quote last", () => {
+    const history = new RunHistory({
+      storage: new LocalStorageAdapter({ storage: memoryStorage() }),
+    });
+    history.debrief(e({ score: 1000 }));
+    history.rememberDebrief("vega", "Line.");
+    const debut = history.debrief(
+      full({ verdict: "commendation", score: 9000, bonus: 7, accuracy: 0.9 })
+    );
+    expect(debut.hooks).toHaveLength(4);
+    expect(debut.hooks[0]).toMatch(/^Captain Altair's first debrief/);
+    expect(debut.hooks[1]).toMatch(/^New personal best/);
+    expect(debut.hooks[3]).toMatch(/^Last mission, Commander Vega/);
+  });
+
+  it("keeps Commander Vega for languages without a male voice", () => {
+    const history = new RunHistory({
+      storage: new LocalStorageAdapter({ storage: memoryStorage() }),
+    });
+    expect(history.debrief(full({}), { locale: "nl-NL" }).commander).toBe("vega");
+    expect(history.debrief(full({}), { locale: "pl-PL" }).commander).toBe("vega");
+    expect(history.debrief(full({}), { locale: "de-DE" }).commander).toBe("altair");
+  });
+
   it("can describe a mission without remembering it (autopilot)", () => {
     const history = new RunHistory({
       storage: new LocalStorageAdapter({ storage: memoryStorage() }),
     });
-    expect(history.debrief(e({}), { record: false }).mission).toBe(1);
-    expect(history.read()).toEqual({ count: 0, runs: [] });
+    expect(history.debrief(full({}), { record: false })).toMatchObject({
+      mission: 1,
+      commander: "altair",
+    });
+    expect(history.read()).toEqual({ count: 0, runs: [], cast: {} });
   });
 
   it("treats missing or corrupt storage as an empty history", () => {
@@ -167,14 +230,20 @@ describe("RunHistory", () => {
     expect(new RunHistory({ storage: new LocalStorageAdapter({ storage }) }).read()).toEqual({
       count: 0,
       runs: [],
+      cast: {},
     });
     storage.setItem(
       "aiHorizonRunHistory",
-      JSON.stringify({ count: 9, runs: [{ score: "x" }, e({})] })
+      JSON.stringify({
+        count: 9,
+        runs: [{ score: "x" }, e({})],
+        cast: { last: "zorg", altairMet: "yes", line: "Hi.", lineBy: "altair" },
+      })
     );
     expect(new RunHistory({ storage: new LocalStorageAdapter({ storage }) }).read()).toEqual({
       count: 9,
       runs: [e({})],
+      cast: { line: "Hi.", lineBy: "altair" },
     });
   });
 });

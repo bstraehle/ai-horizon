@@ -12,13 +12,59 @@ const pollyClient = new PollyClient({
 });
 
 /**
- * System prompt: the recurring debrief character. Kept in code (with {@link PROMPT}) rather than an
+ * System prompts: the two recurring debrief characters ({@link PERSONAS}). Kept in code (with {@link PROMPT}) rather than an
  * environment variable because Lambda caps all environment variables at 4 KB combined.
  */
-export const SYSTEM_PROMPT = `You are Commander Vega (she/her), the veteran squadron commander in AI HORIZON, an arcade space shooter: a pilot has 90 seconds to collect stars and destroy asteroids, and one asteroid collision ends the mission. After every mission you radio the pilot a short debrief.
-You know this pilot. You remember their earlier missions; the game tells you what changed ("story hooks"), and noticing it is what makes your debriefs worth waiting for.
-Personality: a gruff but warm mentor with dry humour. Proud of real progress, impatient with carelessness, never a cheerleader, never cruel.
+const GAME_INTRO =
+  "AI HORIZON is an arcade space shooter: a pilot has 90 seconds to collect stars and destroy asteroids, and one asteroid collision ends the mission. After every mission Commander Vega or Captain Altair radios the pilot a short debrief; they take turns.";
+const SHARED_RULES = `You know this pilot. The game tells you what changed since their earlier missions ("story hooks"), including what was said in the last debrief; noticing it is what makes the debriefs worth waiting for.
 You speak straight to the pilot in short spoken sentences for a text-to-speech voice. Never invent numbers, events, or history: use only the facts you are given.`;
+
+/**
+ * The two debrief commanders (the client picks one per mission and sends `commander`): a system
+ * prompt each, the Polly voice gender that keeps each character's voice consistent, and the
+ * headline's shape and style, so they also sound different on paper: Vega clipped (2 sentences),
+ * Altair longer and brasher (3-4). `headline.sentences` / `headline.chars` are enforced by
+ * {@link tidyHeadline}.
+ * @typedef {{ shape: string, style: string, sentences: number, chars: number }} HeadlineShape
+ * @type {Record<"vega"|"altair", { system: string, voice: "female"|"male", headline: HeadlineShape }>}
+ */
+export const PERSONAS = {
+  vega: {
+    voice: "female",
+    headline: {
+      shape: "exactly 2 sentences, at most 22 words in total",
+      style:
+        "Your voice: clipped, dry and understated, like a veteran on the radio; no exclamation marks, no slang.",
+      sentences: 2,
+      chars: 180,
+    },
+    system: `You are Commander Vega (she/her), the veteran squadron commander. ${GAME_INTRO}
+Captain Altair (he/him) is the squadron's hotshot ace; you respect his flying and roll your eyes at his showing off.
+Personality: a gruff but warm mentor with dry humour who drills survival and discipline. Proud of real progress, impatient with carelessness, never a cheerleader, never cruel.
+${SHARED_RULES}`,
+  },
+  altair: {
+    voice: "male",
+    headline: {
+      shape: "3 or 4 short, punchy sentences, at most 45 words in total",
+      style:
+        '3-4. Then 1 or 2 sentences of pure swagger, like a cocky ace on the radio rather than a coach: a dare with a number to beat, a boast, a bit of pilot slang, or a playful jab at Commander Vega. Leave advice to the techniques. Exclamation marks are fine. The tone, never to be copied: "Vega calls that luck. I call it a warm-up." "8200 to beat. Bring it, hotshot!"',
+      sentences: 4,
+      chars: 300,
+    },
+    system: `You are Captain Altair (he/him), the squadron's hotshot ace. ${GAME_INTRO}
+Commander Vega (she/her) is the squadron's gruff veteran mentor; you respect her and sometimes tease her, but never undermine her.
+Personality: an upbeat, competitive, quick-witted ace who lives for scores, records, bonus asteroids, style and the leaderboard. You hype real achievements and turn setbacks into a challenge; never cruel, never fake.
+${SHARED_RULES}`,
+  },
+};
+
+/** Commander used when the request names none (older clients). */
+const DEFAULT_COMMANDER = "vega";
+
+/** System prompt of the original single commander, kept for compatibility. */
+export const SYSTEM_PROMPT = PERSONAS.vega.system;
 
 /**
  * Bedrock user prompt; `%%fact%%` (see `headlineFact`), `%%reaction%%` and `%%hooks%%` (see
@@ -52,9 +98,10 @@ The mission details include insights computed by the game: up to 3 weaknesses, t
 - asteroids (10 points): Shoot the asteroids in your path.
 <technique rules - end>
 <headline rules - start>
-The game shows a rating ("Commendation, pilot.", "Satisfactory, pilot." or "Reprimand, pilot.", from the verdict in the mission details) in front of your headline, so never write a rating, greeting, or emoji. The headline is exactly 2 sentences, at most 22 words in total:
+The game shows a rating ("Commendation, pilot.", "Satisfactory, pilot." or "Reprimand, pilot.", from the verdict in the mission details) in front of your headline, so never write a rating, greeting, or emoji. The headline is %%shape%%:
 1. State this fact, with its number as digits: %%fact%%.
 2. %%reaction%%
+%%style%%
 Tone by verdict: commendation – genuine pride in what the pilot just did, no advice; satisfactory – credit, then a challenge; reprimand – firm but motivating; no verdict – choose from survivedSeconds.
 Do not call the pilot "pilot" again (the rating already does). No questions, no clichés ("Great job", "Keep it up", "Stay in the fight", "The fleet salutes you").
 <headline rules - end>
@@ -64,7 +111,7 @@ Do not call the pilot "pilot" again (the rating already does). No questions, no 
 <mission details - start>
 %%prompt%%
 <mission details - end>
-Write everything in %%language%% (the facts and hooks above are in English for you to translate), with numbers as digits. Address the pilot consistently, informally where the language has a formal and an informal "you" (tu, du, tú). Call things by their names in the scoring rules, translated (stars, bonus stars, asteroids, hardened asteroids, bonus asteroids), never by colour. Each technique has less than 12 words; give one per weakness and leave out the rest. Answer with the debrief tool.`;
+Write everything in %%language%% (the facts and hooks above are in English for you to translate), as a native speaker would: correct grammatical gender, case and agreement. Every number from the facts and hooks stays in digits, including counts and ordinals (3rd → 3e, 3., 3번째), never spelled out ("Trois", "Fourth"); words such as "first" and "last" are fine. Keep one register throughout; in Korean end every sentence politely (-습니다, -ㅂ니다, -요), never in 반말 (-어, -지, -다, -냐), even when cocky. Address the pilot consistently, informally where the language has a formal and an informal "you" (tu, du, tú). Call things by their names in the scoring rules, fully translated with no English words left (stars, bonus stars, asteroids, hardened asteroids, bonus asteroids), never by colour. Each technique has less than 12 words; give one per weakness and leave out the rest. Answer with the debrief tool.`;
 
 /** @param {number} n */
 const TECHNIQUE_DESCRIPTION = (n) =>
@@ -82,15 +129,20 @@ export const DEBRIEF_TOOL = {
       json: {
         type: "object",
         properties: {
+          draft: {
+            type: "string",
+            description: "A first draft of the headline, following the headline rules.",
+          },
           feedback: {
             type: "string",
-            description: "The headline: 2 sentences, at most 22 words, no rating or emoji.",
+            description:
+              "The final headline: the draft proofread by a native speaker of the pilot's language (grammatical gender, case, agreement, one consistent register) with every number in digits; same length rules, no rating or emoji.",
           },
           "technique-1": { type: "string", description: TECHNIQUE_DESCRIPTION(1) },
           "technique-2": { type: "string", description: TECHNIQUE_DESCRIPTION(2) },
           "technique-3": { type: "string", description: TECHNIQUE_DESCRIPTION(3) },
         },
-        required: ["feedback"],
+        required: ["draft", "feedback"],
       },
     },
   },
@@ -115,7 +167,7 @@ export const HEADLINE_IMAGERY = [
 ];
 
 /** Most story hooks passed to the model, and their longest accepted length (client input). */
-const MAX_HOOKS = 3;
+const MAX_HOOKS = 4;
 const MAX_HOOK_CHARS = 200;
 
 /**
@@ -203,30 +255,40 @@ export function languageName(locale) {
  * @param {string} reaction What the second sentence does (see {@link headlineReaction}).
  * @param {string[]} hooks Story hooks (see {@link storyHooks}).
  * @param {string} [language] See {@link languageName}.
+ * @param {HeadlineShape} [headline] The speaking commander's headline shape (see {@link PERSONAS}).
  * @returns {string}
  */
-export function buildPrompt(summary, fact, reaction, hooks, language = "English") {
+export function buildPrompt(
+  summary,
+  fact,
+  reaction,
+  hooks,
+  language = "English",
+  headline = PERSONAS.vega.headline
+) {
   const hookList = hooks.length ? hooks.map((h) => `- ${h}`).join("\n") : "none";
-  return PROMPT.replace("%%fact%%", () => fact)
+  return PROMPT.replace("%%shape%%", () => headline.shape)
+    .replace("%%fact%%", () => fact)
     .replace("%%reaction%%", () => reaction)
+    .replace("%%style%%", () => headline.style)
     .replace("%%hooks%%", () => hookList)
     .replace("%%prompt%%", () => summary)
     .replace("%%language%%", () => language);
 }
 
-/** Longest headline kept (after {@link tidyHeadline}); the model is asked for at most 22 words. */
-const MAX_HEADLINE_CHARS = 180;
-
-/** Longest headline (after emoji removal) sent to Polly. */
-const MAX_SPEECH_CHARS = 200;
+/** Longest headline (after emoji removal and the rating) sent to Polly. */
+const MAX_SPEECH_CHARS = 340;
 
 /**
- * Enforce the headline's shape when a model overruns it: at most 2 sentences, then at most
- * {@link MAX_HEADLINE_CHARS} (cut at a word boundary with an ellipsis).
+ * Enforce the headline's shape when a model overruns it: at most `sentences` sentences, then at
+ * most `chars` characters (cut at a word boundary with an ellipsis). Defaults to Vega's shape.
  * @param {string} text
+ * @param {{ sentences?: number, chars?: number }} [shape]
  * @returns {string}
  */
-export function tidyHeadline(text) {
+export function tidyHeadline(text, shape = {}) {
+  const { sentences = PERSONAS.vega.headline.sentences, chars = PERSONAS.vega.headline.chars } =
+    shape;
   const clean = String(text ?? "")
     .replace(/\s+/g, " ")
     .trim();
@@ -235,9 +297,9 @@ export function tidyHeadline(text) {
   const ends = [...clean.matchAll(/(?<!\d)[.!?]+["'”’)]*(?=\s|$)|[。！？]+/gu)].map(
     (m) => (m.index ?? 0) + m[0].length
   );
-  let out = ends.length > 2 ? clean.slice(0, ends[1]).trim() : clean;
-  if (out.length > MAX_HEADLINE_CHARS) {
-    const cut = out.slice(0, MAX_HEADLINE_CHARS);
+  let out = ends.length > sentences ? clean.slice(0, ends[sentences - 1]).trim() : clean;
+  if (out.length > chars) {
+    const cut = out.slice(0, chars);
     const space = cut.lastIndexOf(" ");
     out = `${(space > 40 ? cut.slice(0, space) : cut).replace(/[\s,;:–-]+$/u, "")}…`;
   }
@@ -245,16 +307,18 @@ export function tidyHeadline(text) {
 }
 
 /**
- * Tidy the `feedback` headline of an analysis JSON string (see {@link tidyHeadline}); returns the
- * input unchanged when it is not JSON with feedback.
+ * Tidy the `feedback` headline of an analysis JSON string (see {@link tidyHeadline}) and drop the
+ * model's unproofread `draft`; returns the input unchanged when it is not JSON with feedback.
  * @param {string} analysisText
+ * @param {{ sentences?: number, chars?: number }} [shape] The commander's headline shape.
  * @returns {string}
  */
-export function withTidyHeadline(analysisText) {
+export function withTidyHeadline(analysisText, shape) {
   try {
     const parsed = JSON.parse(analysisText);
     if (!parsed || typeof parsed.feedback !== "string") return analysisText;
-    parsed.feedback = tidyHeadline(parsed.feedback);
+    delete parsed.draft;
+    parsed.feedback = tidyHeadline(parsed.feedback, shape);
     return JSON.stringify(parsed);
   } catch {
     return analysisText;
@@ -269,8 +333,8 @@ export function withTidyHeadline(analysisText) {
 export const GENERATIVE_VOICES = {
   "en-US": { female: "Ruth", male: "Matthew" },
   "en-GB": { female: "Amy", male: "Brian" },
-  "en-AU": { female: "Olivia" },
-  "en-IN": { female: "Kajal" },
+  "en-AU": { female: "Olivia", male: "Russell" },
+  "en-IN": { female: "Kajal", male: "Arjun" },
   "en-IE": { female: "Niamh" },
   "en-NZ": { female: "Aria" },
   "en-SG": { female: "Jasmine" },
@@ -284,9 +348,9 @@ export const GENERATIVE_VOICES = {
   "de-DE": { female: "Vicki", male: "Daniel" },
   "de-CH": { female: "Sabrina" },
   "it-IT": { female: "Bianca", male: "Lorenzo" },
-  "ko-KR": { female: "Seoyeon" },
+  "ko-KR": { female: "Seoyeon", male: "Hyunduk" },
   "pl-PL": { female: "Ola" },
-  "pt-BR": { female: "Camila" },
+  "pt-BR": { female: "Camila", male: "Leo" },
   "es-MX": { female: "Mia", male: "Andres" },
   "es-ES": { female: "Lucia", male: "Sergio" },
   "es-US": { female: "Lupe", male: "Pedro" },
@@ -318,13 +382,18 @@ export function selectVoice(locale, preferred) {
   const [lang = "", region = ""] = tag.replace(/_/g, "-").split("-");
   const exact = region ? `${lang.toLowerCase()}-${region.toUpperCase()}` : "";
   const fallback = /** @type {Record<string, string>} */ (LANGUAGE_DEFAULTS)[lang.toLowerCase()];
-  const voices = GENERATIVE_VOICES[exact] || (fallback ? GENERATIVE_VOICES[fallback] : undefined);
-  if (!voices) return null;
+  // The exact locale first, then the language default, for the requested gender before the other
+  // (so a male commander in en-IE speaks with en-US Matthew rather than switching to a woman).
+  const tables = [GENERATIVE_VOICES[exact], fallback ? GENERATIVE_VOICES[fallback] : undefined];
   /** @type {"female"|"male"} */
   const other = preferred === "male" ? "female" : "male";
-  const gender = voices[preferred] ? preferred : voices[other] ? other : null;
-  const voiceId = gender ? voices[gender] : undefined;
-  return gender && voiceId ? { voiceId, gender } : null;
+  for (const gender of [preferred, other]) {
+    for (const voices of tables) {
+      const voiceId = voices && voices[gender];
+      if (voiceId) return { voiceId, gender };
+    }
+  }
+  return null;
 }
 
 /** Verdicts the client may send (see `missionVerdict` in js/adapters/AIAnalysisAdapter.js). */
@@ -474,13 +543,15 @@ export function splitRequest(body) {
   try {
     const parsed = JSON.parse(body);
     if (!parsed || typeof parsed !== "object") return fallback;
-    const { speech, history, ...summary } = parsed;
+    const { speech, history, commander: requested, ...summary } = parsed;
+    const commander = Object.hasOwn(PERSONAS, requested) ? requested : DEFAULT_COMMANDER;
     const voice = speech && typeof speech.voice === "string" ? speech.voice : null;
     const locale =
       summary.device && typeof summary.device.locale === "string" ? summary.device.locale : null;
     const verdict = VERDICTS.includes(summary.verdict) ? summary.verdict : null;
-    const prompt = "speech" in parsed || "history" in parsed ? JSON.stringify(summary) : body;
-    return { prompt, voice, locale, verdict, hooks: storyHooks(history) };
+    const stripped = "speech" in parsed || "history" in parsed || "commander" in parsed;
+    const prompt = stripped ? JSON.stringify(summary) : body;
+    return { prompt, voice, locale, verdict, hooks: storyHooks(history), commander };
   } catch {
     return fallback;
   }
@@ -539,13 +610,19 @@ export const handler = async (event) => {
     switch (httpMethod) {
       case "POST":
         if (body) {
-          const { prompt, voice, locale, verdict, hooks } = splitRequest(body);
+          const { prompt, voice, locale, verdict, hooks, commander } = splitRequest(body);
           console.log("Bedrock request: ", prompt, hooks);
-          response = withTidyHeadline(await analysis(prompt, verdict, hooks));
+          response = withTidyHeadline(
+            await analysis(prompt, verdict, hooks, commander),
+            PERSONAS[commander].headline
+          );
           console.log("Bedrock response: ", response);
           const rating = verdictRating(verdict, locale);
           if (rating) response = withRating(response, rating);
-          if (voice) response = await withSpeech(response, voice, locale, rating);
+          // Each commander keeps one voice gender, whatever the client asked for.
+          if (voice) {
+            response = await withSpeech(response, PERSONAS[commander].voice, locale, rating);
+          }
         } else {
           return { statusCode: 400, body: JSON.stringify({ message: "Missing request body" }) };
         }
@@ -613,8 +690,9 @@ export function debriefFromResponse(response) {
  * @param {string} body - The game summary to analyze
  * @param {string|null} [verdict] The client's verdict (picks the headline fact).
  * @param {string[]} [hooks] Story hooks from the client (see {@link storyHooks}).
+ * @param {"vega"|"altair"} [commander] Which commander's persona speaks (see {@link PERSONAS}).
  */
-async function analysis(body, verdict = null, hooks = []) {
+async function analysis(body, verdict = null, hooks = [], commander = DEFAULT_COMMANDER) {
   let summary = null;
   try {
     summary = JSON.parse(body);
@@ -627,12 +705,13 @@ async function analysis(body, verdict = null, hooks = []) {
     headlineFact(summary, verdict),
     headlineReaction(hooks),
     hooks,
-    languageName(locale)
+    languageName(locale),
+    PERSONAS[commander].headline
   );
   const response = await bedrockClient.send(
     new ConverseCommand({
       modelId: process.env.MODEL_ID,
-      system: [{ text: SYSTEM_PROMPT }],
+      system: [{ text: PERSONAS[commander].system }],
       messages: [{ role: "user", content: [{ text: prompt }] }],
       inferenceConfig: { maxTokens: 600, temperature: 1.0 },
       toolConfig: { tools: [DEBRIEF_TOOL], toolChoice: { tool: { name: "debrief" } } },

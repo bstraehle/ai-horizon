@@ -81,12 +81,35 @@ describe("AIAnalysisManager.render", () => {
     AIAnalysisManager.render(msg, {}, { ...RUN, device: { locale: "de-DE" } }, true);
     expect(msg.querySelector(".transmission-label")?.textContent).toBe("📡 Eingehende Übertragung");
     expect(msg.querySelector(".transmission-from")?.textContent).toBe("Kommandantin Vega");
-    expect(playTransmission).toHaveBeenCalledTimes(1);
+    expect(msg.classList.contains("commander-vega")).toBe(true);
+    expect(playTransmission).toHaveBeenCalledWith("vega");
     expect(msg.querySelector(".transmission")?.getAttribute("role")).toBe("status");
     const okBtn = /** @type {HTMLButtonElement} */ (document.getElementById("okBtn"));
     expect(okBtn.disabled).toBe(true);
     expect(okBtn.hidden).toBe(true);
     expect(/** @type {HTMLElement} */ (document.getElementById("gameOverTitle")).hidden).toBe(true);
+  });
+
+  it("names Captain Altair, in his colour and with his call tone, when he debriefs", async () => {
+    const playTransmission = vi.fn();
+    AIAnalysisManager.audio = /** @type {any} */ ({
+      supported: true,
+      muted: true,
+      playTransmission,
+      playSpeech: vi.fn(),
+    });
+    const msg = /** @type {HTMLElement} */ (document.getElementById("msg"));
+    msg.classList.add("commander-vega");
+    const history = { mission: 4, hooks: [], commander: /** @type {const} */ ("altair") };
+    AIAnalysisManager.render(msg, {}, { ...RUN, device: { locale: "ko-KR" } }, true, null, history);
+    expect(msg.querySelector(".transmission-from")?.textContent).toBe("알타이르 대위");
+    expect(msg.className).toBe("commander-altair");
+    expect(playTransmission).toHaveBeenCalledWith("altair");
+    setReducedMotion(true);
+    await new Promise((resolve) => {
+      AIAnalysisManager.render(msg, {}, RUN, false, resolve, history);
+    });
+    expect(msg.querySelector(".debrief-from")?.textContent).toBe("Captain Altair");
   });
 
   it("shows the title and the Ok button again once the debrief arrives", async () => {

@@ -14,14 +14,28 @@ const TYPE_MIN_MS = 1000;
 const TYPE_MAX_MS = 3500;
 /** Longest wait for the narration clip's timing before typing without it. */
 const SPEECH_TIMING_WAIT_MS = 1500;
+/**
+ * Longest wait for the remote debrief before the offline one: a cold Lambda plus Bedrock and
+ * Polly can pass the default 8 s, and the incoming transmission covers the wait.
+ */
+const ANALYSIS_TIMEOUT_MS = 15000;
+
+/**
+ * The commander who debriefs (see managers/Commanders.js); Commander Vega without history.
+ * @param {{ commander?: string }|null|undefined} history
+ * @returns {"vega"|"altair"}
+ */
+const commanderOf = (history) => (history && history.commander === "altair" ? "altair" : "vega");
 
 /**
  * AIAnalysisManager – static facade to compute and render post-game AI analysis.
  * Mirrors the online/offline gating style of LeaderboardManager.
  *
  * Presentation: while a remote debrief loads, the screen shows an "incoming transmission" from
- * Commander Vega (localized) with a radio crackle; the outcome title and the Ok button are hidden
- * until the debrief arrives (then shown, Ok enabled and focused). The headline then types out in
+ * the mission's commander, Commander Vega or Captain Altair (localized, each with an accent colour
+ * via `commander-<id>` on the container), with their call tone and a radio crackle; the outcome
+ * title and the Ok button are hidden until the debrief arrives (then shown, Ok enabled and
+ * focused). The headline then types out in
  * sync with the spoken clip (or at a reading pace without one, instantly under reduced motion),
  * and the Well done / Next mission sections appear when it is complete. Screen readers get the
  * full headline at once.
@@ -33,8 +47,9 @@ export class AIAnalysisManager {
    * Sound engine used to narrate the Game Over headline (set by the game). Speech is requested
    * from the server – which invokes Amazon Polly – only when this is set, supported, unmuted and
    * remote mode is on.
-   * @type {{ supported: boolean, muted: boolean, playTransmission?: () => void,
-   *   playSpeech: (base64: string) => Promise<{ delay: number, duration: number }|null> }|null}
+   * @type {{ supported: boolean, muted: boolean, playTransmission?: (commander: string) => void,
+   *   playSpeech: (base64: string, commander: string) =>
+   *     Promise<{ delay: number, duration: number }|null> }|null}
    */
   static audio = null;
 
@@ -62,7 +77,10 @@ export class AIAnalysisManager {
     try {
       if (!isTestEnv && AIAnalysisManager.IS_REMOTE) {
         endpoint = getApiEndpoint();
-        remoteAdapter = new RemoteStorageAdapter({ fetchFn: await loadSignedFetch() });
+        remoteAdapter = new RemoteStorageAdapter({
+          fetchFn: await loadSignedFetch(),
+          timeoutMs: ANALYSIS_TIMEOUT_MS,
+        });
       }
     } catch (_) {
       endpoint = "";
@@ -76,14 +94,15 @@ export class AIAnalysisManager {
   }
 
   /**
-   * Speech request for this debrief (Commander Vega's voice), or null when sound is
+   * Speech request for this debrief (the commander's voice), or null when sound is
    * off/unsupported or not remote (so Polly is never invoked).
+   * @param {"vega"|"altair"} commander
    * @returns {{ voice: string }|null}
    */
-  static _speechRequest() {
+  static _speechRequest(commander) {
     const audio = AIAnalysisManager.audio;
     if (!AIAnalysisManager.IS_REMOTE || !audio || !audio.supported || audio.muted) return null;
-    return { voice: CONFIG.AUDIO.NARRATOR_VOICE };
+    return { voice: CONFIG.AUDIO.COMMANDERS[commander].voice };
   }
 
   /**
@@ -100,13 +119,15 @@ export class AIAnalysisManager {
     const p = (async () => {
       try {
         const adapter = await AIAnalysisManager._createAdapter();
-        const speech = AIAnalysisManager._speechRequest();
+        const commander = commanderOf(stats && stats.history);
+        const speech = AIAnalysisManager._speechRequest(commander);
         const { speech: clip, ...result } = await adapter.analyze(
           speech ? { ...stats, speech } : stats
         );
         AIAnalysisManager._cache = result;
         if (clip && AIAnalysisManager.audio) {
-          const speechTiming = Promise.resolve(AIAnalysisManager.audio.playSpeech(clip.audio))
+          const audio = AIAnalysisManager.audio;
+          const speechTiming = Promise.resolve(audio.playSpeech(clip.audio, commander))
             .then((t) => (t && typeof t === "object" ? t : null))
             .catch(() => null);
           return { ...result, speechTiming };
@@ -164,8 +185,8 @@ export class AIAnalysisManager {
    * @param {object|null} runSummary
    * @param {boolean} isRemote Whether remote mode is enabled
    * @param {((result: {title:string,sections:import("../adapters/AIAnalysisAdapter.js").DebriefSection[],isRemote:boolean,rawResponse?:any}) => void)|null} [onComplete] Optional callback when analysis completes
-   * @param {import("./RunHistory.js").DebriefHistory|null} [history] Mission number and story
-   *   hooks sent with the request (see RunHistory)
+   * @param {import("./RunHistory.js").DebriefHistory|null} [history] Mission number, story
+   *   hooks and commander sent with the request (see RunHistory)
    */
   static render(
     container,
@@ -180,6 +201,10 @@ export class AIAnalysisManager {
       (runSummary && runSummary.device && runSummary.device.locale) ||
       (typeof navigator !== "undefined" ? navigator.language : null);
     const labels = debriefLabels(locale);
+    const commander = commanderOf(history);
+    const sender = labels[commander];
+    container.classList.remove("commander-vega", "commander-altair");
+    container.classList.add(`commander-${commander}`);
     if (AIAnalysisManager._reveal) AIAnalysisManager._reveal.cancel();
     AIAnalysisManager._reveal = null;
 
@@ -200,7 +225,7 @@ export class AIAnalysisManager {
       try {
         const from = document.createElement("p");
         from.className = "debrief-from";
-        from.textContent = labels.commander;
+        from.textContent = sender;
         const headline = document.createElement("p");
         headline.className = "debrief-headline";
         const spoken = document.createElement("span");
@@ -316,7 +341,7 @@ export class AIAnalysisManager {
         dots.textContent = "…";
         const from = document.createElement("span");
         from.className = "transmission-from";
-        from.textContent = labels.commander;
+        from.textContent = sender;
         p.append(label, dots, from);
         container.appendChild(p);
         AIAnalysisManager._setHeadlineHidden(true);
@@ -325,7 +350,9 @@ export class AIAnalysisManager {
       }
       try {
         const audio = AIAnalysisManager.audio;
-        if (audio && typeof audio.playTransmission === "function") audio.playTransmission();
+        if (audio && typeof audio.playTransmission === "function") {
+          audio.playTransmission(commander);
+        }
       } catch {
         /* sound optional */
       }
