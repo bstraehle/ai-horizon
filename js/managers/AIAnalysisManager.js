@@ -20,11 +20,11 @@ const SPEECH_TIMING_WAIT_MS = 1500;
  * Mirrors the online/offline gating style of LeaderboardManager.
  *
  * Presentation: while a remote debrief loads, the screen shows an "incoming transmission" from
- * Commander Vega (localized) with a radio crackle, and the Ok button is hidden until the debrief
- * arrives (then shown, enabled and focused); the headline then types out in sync with the
- * spoken clip (or at a reading pace without one, instantly under reduced motion), and the Well
- * done / Next mission sections appear when it is complete. Screen readers get the full headline
- * at once.
+ * Commander Vega (localized) with a radio crackle; the outcome title and the Ok button are hidden
+ * until the debrief arrives (then shown, Ok enabled and focused). The headline then types out in
+ * sync with the spoken clip (or at a reading pace without one, instantly under reduced motion),
+ * and the Well done / Next mission sections appear when it is complete. Screen readers get the
+ * full headline at once.
  */
 export class AIAnalysisManager {
   static IS_REMOTE = true;
@@ -121,6 +121,16 @@ export class AIAnalysisManager {
   }
 
   /**
+   * Hide or show the post-game screen's outcome title (#gameOverTitle, e.g. "Ship Down"), which
+   * stays hidden while the transmission is incoming.
+   * @param {boolean} hidden
+   */
+  static _setHeadlineHidden(hidden) {
+    const el = typeof document !== "undefined" ? document.getElementById("gameOverTitle") : null;
+    if (el) el.hidden = hidden;
+  }
+
+  /**
    * How to type the headline: in sync with the voice when its timing arrives in time, otherwise
    * at a reading pace; instantly under reduced motion.
    * @param {string} title
@@ -183,6 +193,7 @@ export class AIAnalysisManager {
 
     const doRender = (payload) => {
       clear();
+      AIAnalysisManager._setHeadlineHidden(false);
       const title = String(payload?.title ?? "");
       /** @type {HTMLElement|null} */
       let typed = null;
@@ -308,6 +319,7 @@ export class AIAnalysisManager {
         from.textContent = labels.commander;
         p.append(label, dots, from);
         container.appendChild(p);
+        AIAnalysisManager._setHeadlineHidden(true);
       } catch {
         /* non-critical immediate placeholder render */
       }

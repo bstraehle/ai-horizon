@@ -27,7 +27,9 @@ describe("AIAnalysisManager.render", () => {
   const original = { audio: AIAnalysisManager.audio };
 
   beforeEach(() => {
-    const dom = new JSDOM('<!doctype html><div id="msg"></div><button id="okBtn"></button>');
+    const dom = new JSDOM(
+      '<!doctype html><h2 id="gameOverTitle">Ship Down</h2><div id="msg"></div><button id="okBtn"></button>'
+    );
     globalThis.window = /** @type {any} */ (dom.window);
     globalThis.document = dom.window.document;
   });
@@ -84,19 +86,23 @@ describe("AIAnalysisManager.render", () => {
     const okBtn = /** @type {HTMLButtonElement} */ (document.getElementById("okBtn"));
     expect(okBtn.disabled).toBe(true);
     expect(okBtn.hidden).toBe(true);
+    expect(/** @type {HTMLElement} */ (document.getElementById("gameOverTitle")).hidden).toBe(true);
   });
 
-  it("shows the Ok button again once the debrief arrives", async () => {
+  it("shows the title and the Ok button again once the debrief arrives", async () => {
     setReducedMotion(true);
     const okBtn = /** @type {HTMLButtonElement} */ (document.getElementById("okBtn"));
+    const title = /** @type {HTMLElement} */ (document.getElementById("gameOverTitle"));
     okBtn.hidden = true;
     okBtn.disabled = true;
+    title.hidden = true;
     const msg = /** @type {HTMLElement} */ (document.getElementById("msg"));
     await new Promise((resolve) => {
       AIAnalysisManager.render(msg, {}, RUN, false, resolve);
     });
     expect(okBtn.hidden).toBe(false);
     expect(okBtn.disabled).toBe(false);
+    expect(title.hidden).toBe(false);
   });
 
   it("types the headline out and reveals the sections when it is complete", async () => {

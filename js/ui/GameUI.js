@@ -69,8 +69,10 @@ export const GameUI = {
         okBtn.hidden = true;
         okBtn.tabIndex = -1;
       }
+      const title = document.getElementById("gameOverTitle");
+      if (title && AIAnalysisManager.IS_REMOTE) title.hidden = true;
     } catch {
-      /* non-critical pre-hide ok button (shown again with the debrief) */
+      /* non-critical pre-hide of the ok button and title (shown again with the debrief) */
     }
 
     UIManager.showGameOver(
