@@ -18,29 +18,19 @@ export const GameUI = {
     UIManager.hideGameInfo(game.gameInfo || null);
   },
   /**
-   * Show the pause overlay.
-   * @param {AIHorizon} game
-   */
-  showPause(game) {
-    UIManager.showPause(game.pauseScreen || null);
-  },
-  /**
-   * Hide the pause overlay.
-   * @param {AIHorizon} game
-   */
-  hidePause(game) {
-    UIManager.hidePause(game.pauseScreen || null);
-  },
-  /**
    * Present the game over screen and populate score elements; the headline reflects the run's
-   * outcome (see `gameOverHeadline`).
+   * outcome in the player's language (see `gameOverHeadline`).
    * @param {AIHorizon} game
    * @param {boolean} submittedScore Whether a leaderboard submission just occurred.
    */
   showGameOver(game, submittedScore) {
     try {
       const title = document.getElementById("gameOverTitle");
-      if (title) title.textContent = gameOverHeadline(game._lastRunSummary);
+      if (title) {
+        const { text, lang } = gameOverHeadline(game._lastRunSummary);
+        title.textContent = text;
+        title.lang = lang;
+      }
     } catch {
       /* headline optional */
     }
