@@ -375,7 +375,7 @@ body {
   align-items: baseline;
   display: flex;
   flex-wrap: wrap;
-  gap: 0 var(--space-2);
+  gap: var(--space-3) var(--space-2);
   justify-content: center;
 }
 .post-game-message .transmission-label {
@@ -395,6 +395,21 @@ body {
 }
 .post-game-message .transmission-from {
   flex-basis: 100%;
+}
+/* While the transmission is incoming it is the panel's only content, so the space above
+   "Incoming transmission" equals the space below "Commander Vega": equal panel padding, no trailing
+   margins, and both lines trimmed to cap height / baseline so the visible gaps match too. */
+#gameOverScreen .game-over-content:has(.transmission) {
+  padding-bottom: var(--space-6);
+}
+.post-game-message:has(> .transmission),
+.post-game-message .transmission {
+  margin-bottom: 0;
+}
+.post-game-message .transmission-label,
+.post-game-message .transmission-dots,
+.post-game-message .transmission-from {
+  text-box: trim-both cap alphabetic;
 }
 .post-game-message .debrief-from {
   margin-bottom: var(--space-2);
