@@ -28,16 +28,17 @@ const STAR_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
  *    screech, huge sub drop, long rumble and debris. Bypasses the voice cap so it always plays.
  *
  * Narration (Game Over headline spoken by Amazon Polly, synthesized server-side)
- *  - takeNarratorVoice(): alternates "female" / "male" (persisted) for each spoken debrief.
+ *  - playTransmission(): a radio channel opening (squelch and crackle) while the debrief loads.
  *  - playSpeech(base64Mp3): decodes and plays the clip through the master bus (so mute applies)
  *    as a radio transmission (Quindar tones, squelch, band-limited voice, hiss), starting after
- *    the loud part of a fatal crash; stopSpeech() cancels it (new run).
+ *    the loud part of a fatal crash, and reports when the voice starts and how long it lasts
+ *    (the headline types along with it); stopSpeech() cancels it (new run).
  *
  * Lifecycle & policy
  *  - The AudioContext is created lazily by `unlock()`, which callers invoke from a user gesture
  *    (Launch Mission / sound toggle) to satisfy browser autoplay rules. Until then every play
  *    call is a silent no-op, as it is when muted, suspended, or Web Audio is unsupported.
- *  - `suspend()` / `resume()` follow pause and tab visibility.
+ *  - `suspend()` / `resume()` follow tab visibility.
  *  - Mute state persists in localStorage (`CONFIG.AUDIO.STORAGE_KEY`); listeners registered via
  *    `onMuteChange` are notified so every toggle control stays in sync.
  *  - Per-sound minimum intervals and a voice cap keep rapid fire from clipping or piling up; a
@@ -137,7 +138,7 @@ export class AudioManager {
     this.resume();
   }
 
-  /** Pause audio processing (game paused / tab hidden). */
+  /** Pause audio processing (tab hidden). */
   suspend() {
     if (this._ctx && this._ctx.state === "running") this._settle(() => this._ctx?.suspend());
   }
@@ -344,18 +345,22 @@ export class AudioManager {
   }
 
   /**
-   * Next narrator gender for a spoken debrief; alternates female → male → female (persisted).
-   * Call only when speech will actually be requested.
-   * @returns {"female"|"male"}
+   * A radio channel opening while the debrief is on its way: squelch, then a few crackles of
+   * static. Starts after the loud part of a fatal crash, like the narration.
    */
-  takeNarratorVoice() {
-    const key = CONFIG.AUDIO.NARRATOR_STORAGE_KEY;
-    const next =
-      this._storage.getJSON(key, /** @type {string|null} */ (null)) === "female"
-        ? "male"
-        : "female";
-    this._storage.setJSON(key, next);
-    return next;
+  playTransmission() {
+    const now = this._begin("transmission", CONFIG.AUDIO.MIN_INTERVAL_MS.TRANSMISSION, true);
+    if (now === null) return;
+    const t = Math.max(now, this._fatalEndsAt);
+    const bus = this._bus(0, 0.05);
+    this._squelch(t, bus);
+    const crackles = 5 + Math.floor(this._random() * 4);
+    for (let i = 0; i < crackles; i++) {
+      const at = t + CONFIG.AUDIO.RADIO.SQUELCH_S + this._random() * 0.6;
+      const f = 1800 + this._random() * 3500;
+      const decay = 0.015 + this._random() * 0.03;
+      this._noiseBurst(at, decay, "bandpass", f, f, 1.5, this._env(at, 0.12, 0.001, decay, bus));
+    }
   }
 
   /**
@@ -364,11 +369,12 @@ export class AudioManager {
    * the voice band-limited and lightly saturated over a faint hiss, then outro tone and squelch.
    * Skipped when muted, locked, suspended, or superseded by stopSpeech() while decoding.
    * @param {string} base64
-   * @returns {Promise<boolean>} Whether playback was scheduled.
+   * @returns {Promise<{ delay: number, duration: number }|null>} When playback is scheduled:
+   *   seconds from now until the voice starts, and the voice's length; otherwise null.
    */
   async playSpeech(base64) {
     const ctx = this._ctx;
-    if (this._muted || !ctx || typeof base64 !== "string" || !base64) return false;
+    if (this._muted || !ctx || typeof base64 !== "string" || !base64) return null;
     this.stopSpeech();
     const token = this._speechToken;
     try {
@@ -376,7 +382,7 @@ export class AudioManager {
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       const buffer = await ctx.decodeAudioData(bytes.buffer);
-      if (token !== this._speechToken || this._muted || ctx.state !== "running") return false;
+      if (token !== this._speechToken || this._muted || ctx.state !== "running") return null;
       const R = CONFIG.AUDIO.RADIO;
       const at = Math.max(ctx.currentTime + 0.05, this._fatalEndsAt);
       const voiceAt = at + R.TONE_S + R.SQUELCH_S;
@@ -399,9 +405,9 @@ export class AudioManager {
       src.connect(this._radioBand(gain));
       src.start(voiceAt);
       this._speech = { src, out };
-      return true;
+      return { delay: Math.max(0, voiceAt - ctx.currentTime), duration: voiceEnd - voiceAt };
     } catch {
-      return false;
+      return null;
     }
   }
 

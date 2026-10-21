@@ -88,8 +88,11 @@ const TOPICS = {
 };
 
 /**
- * @typedef {{ wellDone: string, nextMission: string, seconds: (done: number, total: number) => string,
- *   points: (n: number) => string, topics: Record<InsightTopic, string> }} DebriefLabels
+ * @typedef {{ wellDone: string, nextMission: string, transmission: string, commander: string,
+ *   seconds: (done: number, total: number) => string, points: (n: number) => string,
+ *   topics: Record<InsightTopic, string> }} DebriefLabels
+ *   `transmission` / `commander` label the "incoming transmission" while the debrief loads and
+ *   name its sender, Commander Vega (the persona in server/lambda/analysis.js).
  */
 
 /**
@@ -102,6 +105,8 @@ export const DEBRIEF_LABELS = {
   en: {
     wellDone: "Well done",
     nextMission: "Next mission",
+    transmission: "Incoming transmission",
+    commander: "Commander Vega",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} points`,
     topics: {
@@ -118,6 +123,8 @@ export const DEBRIEF_LABELS = {
   nl: {
     wellDone: "Goed gedaan",
     nextMission: "Volgende missie",
+    transmission: "Inkomende transmissie",
+    commander: "Commandant Vega",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} punten`,
     topics: {
@@ -134,6 +141,8 @@ export const DEBRIEF_LABELS = {
   fr: {
     wellDone: "Bien joué",
     nextMission: "Prochaine mission",
+    transmission: "Transmission entrante",
+    commander: "Commandante Vega",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} points`,
     topics: {
@@ -150,6 +159,8 @@ export const DEBRIEF_LABELS = {
   de: {
     wellDone: "Gut gemacht",
     nextMission: "Nächste Mission",
+    transmission: "Eingehende Übertragung",
+    commander: "Kommandantin Vega",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} Punkte`,
     topics: {
@@ -166,6 +177,8 @@ export const DEBRIEF_LABELS = {
   it: {
     wellDone: "Ben fatto",
     nextMission: "Prossima missione",
+    transmission: "Trasmissione in arrivo",
+    commander: "Comandante Vega",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} punti`,
     topics: {
@@ -182,6 +195,8 @@ export const DEBRIEF_LABELS = {
   ko: {
     wellDone: "잘한 점",
     nextMission: "다음 임무",
+    transmission: "교신 수신 중",
+    commander: "베가 사령관",
     seconds: (d, t) => `${d} / ${t}초`,
     points: (n) => `${n}점`,
     topics: {
@@ -198,6 +213,8 @@ export const DEBRIEF_LABELS = {
   pl: {
     wellDone: "Dobra robota",
     nextMission: "Następna misja",
+    transmission: "Transmisja przychodząca",
+    commander: "Komandor Vega",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} pkt`,
     topics: {
@@ -214,6 +231,8 @@ export const DEBRIEF_LABELS = {
   pt: {
     wellDone: "Muito bem",
     nextMission: "Próxima missão",
+    transmission: "Recebendo transmissão",
+    commander: "Comandante Vega",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} pontos`,
     topics: {
@@ -230,6 +249,8 @@ export const DEBRIEF_LABELS = {
   es: {
     wellDone: "Bien hecho",
     nextMission: "Próxima misión",
+    transmission: "Transmisión entrante",
+    commander: "Comandante Vega",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} puntos`,
     topics: {
@@ -420,9 +441,10 @@ export class AIAnalysisAdapter {
 
   /**
    * Analyze a run and return the debrief: a headline plus Well done / Next mission sections.
-   * Accepts either a plain stats object or a payload { stats, runSummary, speech }.
+   * Accepts either a plain stats object or a payload { stats, runSummary, speech, history }.
    * The run summary is sent with its {@link missionVerdict} as `verdict`, which sets the tone of
-   * the headline, and its {@link missionInsights} as `insights`; the model returns the headline
+   * the headline, its {@link missionInsights} as `insights`, and the device's `history`
+   * (mission number and story hooks, see managers/RunHistory.js) when given; the model returns the headline
    * and one technique per weakness, and the sections are built here from the insights' exact
    * facts with {@link debriefLabels} for the player's locale. When `speech: { voice }` is given,
    * it is sent too so the server can return the headline spoken by Amazon Polly. The audio is
@@ -445,6 +467,7 @@ export class AIAnalysisAdapter {
               ...summary,
               ...(verdict ? { verdict } : {}),
               ...(insights ? { insights } : {}),
+              ...(payload.history ? { history: payload.history } : {}),
               ...(payload.speech ? { speech: payload.speech } : {}),
             }
           : summary;

@@ -66,8 +66,7 @@ describe("AIAnalysisManager narration", () => {
     const audio = {
       supported: opts.supported !== false,
       muted: !!opts.muted,
-      takeNarratorVoice: vi.fn(() => "male"),
-      playSpeech: vi.fn(async () => true),
+      playSpeech: vi.fn(async () => ({ delay: 0.4, duration: 2.5 })),
     };
     const adapter = {
       analyze: vi.fn(async (/** @type {any} */ input) => ({
@@ -84,30 +83,38 @@ describe("AIAnalysisManager narration", () => {
     return { audio, adapter };
   }
 
-  it("requests speech when sound is on, plays the clip, and keeps it out of the result", async () => {
+  it("requests Commander Vega's voice when sound is on, plays the clip, and reports its timing", async () => {
     const { audio, adapter } = setup();
-    const result = await AIAnalysisManager.analyze({ runSummary: { score: 1 } });
+    const result = /** @type {any} */ (
+      await AIAnalysisManager.analyze({
+        runSummary: { score: 1 },
+        history: { mission: 2, hooks: [] },
+      })
+    );
     expect(adapter.analyze).toHaveBeenCalledWith({
       runSummary: { score: 1 },
-      speech: { voice: "male" },
+      history: { mission: 2, hooks: [] },
+      speech: { voice: "female" },
     });
     expect(audio.playSpeech).toHaveBeenCalledWith("AQID");
-    expect(/** @type {any} */ (result).speech).toBeUndefined();
+    expect(result.speech).toBeUndefined();
+    await expect(result.speechTiming).resolves.toEqual({ delay: 0.4, duration: 2.5 });
   });
 
   it("never requests speech (no Polly call) when sound is off, unsupported, or offline", async () => {
     for (const opts of [{ muted: true }, { supported: false }]) {
       const { audio, adapter } = setup(opts);
-      await AIAnalysisManager.analyze({ runSummary: { score: 1 } });
+      const result = /** @type {any} */ (
+        await AIAnalysisManager.analyze({ runSummary: { score: 1 } })
+      );
       expect(adapter.analyze).toHaveBeenCalledWith({ runSummary: { score: 1 } });
-      expect(audio.takeNarratorVoice).not.toHaveBeenCalled();
       expect(audio.playSpeech).not.toHaveBeenCalled();
+      expect(result.speechTiming).toBeUndefined();
       vi.restoreAllMocks();
     }
-    const { audio, adapter } = setup();
+    const { adapter } = setup();
     AIAnalysisManager.IS_REMOTE = false;
     await AIAnalysisManager.analyze({ runSummary: { score: 1 } });
     expect(adapter.analyze).toHaveBeenCalledWith({ runSummary: { score: 1 } });
-    expect(audio.takeNarratorVoice).not.toHaveBeenCalled();
   });
 });

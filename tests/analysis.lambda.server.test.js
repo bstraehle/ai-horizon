@@ -9,7 +9,7 @@ vi.mock("@aws-sdk/client-bedrock-runtime", () => ({
       return bedrockSend(cmd);
     }
   },
-  InvokeModelCommand: class {
+  ConverseCommand: class {
     constructor(/** @type {any} */ params) {
       this.params = params;
     }
@@ -32,18 +32,23 @@ vi.mock("@aws-sdk/client-polly", () => ({
 process.env.MODEL_ID = "test-model";
 
 const {
+  DEBRIEF_TOOL,
   HEADLINE_IMAGERY,
-  HEADLINE_OPENINGS,
   PROMPT,
+  SYSTEM_PROMPT,
   VERDICT_RATINGS,
   buildPrompt,
+  debriefFromResponse,
   handler,
   headlineFact,
-  headlineStyle,
+  headlineReaction,
+  languageName,
   selectVoice,
   speakableText,
   speechInput,
   splitRequest,
+  storyHooks,
+  tidyHeadline,
   verdictRating,
   withRating,
 } = await import("../server/lambda/analysis.js");
@@ -53,14 +58,13 @@ const ANALYSIS = {
   "improvement-tip-1": "🚀 Dodge earlier",
 };
 
-/** Bedrock InvokeModel response carrying `text`. @param {string} text */
+/** Bedrock Converse response answering in text. @param {string} text */
 function bedrockReply(text) {
-  return {
-    body: new TextEncoder().encode(
-      JSON.stringify({ output: { message: { content: [{ text }] } } })
-    ),
-  };
+  return { output: { message: { role: "assistant", content: [{ text }] } } };
 }
+
+/** The user prompt of the n-th Converse call. @param {number} [n] */
+const sentPrompt = (n = 0) => bedrockSend.mock.calls[n][0].params.messages[0].content[0].text;
 
 /** @param {any} summary */
 async function post(summary) {
@@ -99,27 +103,30 @@ describe("analysis Lambda – Polly narration", () => {
 
   it("strips emoji and caps the spoken text", () => {
     expect(speakableText("👨‍🚀 Survive  90s 🔥")).toBe("Survive 90s");
-    expect(speakableText("x".repeat(500))).toHaveLength(160);
+    expect(speakableText("x".repeat(500))).toHaveLength(200);
     expect(speakableText(undefined)).toBe("");
   });
 
-  it("keeps the speech request out of the Bedrock prompt", () => {
+  it("keeps the speech and history requests out of the mission details", () => {
     const body = JSON.stringify({
       score: 1,
       device: { locale: "de-DE" },
       speech: { voice: "male" },
+      history: { mission: 4, hooks: ["New personal best: 900 points."] },
     });
     expect(splitRequest(body)).toEqual({
       prompt: JSON.stringify({ score: 1, device: { locale: "de-DE" } }),
       voice: "male",
       locale: "de-DE",
       verdict: null,
+      hooks: ["New personal best: 900 points."],
     });
     expect(splitRequest('{"score":1,"verdict":"reprimand"}')).toEqual({
       prompt: '{"score":1,"verdict":"reprimand"}',
       voice: null,
       locale: null,
       verdict: "reprimand",
+      hooks: [],
     });
     expect(splitRequest('{"verdict":"promoted"}').verdict).toBeNull();
     expect(splitRequest("not json")).toEqual({
@@ -127,7 +134,15 @@ describe("analysis Lambda – Polly narration", () => {
       voice: null,
       locale: null,
       verdict: null,
+      hooks: [],
     });
+  });
+
+  it("limits the client's story hooks in count and length", () => {
+    expect(storyHooks({ hooks: ["  a  ", 5, "", "b", "c", "d"] })).toEqual(["a", "b", "c"]);
+    expect(storyHooks({ hooks: ["x".repeat(500)] })[0]).toHaveLength(200);
+    expect(storyHooks(null)).toEqual([]);
+    expect(storyHooks({ hooks: "nope" })).toEqual([]);
   });
 
   it("returns the headline as generative Polly audio when speech is requested", async () => {
@@ -137,8 +152,7 @@ describe("analysis Lambda – Polly narration", () => {
       speech: { voice: "male" },
     });
     expect(status).toBe(200);
-    const prompt = JSON.parse(bedrockSend.mock.calls[0][0].params.body).messages[0].content[0].text;
-    expect(prompt).not.toContain('"speech"');
+    expect(sentPrompt()).not.toContain('"speech"');
     expect(pollySend).toHaveBeenCalledTimes(1);
     expect(pollySend.mock.calls[0][0].params).toEqual({
       Engine: "generative",
@@ -249,17 +263,24 @@ describe("analysis Lambda – verdict rating", () => {
 });
 
 describe("analysis Lambda – prompt", () => {
-  const STYLE = { opening: "Open it with the number.", imagery: "the asteroid belt" };
-
-  it("embeds the run summary, fact and style verbatim, including `$` sequences", () => {
+  it("embeds the run summary, fact, reaction and hooks verbatim, including `$` sequences", () => {
     const summary = JSON.stringify({ verdict: "reprimand", note: "$& $1 $'" });
-    const prompt = buildPrompt(summary, "the pilot survived $1 seconds", STYLE);
+    const prompt = buildPrompt(summary, "the pilot survived $1 seconds", "React $&.", [
+      "New personal best: $1 points.",
+      "3rd full mission in a row.",
+    ]);
     expect(prompt).toContain(`<mission details - start>\n${summary}\n<mission details - end>`);
     expect(prompt).toContain(
-      "this fact of the mission, with its number as digits: the pilot survived $1 seconds. Open it with the number."
+      "1. State this fact, with its number as digits: the pilot survived $1 seconds."
     );
-    expect(prompt).toContain("built on this imagery: the asteroid belt.");
+    expect(prompt).toContain("2. React $&.");
+    expect(prompt).toContain(
+      "<story hooks - start>\n- New personal best: $1 points.\n- 3rd full mission in a row.\n<story hooks - end>"
+    );
     expect(prompt).not.toMatch(/%%\w+%%/);
+    expect(buildPrompt("{}", "f", "r", [])).toContain(
+      "<story hooks - start>\nnone\n<story hooks - end>"
+    );
   });
 
   it("states the verdict's key fact for the headline", () => {
@@ -285,32 +306,90 @@ describe("analysis Lambda – prompt", () => {
     expect(headlineFact(null, null)).toBe("the most important number in the mission details");
   });
 
-  it("picks the headline style from its lists", () => {
-    expect(headlineStyle(() => 0)).toEqual({
-      opening: HEADLINE_OPENINGS[0],
-      imagery: HEADLINE_IMAGERY[0],
-    });
-    expect(headlineStyle(() => 0.999)).toEqual({
-      opening: HEADLINE_OPENINGS.at(-1),
-      imagery: HEADLINE_IMAGERY.at(-1),
-    });
+  it("reacts to the first story hook, or to random imagery without hooks", () => {
+    expect(headlineReaction(["New personal best: 900 points.", "2nd full mission."])).toMatch(
+      /^React to this, .*: New personal best: 900 points\.$/
+    );
+    expect(headlineReaction([], () => 0)).toContain(`imagery: ${HEADLINE_IMAGERY[0]}.`);
+    expect(headlineReaction([], () => 0.999)).toContain(`imagery: ${HEADLINE_IMAGERY.at(-1)}.`);
   });
 
-  it("sends the filled prompt to Bedrock", async () => {
+  it("names the player's language for the prompt", () => {
+    expect(languageName("de-DE")).toBe("German (Germany)");
+    expect(languageName("pt_BR")).toBe("Brazilian Portuguese");
+    expect(languageName("ko")).toBe("Korean");
+    expect(languageName(null)).toBe("English");
+    expect(languageName("not a tag!")).toBe("English");
+    expect(buildPrompt("{}", "f", "r", [], "French (France)")).toContain(
+      "Write everything in French (France) (the facts"
+    );
+  });
+
+  it("keeps the headline to 2 sentences and a readable length", () => {
+    expect(tidyHeadline("One.  Two!   Three? Four.")).toBe("One. Two!");
+    expect(tidyHeadline("Only one sentence without a stop")).toBe(
+      "Only one sentence without a stop"
+    );
+    expect(tidyHeadline("90 Sekunden. Stark!")).toBe("90 Sekunden. Stark!");
+    // A German ordinal ("4.") is not a sentence end.
+    expect(tidyHeadline("9 Sekunden überlebt. Der 4. Absturz in Folge.")).toBe(
+      "9 Sekunden überlebt. Der 4. Absturz in Folge."
+    );
+    expect(tidyHeadline("하나。둘。셋。")).toBe("하나。둘。");
+    const long = tidyHeadline(`${"word ".repeat(60)}end.`);
+    expect(long.length).toBeLessThanOrEqual(181);
+    expect(long.endsWith("word…")).toBe(true);
+  });
+
+  it("asks every model for the debrief through a forced tool call with the commander persona", async () => {
     bedrockSend.mockReset();
     bedrockSend.mockResolvedValue(bedrockReply(JSON.stringify(ANALYSIS)));
     const random = vi.spyOn(Math, "random").mockReturnValue(0);
     const summary = { timer: { totalSeconds: 90, survivedSeconds: 30 }, verdict: "reprimand" };
+    await post({ ...summary, history: { mission: 7, hooks: ["4th early crash in a row."] } });
     await post(summary);
     random.mockRestore();
-    const sent = JSON.parse(bedrockSend.mock.calls[0][0].params.body).messages[0].content[0].text;
-    expect(sent).toBe(
-      buildPrompt(JSON.stringify(summary), "the pilot survived 30 seconds", {
-        opening: HEADLINE_OPENINGS[0],
-        imagery: HEADLINE_IMAGERY[0],
-      })
+    const params = bedrockSend.mock.calls[0][0].params;
+    expect(params.modelId).toBe("test-model");
+    expect(params.system).toEqual([{ text: SYSTEM_PROMPT }]);
+    expect(params.toolConfig).toEqual({
+      tools: [DEBRIEF_TOOL],
+      toolChoice: { tool: { name: "debrief" } },
+    });
+    const hooks = ["4th early crash in a row."];
+    expect(sentPrompt(0)).toBe(
+      buildPrompt(
+        JSON.stringify(summary),
+        "the pilot survived 30 seconds",
+        headlineReaction(hooks),
+        hooks
+      )
     );
-    expect(PROMPT).toContain("<verdict rules - start>");
+    expect(sentPrompt(1)).toBe(
+      buildPrompt(
+        JSON.stringify(summary),
+        "the pilot survived 30 seconds",
+        headlineReaction([], () => 0),
+        []
+      )
+    );
+    expect(PROMPT).toContain("<headline rules - start>");
+  });
+
+  it("reads the tool call, or JSON inside a text answer, and tidies the headline", async () => {
+    const tool = { toolUse: { toolUseId: "t1", name: "debrief", input: { feedback: "A. B. C." } } };
+    expect(debriefFromResponse({ output: { message: { content: [tool] } } })).toBe(
+      JSON.stringify({ feedback: "A. B. C." })
+    );
+    expect(
+      debriefFromResponse(bedrockReply(`Here you go:\n\`\`\`json\n{"feedback":"x"}\n\`\`\`\nDone.`))
+    ).toBe('{"feedback":"x"}');
+    expect(debriefFromResponse(null)).toBe("");
+
+    bedrockSend.mockReset();
+    bedrockSend.mockResolvedValue({ output: { message: { content: [tool] } } });
+    const { analysis } = await post({ score: 1 });
+    expect(analysis).toEqual({ feedback: "A. B." });
   });
 
   it("strips Markdown code fences with or without a json tag", async () => {

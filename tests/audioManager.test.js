@@ -318,14 +318,19 @@ describe("AudioManager", () => {
     expect(created(ctx, () => audio.playFatal()).osc).toBe(0);
   });
 
-  it("alternates the narrator voice, starting female, and persists it", () => {
-    const { audio, storage } = setup();
-    expect([
-      audio.takeNarratorVoice(),
-      audio.takeNarratorVoice(),
-      audio.takeNarratorVoice(),
-    ]).toEqual(["female", "male", "female"]);
-    expect(storage.data[CONFIG.AUDIO.NARRATOR_STORAGE_KEY]).toBe("female");
+  it("opens the radio channel after the crash's loud part, once per throttle window", () => {
+    const { audio, ctx } = unlocked();
+    ctx.currentTime = 10;
+    audio.playFatal();
+    const first = created(ctx, () => audio.playTransmission());
+    expect(first.src).toBeGreaterThan(1);
+    const starts = ctx.sources
+      .slice(-first.src)
+      .map((/** @type {any} */ s) => s.start.mock.calls[0][0]);
+    expect(Math.min(...starts)).toBeCloseTo(10 + CONFIG.AUDIO.SPEECH_AFTER_FATAL_S);
+    expect(created(ctx, () => audio.playTransmission()).src).toBe(0);
+    const muted = unlocked({ muted: true });
+    expect(created(muted.ctx, () => muted.audio.playTransmission()).src).toBe(0);
   });
 
   it("plays narration as a radio transmission after the crash's loud part", async () => {
@@ -334,9 +339,11 @@ describe("AudioManager", () => {
     audio.playFatal();
     const before = ctx.oscillators.length;
     const clip = Buffer.from([7, 8, 9]).toString("base64");
-    await expect(audio.playSpeech(clip)).resolves.toBe(true);
     const R = CONFIG.AUDIO.RADIO;
     const fatalEnd = 10 + CONFIG.AUDIO.SPEECH_AFTER_FATAL_S;
+    const timing = /** @type {any} */ (await audio.playSpeech(clip));
+    expect(timing.delay).toBeCloseTo(fatalEnd + R.TONE_S + R.SQUELCH_S - 10);
+    expect(timing.duration).toBeGreaterThanOrEqual(0);
     const voice = ctx.sources.find((/** @type {any} */ s) => s.buffer && s.buffer.decodedFrom);
     expect(voice.buffer.decodedFrom).toEqual(new Uint8Array([7, 8, 9]));
     expect(voice.start.mock.calls[0][0]).toBeCloseTo(fatalEnd + R.TONE_S + R.SQUELCH_S);
@@ -351,17 +358,17 @@ describe("AudioManager", () => {
   it("skips narration when muted, locked, or invalid, and stopSpeech cancels it", async () => {
     const clip = Buffer.from([1]).toString("base64");
     const locked = setup();
-    await expect(locked.audio.playSpeech(clip)).resolves.toBe(false);
+    await expect(locked.audio.playSpeech(clip)).resolves.toBeNull();
 
     const muted = unlocked({ muted: true });
-    await expect(muted.audio.playSpeech(clip)).resolves.toBe(false);
+    await expect(muted.audio.playSpeech(clip)).resolves.toBeNull();
     expect(muted.ctx.decodeAudioData).not.toHaveBeenCalled();
 
     const { audio, ctx } = unlocked();
-    await expect(audio.playSpeech("")).resolves.toBe(false);
+    await expect(audio.playSpeech("")).resolves.toBeNull();
     const pending = audio.playSpeech(clip);
     audio.stopSpeech();
-    await expect(pending).resolves.toBe(false);
+    await expect(pending).resolves.toBeNull();
 
     const gainsBefore = ctx.gains.length;
     await audio.playSpeech(clip);

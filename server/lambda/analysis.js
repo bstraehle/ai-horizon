@@ -1,4 +1,4 @@
-import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
+import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 import { PollyClient, SynthesizeSpeechCommand } from "@aws-sdk/client-polly";
 
 const bedrockClient = new BedrockRuntimeClient({
@@ -12,15 +12,23 @@ const pollyClient = new PollyClient({
 });
 
 /**
- * Bedrock prompt; `%%fact%%`, `%%opening%%` and `%%imagery%%` shape the headline (see
- * `headlineFact` / `headlineStyle`) and `%%prompt%%` is the run summary JSON, including the client's
- * `verdict` and `insights` (see `missionVerdict` / `missionInsights` in
- * js/adapters/AIAnalysisAdapter.js). The client shows each weakness as its exact fact followed by
- * the model's `technique-N`; its offline debrief uses the same techniques in English.
- * Kept in code rather than an environment variable because Lambda caps all environment variables
- * at 4 KB combined.
+ * System prompt: the recurring debrief character. Kept in code (with {@link PROMPT}) rather than an
+ * environment variable because Lambda caps all environment variables at 4 KB combined.
  */
-export const PROMPT = `You are a space force debrief officer for AI HORIZON, an arcade-style space shooter, in which a player has 90 seconds to collect stars and destroy asteroids without having to eject due to an imminent asteroid collision. Based on the provided scoring rules, technique rules, verdict rules, and mission details, provide your analysis to help the pilot improve. Respond in the provided answer format.
+export const SYSTEM_PROMPT = `You are Commander Vega (she/her), the veteran squadron commander in AI HORIZON, an arcade space shooter: a pilot has 90 seconds to collect stars and destroy asteroids, and one asteroid collision ends the mission. After every mission you radio the pilot a short debrief.
+You know this pilot. You remember their earlier missions; the game tells you what changed ("story hooks"), and noticing it is what makes your debriefs worth waiting for.
+Personality: a gruff but warm mentor with dry humour. Proud of real progress, impatient with carelessness, never a cheerleader, never cruel.
+You speak straight to the pilot in short spoken sentences for a text-to-speech voice. Never invent numbers, events, or history: use only the facts you are given.`;
+
+/**
+ * Bedrock user prompt; `%%fact%%` (see `headlineFact`), `%%reaction%%` and `%%hooks%%` (see
+ * `headlineReaction` / the client's story hooks) shape the headline and `%%prompt%%` is the run
+ * summary JSON, including the client's `verdict` and `insights` (see `missionVerdict` /
+ * `missionInsights` in js/adapters/AIAnalysisAdapter.js). The client shows each weakness as its
+ * exact fact followed by the model's `technique-N`; its offline debrief uses the same techniques
+ * in English. The answer comes back through the {@link DEBRIEF_TOOL} call.
+ */
+export const PROMPT = `Write the debrief for the mission below.
 <scoring rules - start>
 - Stars: +25
 - Bonus stars: +50
@@ -43,43 +51,54 @@ The mission details include insights computed by the game: up to 3 weaknesses, t
 - stars (25 points): Grab stars on the way between attacks.
 - asteroids (10 points): Shoot the asteroids in your path.
 <technique rules - end>
-<verdict rules - start>
-The mission details include a verdict decided by the game. The game puts the rating (e.g. "Commendation, pilot.") in front of the feedback headline, so do not write a rating yourself. The headline is read aloud by a text-to-speech voice, so write it for listening, as a charismatic squadron commander with a vivid, energetic voice: 2 short sentences.
-Sentence 1 states exactly this fact of the mission, with its number as digits: %%fact%%. %%opening%%
-Sentence 2 is a memorable remark in the verdict's tone, built on this imagery: %%imagery%%. Use strong verbs; never mock the pilot; no questions, sarcasm, or generic praise.
-- commendation: proud, rousing praise for what the pilot just did; no orders, advice, or "next time";
-- satisfactory: credit, then a challenge for the next mission;
-- reprimand: firm but motivating, sending the pilot back out;
-- no verdict: choose the tone from survivedSeconds.
-<verdict rules - end>
+<headline rules - start>
+The game shows a rating ("Commendation, pilot.", "Satisfactory, pilot." or "Reprimand, pilot.", from the verdict in the mission details) in front of your headline, so never write a rating, greeting, or emoji. The headline is exactly 2 sentences, at most 22 words in total:
+1. State this fact, with its number as digits: %%fact%%.
+2. %%reaction%%
+Tone by verdict: commendation – genuine pride in what the pilot just did, no advice; satisfactory – credit, then a challenge; reprimand – firm but motivating; no verdict – choose from survivedSeconds.
+Do not call the pilot "pilot" again (the rating already does). No questions, no clichés ("Great job", "Keep it up", "Stay in the fight", "The fleet salutes you").
+<headline rules - end>
+<story hooks - start>
+%%hooks%%
+<story hooks - end>
 <mission details - start>
 %%prompt%%
 <mission details - end>
-<answer format - start>
-Write in the language of device.locale, with numbers as digits. Call things by their names in the scoring rules (stars, bonus stars, asteroids, hardened asteroids, bonus asteroids), never by colour. The headline has less than 16 words, each technique less than 12 words. Include one technique per weakness and leave out the rest.
-{
-"feedback": "👨‍🚀 <headline without the rating, see verdict rules>",
-"technique-1": "<technique for weakness 1, see technique rules>",
-"technique-2": "<technique for weakness 2>",
-"technique-3": "<technique for weakness 3>"
-}
-<answer format - end>
-Your answer:`;
+Write everything in %%language%% (the facts and hooks above are in English for you to translate), with numbers as digits. Address the pilot consistently, informally where the language has a formal and an informal "you" (tu, du, tú). Call things by their names in the scoring rules, translated (stars, bonus stars, asteroids, hardened asteroids, bonus asteroids), never by colour. Each technique has less than 12 words; give one per weakness and leave out the rest. Answer with the debrief tool.`;
+
+/** @param {number} n */
+const TECHNIQUE_DESCRIPTION = (n) =>
+  `Technique for weakness ${n}: one short order in your own words, under 12 words, one sentence, no semicolons.`;
 
 /**
- * How the headline's first sentence opens; one is picked at random per debrief (with
- * {@link HEADLINE_IMAGERY}) because the model otherwise words the same fact the same way.
+ * Tool the model must call (Converse `toolChoice`), so every model returns the debrief as
+ * structured input instead of prose around JSON.
  */
-export const HEADLINE_OPENINGS = [
-  "Open it with the number.",
-  "Open it with a vivid verb.",
-  "Open it with a two- or three-word exclamation in the verdict's tone, then the fact.",
-  "Phrase it as a radio call from the control tower.",
-];
+export const DEBRIEF_TOOL = {
+  toolSpec: {
+    name: "debrief",
+    description: "Send the mission debrief to the pilot.",
+    inputSchema: {
+      json: {
+        type: "object",
+        properties: {
+          feedback: {
+            type: "string",
+            description: "The headline: 2 sentences, at most 22 words, no rating or emoji.",
+          },
+          "technique-1": { type: "string", description: TECHNIQUE_DESCRIPTION(1) },
+          "technique-2": { type: "string", description: TECHNIQUE_DESCRIPTION(2) },
+          "technique-3": { type: "string", description: TECHNIQUE_DESCRIPTION(3) },
+        },
+        required: ["feedback"],
+      },
+    },
+  },
+};
 
 /**
- * Imagery themes for the headline's closing remark; one is picked at random per debrief so
- * repeat runs with the same verdict don't read alike (the model tends to reuse one phrasing).
+ * Imagery for the headline's second sentence when there is no story hook; one is picked at random
+ * per debrief so repeat runs with the same verdict don't read alike.
  */
 export const HEADLINE_IMAGERY = [
   "engines and thrusters",
@@ -95,16 +114,39 @@ export const HEADLINE_IMAGERY = [
   "the squadron's history books",
 ];
 
+/** Most story hooks passed to the model, and their longest accepted length (client input). */
+const MAX_HOOKS = 3;
+const MAX_HOOK_CHARS = 200;
+
 /**
- * Random headline style: an opening from {@link HEADLINE_OPENINGS} and imagery from
- * {@link HEADLINE_IMAGERY}.
- * @param {() => number} [random] Source of [0, 1) numbers (injectable for tests).
- * @returns {{ opening: string, imagery: string }}
+ * Story hooks from the request (the client's comparisons with the pilot's earlier missions,
+ * most interesting first), limited in count and length since they come from the client.
+ * @param {unknown} history The request's `history` (`{ mission?: number, hooks?: string[] }`).
+ * @returns {string[]}
  */
-export function headlineStyle(random = Math.random) {
-  /** @param {string[]} list */
-  const pick = (list) => list[Math.floor(random() * list.length)];
-  return { opening: pick(HEADLINE_OPENINGS), imagery: pick(HEADLINE_IMAGERY) };
+export function storyHooks(history) {
+  const hooks = history && typeof history === "object" ? /** @type {any} */ (history).hooks : null;
+  if (!Array.isArray(hooks)) return [];
+  return hooks
+    .filter((h) => typeof h === "string" && h.trim())
+    .slice(0, MAX_HOOKS)
+    .map((h) => h.trim().slice(0, MAX_HOOK_CHARS));
+}
+
+/**
+ * What the headline's second sentence does: react to the first (most interesting) story hook,
+ * quoted in the instruction because models otherwise pick a lesser one from the list, or,
+ * without hooks, make a remark built on random imagery.
+ * @param {string[]} hooks
+ * @param {() => number} [random] Source of [0, 1) numbers (injectable for tests).
+ * @returns {string}
+ */
+export function headlineReaction(hooks, random = Math.random) {
+  if (hooks.length) {
+    return `React to this, as someone who remembers this pilot's earlier missions, including its number when it has one: ${hooks[0]}`;
+  }
+  const imagery = HEADLINE_IMAGERY[Math.floor(random() * HEADLINE_IMAGERY.length)];
+  return `Make one vivid, specific remark about this mission, built on this imagery: ${imagery}.`;
 }
 
 /** Bonus asteroids that make a commendation about them (mirrors the client's VERDICT_BONUS_ASTEROIDS). */
@@ -140,22 +182,84 @@ export function headlineFact(summary, verdict) {
 }
 
 /**
- * Fill {@link PROMPT} with the run summary, the headline fact and style. Replacer functions
- * keep `$` sequences literal.
- * @param {string} summary Run summary JSON (without the `speech` request).
- * @param {string} fact Fact the headline opens with (see {@link headlineFact}).
- * @param {{ opening: string, imagery: string }} style See {@link headlineStyle}.
+ * The player's language spelled out for the prompt (e.g. "German (Germany)"); models follow a
+ * named language more reliably than a locale code buried in the JSON.
+ * @param {string|null|undefined} locale BCP 47 tag; missing → English.
  * @returns {string}
  */
-export function buildPrompt(summary, fact, { opening, imagery }) {
-  return PROMPT.replace("%%fact%%", () => fact)
-    .replace("%%opening%%", () => opening)
-    .replace("%%imagery%%", () => imagery)
-    .replace("%%prompt%%", () => summary);
+export function languageName(locale) {
+  const tag = typeof locale === "string" && locale.trim() ? locale.trim().replace(/_/g, "-") : "en";
+  try {
+    return new Intl.DisplayNames(["en"], { type: "language" }).of(tag) || "English";
+  } catch {
+    return "English";
+  }
 }
 
-/** Longest headline (after emoji removal) sent to Polly; Bedrock is asked for < 16 words. */
-const MAX_SPEECH_CHARS = 160;
+/**
+ * Fill {@link PROMPT}. Replacer functions keep `$` sequences literal.
+ * @param {string} summary Run summary JSON (without the `speech` / `history` requests).
+ * @param {string} fact Fact the headline opens with (see {@link headlineFact}).
+ * @param {string} reaction What the second sentence does (see {@link headlineReaction}).
+ * @param {string[]} hooks Story hooks (see {@link storyHooks}).
+ * @param {string} [language] See {@link languageName}.
+ * @returns {string}
+ */
+export function buildPrompt(summary, fact, reaction, hooks, language = "English") {
+  const hookList = hooks.length ? hooks.map((h) => `- ${h}`).join("\n") : "none";
+  return PROMPT.replace("%%fact%%", () => fact)
+    .replace("%%reaction%%", () => reaction)
+    .replace("%%hooks%%", () => hookList)
+    .replace("%%prompt%%", () => summary)
+    .replace("%%language%%", () => language);
+}
+
+/** Longest headline kept (after {@link tidyHeadline}); the model is asked for at most 22 words. */
+const MAX_HEADLINE_CHARS = 180;
+
+/** Longest headline (after emoji removal) sent to Polly. */
+const MAX_SPEECH_CHARS = 200;
+
+/**
+ * Enforce the headline's shape when a model overruns it: at most 2 sentences, then at most
+ * {@link MAX_HEADLINE_CHARS} (cut at a word boundary with an ellipsis).
+ * @param {string} text
+ * @returns {string}
+ */
+export function tidyHeadline(text) {
+  const clean = String(text ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  // Sentence ends: . ! ? before a space or the end (not right after a digit, so ordinals such as
+  // German "4." stay inside their sentence), or CJK full-width stops.
+  const ends = [...clean.matchAll(/(?<!\d)[.!?]+["'”’)]*(?=\s|$)|[。！？]+/gu)].map(
+    (m) => (m.index ?? 0) + m[0].length
+  );
+  let out = ends.length > 2 ? clean.slice(0, ends[1]).trim() : clean;
+  if (out.length > MAX_HEADLINE_CHARS) {
+    const cut = out.slice(0, MAX_HEADLINE_CHARS);
+    const space = cut.lastIndexOf(" ");
+    out = `${(space > 40 ? cut.slice(0, space) : cut).replace(/[\s,;:–-]+$/u, "")}…`;
+  }
+  return out;
+}
+
+/**
+ * Tidy the `feedback` headline of an analysis JSON string (see {@link tidyHeadline}); returns the
+ * input unchanged when it is not JSON with feedback.
+ * @param {string} analysisText
+ * @returns {string}
+ */
+export function withTidyHeadline(analysisText) {
+  try {
+    const parsed = JSON.parse(analysisText);
+    if (!parsed || typeof parsed.feedback !== "string") return analysisText;
+    parsed.feedback = tidyHeadline(parsed.feedback);
+    return JSON.stringify(parsed);
+  } catch {
+    return analysisText;
+  }
+}
 
 /**
  * Amazon Polly generative voices (all available in us-west-2), one per gender where Polly offers
@@ -358,27 +462,27 @@ export function speakableText(text) {
 }
 
 /**
- * Separate the optional `speech` request from the run summary so it never reaches the prompt,
- * and read the player's locale and the client's `verdict` (which stays in the prompt).
- * @param {string} body Raw POST body (JSON run summary, optionally with `verdict` and
- *   `speech: { voice }`).
- * @returns {{ prompt: string, voice: string|null, locale: string|null, verdict: string|null }}
+ * Separate the optional `speech` and `history` requests from the run summary so they never
+ * reach the mission details, and read the player's locale, the client's `verdict` (which stays
+ * in the prompt) and the story hooks (see {@link storyHooks}).
+ * @param {string} body Raw POST body (JSON run summary, optionally with `verdict`,
+ *   `speech: { voice }` and `history: { mission, hooks }`).
+ * @returns {{ prompt: string, voice: string|null, locale: string|null, verdict: string|null, hooks: string[] }}
  */
 export function splitRequest(body) {
+  const fallback = { prompt: body, voice: null, locale: null, verdict: null, hooks: [] };
   try {
     const parsed = JSON.parse(body);
-    if (!parsed || typeof parsed !== "object") {
-      return { prompt: body, voice: null, locale: null, verdict: null };
-    }
-    const { speech, ...summary } = parsed;
+    if (!parsed || typeof parsed !== "object") return fallback;
+    const { speech, history, ...summary } = parsed;
     const voice = speech && typeof speech.voice === "string" ? speech.voice : null;
     const locale =
       summary.device && typeof summary.device.locale === "string" ? summary.device.locale : null;
     const verdict = VERDICTS.includes(summary.verdict) ? summary.verdict : null;
-    const prompt = "speech" in parsed ? JSON.stringify(summary) : body;
-    return { prompt, voice, locale, verdict };
+    const prompt = "speech" in parsed || "history" in parsed ? JSON.stringify(summary) : body;
+    return { prompt, voice, locale, verdict, hooks: storyHooks(history) };
   } catch {
-    return { prompt: body, voice: null, locale: null, verdict: null };
+    return fallback;
   }
 }
 
@@ -435,9 +539,9 @@ export const handler = async (event) => {
     switch (httpMethod) {
       case "POST":
         if (body) {
-          const { prompt, voice, locale, verdict } = splitRequest(body);
-          console.log("Bedrock request: ", prompt);
-          response = await analysis(prompt, verdict);
+          const { prompt, voice, locale, verdict, hooks } = splitRequest(body);
+          console.log("Bedrock request: ", prompt, hooks);
+          response = withTidyHeadline(await analysis(prompt, verdict, hooks));
           console.log("Bedrock response: ", response);
           const rating = verdictRating(verdict, locale);
           if (rating) response = withRating(response, rating);
@@ -484,52 +588,55 @@ export const handler = async (event) => {
 };
 
 /**
- * Analyze a game summary using Bedrock and return a structured response.
- * @param {string} body - The game summary / prompt to analyze
- * @param {string|null} [verdict] The client's verdict (picks the headline fact).
+ * The debrief JSON string from a Converse response: the forced {@link DEBRIEF_TOOL} call's input,
+ * or, if a model answered in text anyway, the outermost `{…}` of that text (code fences and any
+ * prose around it dropped).
+ * @param {any} response Converse response.
+ * @returns {string}
  */
-async function analysis(body, verdict = null) {
+export function debriefFromResponse(response) {
+  const content = (response && response.output && response.output.message?.content) || [];
+  const call = content.find((/** @type {any} */ c) => c && c.toolUse && c.toolUse.input);
+  if (call) return JSON.stringify(call.toolUse.input);
+  const text = content
+    .map((/** @type {any} */ c) => (c && typeof c.text === "string" ? c.text : ""))
+    .join("")
+    .trim();
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  return start >= 0 && end > start ? text.slice(start, end + 1) : text;
+}
+
+/**
+ * Analyze a game summary with the Bedrock Converse API (model-agnostic: `MODEL_ID` can be any
+ * Converse model that supports tool use) and return the debrief JSON string.
+ * @param {string} body - The game summary to analyze
+ * @param {string|null} [verdict] The client's verdict (picks the headline fact).
+ * @param {string[]} [hooks] Story hooks from the client (see {@link storyHooks}).
+ */
+async function analysis(body, verdict = null, hooks = []) {
   let summary = null;
   try {
     summary = JSON.parse(body);
   } catch {
     /* not JSON: the fact falls back to a generic description */
   }
-  const prompt = buildPrompt(body, headlineFact(summary, verdict), headlineStyle());
-
-  const requestBody = {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            text: prompt,
-          },
-        ],
-      },
-    ],
-    inferenceConfig: {
-      maxTokens: 1000,
-      temperature: 1.0,
-    },
-  };
-
-  const command = new InvokeModelCommand({
-    modelId: process.env.MODEL_ID,
-    contentType: "application/json",
-    accept: "application/json",
-    body: JSON.stringify(requestBody),
-  });
-
-  const response = await bedrockClient.send(command);
-  const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-
-  let responseText = responseBody.output.message.content[0].text;
-
-  responseText = responseText
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/```\s*$/, "");
-
-  return responseText;
+  const locale = summary && summary.device ? summary.device.locale : null;
+  const prompt = buildPrompt(
+    body,
+    headlineFact(summary, verdict),
+    headlineReaction(hooks),
+    hooks,
+    languageName(locale)
+  );
+  const response = await bedrockClient.send(
+    new ConverseCommand({
+      modelId: process.env.MODEL_ID,
+      system: [{ text: SYSTEM_PROMPT }],
+      messages: [{ role: "user", content: [{ text: prompt }] }],
+      inferenceConfig: { maxTokens: 600, temperature: 1.0 },
+      toolConfig: { tools: [DEBRIEF_TOOL], toolChoice: { tool: { name: "debrief" } } },
+    })
+  );
+  return debriefFromResponse(response);
 }

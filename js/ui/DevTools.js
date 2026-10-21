@@ -96,6 +96,7 @@ export const SOUND_LOG_METHODS = [
   "playUpgrade",
   "playStarCollect",
   "playFatal",
+  "playTransmission",
 ];
 
 /**

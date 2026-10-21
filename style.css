@@ -366,6 +366,66 @@ body {
 .post-game-message p {
   margin-bottom: var(--space-4);
 }
+/* Debrief arrival: "incoming transmission" while it loads, then the sender and typed headline. */
+.post-game-message .transmission {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  justify-content: center;
+}
+.post-game-message .transmission-label {
+  animation: transmission-pulse 1.2s ease-in-out infinite;
+}
+.post-game-message .transmission-dots {
+  animation: transmission-pulse 0.6s steps(2, jump-none) infinite;
+  margin-left: calc(-1 * var(--space-2));
+}
+.post-game-message .transmission-from,
+.post-game-message .debrief-from {
+  color: var(--color-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.post-game-message .transmission-from {
+  flex-basis: 100%;
+}
+.post-game-message .debrief-from {
+  margin-bottom: var(--space-2);
+}
+/* The untyped rest and the pending sections keep their space, so the panel has its final size
+   while the headline types; the sections then fade in. */
+.post-game-message .debrief {
+  transition: opacity 0.4s ease-out;
+}
+.post-game-message .debrief.pending {
+  opacity: 0;
+  visibility: hidden;
+}
+.post-game-message .debrief-typed-rest {
+  visibility: hidden;
+}
+.post-game-message .debrief-typed-shown {
+  position: relative;
+}
+.post-game-message .debrief-typed.typing .debrief-typed-shown::after {
+  animation: transmission-pulse 0.8s steps(2, jump-none) infinite;
+  content: "▍";
+  content: "▍" / "";
+  left: 100%;
+  position: absolute;
+}
+@keyframes transmission-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
 #gameOverScreen .game-over-content {
   max-width: 40rem;
 }

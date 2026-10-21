@@ -6,10 +6,13 @@
  *  - Owns primary entity collections (asteroids, bullets, particles, stars, explosions)
  *  - Orchestrates fixed-step updates & rendering through `GameLoop`
  *  - Seeds & exposes deterministic RNG (query param: `?seed=VALUE`)
- *  - Handles lifecycle: start, pause/resume, game over, full & soft resets
+ *  - Handles lifecycle: start, game over, full & soft resets (no pause: Esc only releases the
+ *    captured mouse)
  *  - Wires cross-cutting event handlers (see `systems/EventHandlers.js`)
  *  - Owns synthesized sound effects (`managers/AudioManager.js`), unlocked on launch and
- *    suspended while paused or hidden; mute via the Sound toggles or the M key
+ *    suspended while the tab is hidden; mute via the Sound toggles or the M key
+ *  - Remembers recent missions on this device (`managers/RunHistory.js`) for the debrief's
+ *    story hooks
  *
  * Design highlights:
  *  - Object pools pre-warmed to avoid first-interaction jank
@@ -46,6 +49,7 @@ import { AIAnalysisManager } from "./managers/AIAnalysisManager.js";
 import { ViewManager } from "./managers/ViewManager.js";
 import { ScoringManager } from "./managers/ScoringManager.js";
 import { AudioManager } from "./managers/AudioManager.js";
+import { RunHistory, runEntry } from "./managers/RunHistory.js";
 
 import { ObjectPool } from "./utils/ObjectPool.js";
 import { RateLimiter } from "./utils/RateLimiter.js";
@@ -163,6 +167,10 @@ class AIHorizon {
     this.input = new InputState();
     /** Touch gestures (drag to steer, second finger / tap to fire) feeding `input`. */
     this.touch = new TouchControls(() => this.input);
+    /** Recent missions on this device, for the debrief commander's story hooks. */
+    this.runHistory = new RunHistory();
+    /** @type {import('./managers/RunHistory.js').DebriefHistory|null} */
+    this._lastHistory = null;
     /** Pointer Lock for desktop mouse steering (captured on a mouse click during a run). */
     this.mouseCapture = new MouseCapture(this.canvas, (locked) =>
       this.handleMouseCaptureChange(locked)
@@ -1122,6 +1130,16 @@ class AIHorizon {
       this._lastRunSummary = this._logRunSummary(accuracySummary, oldHighScore);
     } catch (_e) {
       this._lastRunSummary = null;
+    }
+    // Story hooks for the debrief commander, compared with earlier missions on this device;
+    // autopilot runs (recordings, profiling) are not remembered.
+    try {
+      const entry = runEntry(this._lastRunSummary);
+      this._lastHistory = entry
+        ? this.runHistory.debrief(entry, { record: !(this.devTools && this.devTools.autopilot) })
+        : null;
+    } catch (_e) {
+      this._lastHistory = null;
     }
     handleGameOver(this);
     if (this.loop) {

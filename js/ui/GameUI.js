@@ -88,9 +88,10 @@ export const GameUI = {
         /** @type {HTMLElement|null} */ (document.getElementById("gameOverScreen"));
       const msg = /** @type {HTMLElement|null} */ (document.getElementById("postGameMessage"));
       const visible = !!(postGame && !postGame.classList.contains("hidden"));
-      if (visible && msg) {
+      /** @param {HTMLElement} container */
+      const renderDebrief = (container) =>
         AIAnalysisManager.render(
-          msg,
+          container,
           {
             score: game.score || 0,
             accuracy: game.accuracy || 0,
@@ -118,44 +119,17 @@ export const GameUI = {
             } else {
               game._lastAIAnalysis = "";
             }
-          }
+          },
+          game._lastHistory || null
         );
+      if (visible && msg) {
+        renderDebrief(msg);
       } else if (postGame && msg) {
         const obs = new MutationObserver(() => {
           try {
             const nowVisible = !postGame.classList.contains("hidden");
             if (nowVisible) {
-              AIAnalysisManager.render(
-                msg,
-                {
-                  score: game.score || 0,
-                  accuracy: game.accuracy || 0,
-                  shotsFired: game.shotsFired || 0,
-                  regularAsteroidsKilled: game.regularAsteroidsKilled || 0,
-                  hardenedAsteroidsKilled: game.hardenedAsteroidsKilled || 0,
-                  bonusAsteroidsKilled: game.bonusAsteroidsKilled || 0,
-                  regularStarsCollected: game.regularStarsCollected || 0,
-                  bonusStarsCollected: game.bonusStarsCollected || 0,
-                  timerSeconds: game.timerSeconds || 60,
-                  timerRemaining: game.timerRemaining || 0,
-                },
-                game._lastRunSummary || null,
-                AIAnalysisManager.IS_REMOTE,
-                (result) => {
-                  if (result.isRemote && result.rawResponse) {
-                    try {
-                      game._lastAIAnalysis =
-                        typeof result.rawResponse === "string"
-                          ? JSON.parse(result.rawResponse)
-                          : result.rawResponse;
-                    } catch {
-                      game._lastAIAnalysis = result.rawResponse;
-                    }
-                  } else {
-                    game._lastAIAnalysis = "";
-                  }
-                }
-              );
+              renderDebrief(msg);
               try {
                 obs.disconnect();
               } catch {

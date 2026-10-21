@@ -22,9 +22,14 @@
    The leaderboard Lambda mirrors scoring constants (`RULES`) and the initials blocklist; when
    changing `CONFIG.GAME` scoring/spawn values, update `RULES` and redeploy the Lambda (tests fail
    until they match). Alerts go to SNS topic `ai-horizon-alerts` via env var `ALERT_TOPIC_ARN`.
-   The analysis Lambda's Bedrock prompt is the `PROMPT` constant in `server/lambda/analysis.js`
-   (not an env var: Lambda caps all env vars at 4 KB), so prompt changes need a code redeploy. Its
-   only env var is `MODEL_ID`.
+   The analysis Lambda's Bedrock prompts are the `SYSTEM_PROMPT` / `PROMPT` constants in
+   `server/lambda/analysis.js` (not env vars: Lambda caps all env vars at 4 KB), so prompt changes
+   need a code redeploy. Its only env var is `MODEL_ID`: it calls the Converse API with a forced
+   tool call, so any Converse model with tool use works (`us.anthropic.claude-haiku-4-5-20251001-v1:0`).
+   The function role's inline policy must allow `bedrock:InvokeModel` on that model in every region
+   its cross-region profile routes to. To try prompt changes before deploying, run the exported
+   prompt helpers against `aws bedrock-runtime converse` (Windows CLI: pass `file://` JSON with
+   non-ASCII escaped and set `PYTHONUTF8=1`).
 
 ## Store video (16:9, with game sound)
 

@@ -424,9 +424,11 @@ export const CONFIG = deepFreeze({
       STAR: 30,
       BONUS_STAR: 60,
       FATAL: 1000,
+      TRANSMISSION: 1000,
     },
     STAR_STREAK_WINDOW_MS: 700,
-    NARRATOR_STORAGE_KEY: "aiHorizonNarrator",
+    /** Polly voice gender for Commander Vega, the debrief persona (one consistent voice). */
+    NARRATOR_VOICE: "female",
     SPEECH_GAIN: 1.6,
     SPEECH_AFTER_FATAL_S: 1.4,
     /** Narration as a comms transmission: band-limited voice framed by Quindar tones + squelch. */
@@ -444,6 +446,11 @@ export const CONFIG = deepFreeze({
     },
     REVERB_SECONDS: 2,
     MAX_PAN: 0.7,
+  },
+  /** Recent missions remembered on this device for the debrief's story hooks (RunHistory). */
+  HISTORY: {
+    STORAGE_KEY: "aiHorizonRunHistory",
+    MAX_RUNS: 20,
   },
   SHARE: {
     URL: "https://www.agentmode.dev/",
