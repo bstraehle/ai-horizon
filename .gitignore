@@ -9,5 +9,5 @@
 store-video/_raw-*.mp4
 store-video/_sfx-*
 # Over GitHub's 100 MB limit; published on YouTube instead.
-store-video/ai-horizon-3840x2160.*
+store-video/ai-horizon-3840x2160.mp4
 store-video/.polly-cache/

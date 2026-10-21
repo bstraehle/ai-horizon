@@ -5,10 +5,10 @@ Usage:
       [--out store-video/ai-horizon-1024x500.mp4] [--size 1024x500] [--crf 14]
 
 The raw video comes from `npm run record -- --width=1024 --height=500 --scale=2 --seed=39996 ...`
-(supersampled 2x). The 16:9 build uses the same script on a 960x540 @2x recording:
-`npm run record -- --width=960 --height=540 --scale=2 --seed=2024 --out=store-video/_raw-1920x1080.mp4`
-then `python store-video/narrate.py --raw store-video/_raw-1920x1080.mp4 --size 1920x1080
---out store-video/ai-horizon-1920x1080.mp4` (seed 2024 completes the full 90s at that aspect; 39996
+(supersampled 2x). The 16:9 build uses the same script on a 960x540 @4x recording:
+`npm run record -- --width=960 --height=540 --scale=4 --seed=2024 --out=store-video/_raw-3840x2160.mp4`
+then `python store-video/narrate.py --raw store-video/_raw-3840x2160.mp4 --size 3840x2160
+--out store-video/ai-horizon-3840x2160.mp4` (seed 2024 completes the full 90s at that aspect; 39996
 dies after 15s). Each narration cue has a target start time `at` (seconds of video) and a voice;
 cues never overlap: a cue starts at max(at, previous cue end + gap). The last frame is held until
 the final cue has finished plus `tail` seconds. Speech is synthesised with the Polly neural engine
@@ -17,9 +17,9 @@ as 24 kHz MP3 (cached in store-video/.polly-cache/), mixed onto a 48 kHz track a
 matching .srt is written next to the MP4. Conventions follow the svg-to-mp4 agent skill: female host
 for the intro/outro, male narrator for the gameplay, us-east-1 fallback when the engine is unavailable.
 
-Game sound (optional): record with `--sfx=store-video/_sfx-1920x1080.json`, render it with
-`node --experimental-websocket scripts/render-sfx.cjs --events=store-video/_sfx-1920x1080.json`,
-then pass `--sfx store-video/_sfx-1920x1080.wav`. The effects are set `--sfx-lu` (default 10) LU
+Game sound (optional): record with `--sfx=store-video/_sfx-3840x2160.json`, render it with
+`node --experimental-websocket scripts/render-sfx.cjs --events=store-video/_sfx-3840x2160.json`,
+then pass `--sfx store-video/_sfx-3840x2160.wav`. The effects are set `--sfx-lu` (default 10) LU
 below the measured loudness of the voice-over cues and ducked further by a sidechain compressor
 keyed on the narration, so the voice stays clear (>= ~10 dB over the game) while the game is
 audible between and under the cues.

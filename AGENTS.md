@@ -36,33 +36,37 @@
    prompt helpers against `aws bedrock-runtime converse` (Windows CLI: pass `file://` JSON with
    non-ASCII escaped and set `PYTHONUTF8=1`).
 
-## Store video (16:9, with game sound)
+## Store video (16:9 4K, with game sound)
 
-With `npm run serve` running:
+Only the 4K cut is kept (no 1080p version). With `npm run serve` running:
 
-1. `node --experimental-websocket scripts/record-autoplay.cjs --width=960 --height=540 --scale=2 --seed=2024 --out=store-video/_raw-1920x1080.mp4 --sfx=store-video/_sfx-1920x1080.json`
-   (about 20-25 min; frame-stepped, so audio is captured as a sound-event log, not recorded). The
-   post-run screens are real time and call the production analysis Lambda (a real AI debrief,
-   never an initials submission); the debrief is captured once its headline has typed out.
-2. `node --experimental-websocket scripts/render-sfx.cjs --events=store-video/_sfx-1920x1080.json`
-3. `python store-video/narrate.py --raw store-video/_raw-1920x1080.mp4 --size 1920x1080 --out store-video/ai-horizon-1920x1080.mp4 --sfx store-video/_sfx-1920x1080.wav`
+1. `node --experimental-websocket scripts/record-autoplay.cjs --width=960 --height=540 --scale=4 --seed=2024 --out=store-video/_raw-3840x2160.mp4 --sfx=store-video/_sfx-3840x2160.json`
+   (about 60 min; frame-stepped, so audio is captured as a sound-event log, not recorded). The
+   post-run screens call the production analysis Lambda (a real AI debrief, never an initials
+   submission). Once the debrief has arrived, the recorder replays the incoming transmission (2 s)
+   and the headline typing out (3.5 s) frame by frame in the game's own panel, so the post-run
+   timeline is fixed and its frames are logged (`[record] typing from frame …`). A fresh profile
+   flying the full mission gets Captain Altair's debut debrief. Keep the machine otherwise idle
+   (no second render or other heavy work): CPU contention can change the seeded run (seed 2024
+   then crashed at about 45 s instead of flying the full 90 s).
+2. `node --experimental-websocket scripts/render-sfx.cjs --events=store-video/_sfx-3840x2160.json`
+3. `python store-video/narrate.py --raw store-video/_raw-3840x2160.mp4 --size 3840x2160 --out store-video/ai-horizon-3840x2160.mp4 --sfx store-video/_sfx-3840x2160.wav`
    (needs AWS credentials for Polly; `--sfx-lu` sets how far the game sits under the voice-over).
 
-Only the game-over/debrief/leaderboard screens changed (UI tweak)? Run step 1 with
-`--splice=store-video/_raw-1920x1080.mp4 --out=store-video/_raw-1920x1080.new.mp4` added (a few
-minutes: it re-steps the run without capturing, verifies it matches the earlier raw video, and
-replaces only the frames from game over on), skip step 2 (the sound timeline is unchanged), run
-step 3 with `--raw` pointing at the new file, then move it over the old raw for next time. This
-only works when the game-over dialog's first frame and the sounds are unchanged (the splice checks
-that frame against the old video); otherwise do the full render. The 4K
-landscape screenshots (`store-screenshots/3840x2160`) are frames of the 4K raw video, e.g.
-`4-gameover.png` is frame 5850 and `5-leaderboard.png` frame 6150 (extract with
-`-vf "select=eq(n\,5850)" -frames:v 1 -pix_fmt rgb24`: 24-bit, no alpha).
+Frames are piped to ffmpeg (no temp PNGs). The MP4 exceeds GitHub's 100 MB file limit, so it is
+gitignored (its `.srt` is committed); upload it to YouTube instead. Narration cue times in
+`store-video/narration.json` follow the post-run timeline logged in step 1.
 
-4K: same steps with `--scale=4` and `3840x2160` in the file names/`--size`. The layout (960x540
-CSS) and seed are unchanged, so the run, sound timeline and narration timing match the 1080p cut.
-Frames are piped to ffmpeg (no temp PNGs); the render takes about 4x as long. The 4K MP4 exceeds
-GitHub's 100 MB file limit, so it is gitignored; upload it to YouTube instead of committing it.
+Only the game-over/debrief/leaderboard screens changed (UI tweak)? Run step 1 with
+`--splice=store-video/_raw-3840x2160.mp4 --out=store-video/_raw-3840x2160.new.mp4` added (it
+re-steps the run without capturing, verifies it matches the earlier raw video, and replaces only
+the frames from game over on), skip step 2 (the sound timeline is unchanged), run step 3 with
+`--raw` pointing at the new file, then move it over the old raw for next time. This only works
+when the game-over dialog's first frame and the sounds are unchanged (the splice checks that frame
+against the old video); otherwise do the full render. The 4K landscape screenshots
+(`store-screenshots/3840x2160`) are frames of the raw video: `4-gameover.png` is frame 6150 (the
+held debrief) and `5-leaderboard.png` frame 6450 (extract with
+`-vf "select=eq(n\,6150)" -frames:v 1 -pix_fmt rgb24`: 24-bit, no alpha).
 
 ## Testing against production
 

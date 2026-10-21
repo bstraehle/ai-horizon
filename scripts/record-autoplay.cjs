@@ -19,10 +19,19 @@
  * scaled to the measured capture speed via the Animation domain.
  *
  * Sequence: title screen (held --hold s, with the remote high score loaded) → the run, stepped
- * frame by frame → game-over dialog with the "incoming transmission" (1.2s) → AI debrief once its
- * headline has typed out (4s) → Ok → initials prompt (2s) → leaderboard (3s). No score is
- * submitted (initials left empty). The default seed survived ~50s on the 360x640 viewport; other
- * seeds mostly die within 15s there.
+ * frame by frame → game-over dialog with the animated "incoming transmission" (2s) → the AI
+ * headline typing out (3.5s) and the Well done / Next mission sections fading in (0.5s) →
+ * debrief held (3.5s) → Ok → initials prompt (2s) → leaderboard (3s). The post-run timeline is
+ * fixed, so every cut of the same seed shares one narration timing. No score is submitted
+ * (initials left empty). The default seed survived ~50s on the 360x640 viewport; other seeds
+ * mostly die within 15s there.
+ *
+ * Both are replayed by this script once the real debrief has arrived and typed out, since a slow
+ * capture cannot follow the wall clock they run on: the transmission is saved at game over and
+ * shown again in front of the debrief, then the recorder resets the headline's spans and reveals
+ * it grapheme by grapheme, one step per output frame, in the game's own DOM and CSS (cursor
+ * included). CSS animations (pulsing transmission, cursor, fade-in) are slowed to the measured
+ * capture speed, as during the run.
  *
  * Sound: screenshots carry no audio, so with --sfx the page runs with `soundlog=1` and every
  * sound-effect call made during the stepped run is written to that JSON as
@@ -143,6 +152,77 @@ const SKIP_INITIALS = `(() => {
   return 'skipped';
 })()`;
 const LEADERBOARD_VISIBLE = "!document.getElementById('leaderboardScreen').hidden";
+
+/** The debrief has replaced the incoming transmission in the post-game panel. */
+const DEBRIEF_ARRIVED = "!!document.querySelector('#postGameMessage .debrief')";
+
+/** Post-run timeline, in seconds of video (fixed, see the header), from the game-over frame. */
+const GAME_OVER_TAIL_S = 0.6;
+const TRANSMISSION_S = 2;
+const TYPING_S = 3.5;
+const FADE_S = 0.5;
+const DEBRIEF_HOLD_S = 3.5;
+
+/**
+ * The post-game panel's incoming transmission, saved at game over (false when it is not
+ * showing), then swapped in front of the arrived debrief and back, with the outcome title and
+ * the Ok button hidden as the game hides them while the transmission is incoming. Nodes are
+ * cloned and moved rather than written as HTML: the page enforces Trusted Types.
+ */
+const SAVE_TRANSMISSION = `(() => {
+  const m = document.getElementById('postGameMessage');
+  if (!m.querySelector('.transmission')) return false;
+  window.__transmission = { nodes: Array.from(m.childNodes, (n) => n.cloneNode(true)), cls: m.className };
+  return true;
+})()`;
+const SHOW_TRANSMISSION = `(() => {
+  const m = document.getElementById('postGameMessage');
+  window.__debrief = { nodes: Array.from(m.childNodes), cls: m.className };
+  m.className = __transmission.cls;
+  m.replaceChildren(...__transmission.nodes);
+  document.getElementById('gameOverTitle').hidden = true;
+  document.getElementById('okBtn').hidden = true;
+  return !!m.querySelector('.transmission');
+})()`;
+const SHOW_DEBRIEF = `(() => {
+  const m = document.getElementById('postGameMessage');
+  m.className = __debrief.cls;
+  m.replaceChildren(...__debrief.nodes);
+  document.getElementById('gameOverTitle').hidden = false;
+  const ok = document.getElementById('okBtn');
+  ok.hidden = false;
+  ok.focus();
+})()`;
+
+/**
+ * Installs `window.__typeReplay` over the rendered debrief and resets it to an empty headline
+ * with the sections hidden (no fade-out); returns the headline's grapheme count. `set(k)` shows
+ * the first k graphemes (cursor while typing), `end()` shows all and fades the sections in.
+ */
+const TYPE_REPLAY = `(() => {
+  const root = document.getElementById('postGameMessage');
+  const typed = root.querySelector('.debrief-typed');
+  const shown = root.querySelector('.debrief-typed-shown');
+  const rest = root.querySelector('.debrief-typed-rest');
+  const debrief = root.querySelector('.debrief');
+  if (!typed || !shown || !rest || !debrief) return 0;
+  const parts = Array.from(
+    new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(shown.textContent + rest.textContent),
+    (s) => s.segment
+  );
+  const set = (k) => {
+    shown.textContent = parts.slice(0, k).join('');
+    rest.textContent = parts.slice(k).join('');
+    typed.classList.toggle('typing', k < parts.length);
+  };
+  debrief.style.transition = 'none';
+  debrief.classList.add('pending');
+  void debrief.offsetWidth;
+  debrief.style.transition = '';
+  set(0);
+  window.__typeReplay = { set, end: () => { set(parts.length); debrief.classList.remove('pending'); } };
+  return parts.length;
+})()`;
 
 /** Locate ffmpeg: explicit flag, env, PATH, then the pinned local download. */
 async function resolveFfmpeg() {
@@ -398,14 +478,39 @@ async function main() {
   let cutFrame = -1;
   /** @type {Buffer|null} */
   let firstFrame = null;
-  const grab = async (/** @type {number} */ duration) => {
-    const png = await shoot();
+  /** @type {Buffer|null} */
+  let lastPng = null;
+  const grab = async (/** @type {number} */ duration, repeatLast = false) => {
+    const png = repeatLast && lastPng ? lastPng : await shoot();
+    lastPng = png;
     if (spliceFrom && cutFrame < 0) [cutFrame, firstFrame] = [frameCount, png];
     for (let i = 0, n = frames(duration); i < n; i++) {
       await encoder.write(png);
       frameCount++;
     }
   };
+  /**
+   * Capture `duration` of distinct frames in real time, keeping CSS animations in step with the
+   * output frame rate; `beforeFrame(i, n)` runs before each one.
+   */
+  const grabLive = async (
+    /** @type {number} */ duration,
+    /** @type {(i: number, n: number) => Promise<void>} */ beforeFrame = async () => {}
+  ) => {
+    const n = frames(duration);
+    let last = Date.now();
+    for (let i = 0; i < n; i++) {
+      await beforeFrame(i, n);
+      await grab(1 / fps);
+      const now = Date.now();
+      const playbackRate = Math.min(1, frameMs / Math.max(now - last, frameMs));
+      last = now;
+      await send("Animation.setPlaybackRate", { playbackRate });
+    }
+  };
+  /** Segment boundaries (output frame numbers), logged for picking screenshot frames. */
+  const mark = (/** @type {string} */ name) =>
+    console.error(`[record] ${name} from frame ${frameCount} (${(frameCount / fps).toFixed(2)}s)`);
   try {
     await send("Page.addScriptToEvaluateOnNewDocument", { source: CLOCK_SHIM });
     await send("Animation.enable");
@@ -422,12 +527,13 @@ async function main() {
     const maxFrames = Math.ceil(maxSec * fps);
     let over = false;
     const t0 = Date.now();
+    // Stop on the first game-over frame, so the run never shows the dialog past its transmission.
     for (let i = 0; i < maxFrames && !over; i++) {
       await evaluate(`__frameClock.step(${frameMs})`);
-      if (!spliceFrom || cutFrame >= 0 || (await evaluate(GAME_OVER))) await grab(1 / fps);
+      over = !!(await evaluate(GAME_OVER));
+      if (!spliceFrom || cutFrame >= 0 || over) await grab(1 / fps);
       else frameCount++;
       if (i % 10 === 9) {
-        over = !!(await evaluate(GAME_OVER));
         // Keep CSS animations (finale flash, death punch) in step with virtual time.
         const realPerFrame = (Date.now() - t0) / (i + 1);
         await send("Animation.setPlaybackRate", {
@@ -442,24 +548,52 @@ async function main() {
     }
     if (!over) throw new Error(`run did not finish within --max=${maxSec}s`);
     console.error(`[record] run over after ${(frameCount / fps - holdSec).toFixed(1)}s`);
+    // The transmission is kept (DOM snapshot) and replayed once the debrief has arrived, since a
+    // slow capture would otherwise only catch a few frames of it.
+    if (!(await evaluate(SAVE_TRANSMISSION)))
+      throw new Error("no incoming transmission at game over");
+    // Let the crash flash and the dialog's entrance play out; if the debrief arrives first, the
+    // last frame is held instead, so the timeline stays fixed.
+    for (let left = frames(GAME_OVER_TAIL_S); left > 0; left--) {
+      await evaluate(`__frameClock.step(${frameMs})`);
+      if (await evaluate(DEBRIEF_ARRIVED)) {
+        await grab(left / fps, true);
+        break;
+      }
+      await grab(1 / fps);
+    }
     // Only the stepped run is on the virtual clock, so only its sounds map onto video frames. A
     // sound fired during step k first appears in frame k-1 (frames are grabbed after stepping).
     const soundLog = sfxOut ? (await evaluate("window.__soundLog || []")) || [] : [];
 
     // Back to real time for the network-bound debrief and the dialog flow.
-    await send("Animation.setPlaybackRate", { playbackRate: 1 });
     await evaluate("__frameClock.disable()");
-    await sleep(400);
-    await grab(1.2);
     if (!(await waitFor(evaluate, DEBRIEF_READY, 60000))) throw new Error("debrief never rendered");
-    await sleep(400);
-    await grab(4);
+    await sleep(200);
+    if (!(await evaluate(SHOW_TRANSMISSION))) throw new Error("could not replay the transmission");
+    mark("transmission");
+    await grabLive(TRANSMISSION_S);
+    await evaluate(SHOW_DEBRIEF);
+    const graphemes = await evaluate(TYPE_REPLAY);
+    if (!graphemes) throw new Error("debrief headline not found for the typing replay");
+    mark("typing");
+    await grabLive(TYPING_S, async (i, n) => {
+      await evaluate(`__typeReplay.set(${Math.ceil(((i + 1) / n) * graphemes)})`);
+    });
+    await evaluate("__typeReplay.end()");
+    await grabLive(FADE_S);
+    await send("Animation.setPlaybackRate", { playbackRate: 1 });
+    await sleep(500);
+    mark("debrief");
+    await grab(DEBRIEF_HOLD_S);
     await evaluate("document.getElementById('okBtn').click()");
     await sleep(600);
+    mark("initials");
     await grab(2);
     await evaluate(SKIP_INITIALS);
     await waitFor(evaluate, LEADERBOARD_VISIBLE, 10000);
     await sleep(600);
+    mark("leaderboard");
     await grab(3);
     if (sfxOut) {
       const events = soundLog.map((/** @type {any} */ e) => ({

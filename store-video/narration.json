@@ -50,10 +50,10 @@
     {
       "at": 94.6,
       "voice": "host",
-      "text": "Mission complete. Commander Vega, powered by Amazon Bedrock and Amazon Polly, remembers your missions and tells you how to improve."
+      "text": "Mission complete. Your AI commanders, Vega and Altair, powered by Amazon Bedrock and Amazon Polly, remember your missions and tell you how to improve."
     },
     {
-      "at": 101.8,
+      "at": 104.6,
       "voice": "host",
       "text": "Post your score to the leaderboard. Download AI Horizon on Google Play, and beat the high score!"
     }
