@@ -222,10 +222,6 @@ const COLORS = deepFreeze({
     OUTLINE: "#0a0b0f",
     GLOW: "rgba(79, 180, 255, 0.5)",
   },
-  UI: {
-    OVERLAY_BACKDROP: "rgba(0,0,0,0.5)",
-    OVERLAY_TEXT: "#fff",
-  },
   SCORE: { POPUP: "#ffffff", POPUP_STROKE: "rgba(0, 0, 0, 0.85)" },
 });
 
@@ -407,16 +403,12 @@ export const CONFIG = deepFreeze({
       "KeyS",
       "KeyW",
     ],
-    PAUSE_CODES: ["Escape"],
-    PAUSE_KEYS: ["Esc", "Escape"],
     /** Touch steering: the longest / furthest steering touch that still counts as a tap (one shot). */
     TOUCH: { TAP_MAX_MS: 250, TAP_SLOP_PX: 10 },
     /** Mouse steering: the ship meets a screen edge while the cursor is this far inside it. */
     MOUSE_EDGE_PX: 60,
     /** Captured (pointer-locked) mouse: ship target travel per pixel of mouse motion. */
     MOUSE_LOCK_SPEED: 1,
-    /** Ignore pause keys this long after a lost capture paused the game (the same Esc press). */
-    CAPTURE_PAUSE_GUARD_MS: 500,
   },
   RNG: {
     SEED_PARAM: "seed",
@@ -562,16 +554,6 @@ export const CONFIG = deepFreeze({
     STEP_MS: 1000 / 60,
     MAX_SUB_STEPS: 4,
     SNAP_TOLERANCE: 0.06,
-  },
-  UI: {
-    PAUSE_OVERLAY: {
-      BACKDROP: COLORS.UI.OVERLAY_BACKDROP,
-      FONT: "bold 28px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-      MESSAGE: "Paused - Esc to resume",
-      TEXT_ALIGN: "center",
-      TEXT_BASELINE: "middle",
-      TEXT_COLOR: COLORS.UI.OVERLAY_TEXT,
-    },
   },
 });
 

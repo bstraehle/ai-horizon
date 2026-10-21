@@ -668,30 +668,6 @@ export class UIManager {
     }
   }
 
-  /** @param {HTMLElement|null} pauseScreen */
-  static showPause(pauseScreen) {
-    if (pauseScreen) {
-      pauseScreen.classList.remove("hidden");
-      try {
-        pauseScreen.hidden = false;
-      } catch (_) {
-        /* ignore */
-      }
-    }
-  }
-
-  /** @param {HTMLElement|null} pauseScreen */
-  static hidePause(pauseScreen) {
-    if (pauseScreen) {
-      pauseScreen.classList.add("hidden");
-      try {
-        pauseScreen.hidden = true;
-      } catch (_) {
-        /* ignore */
-      }
-    }
-  }
-
   /** @param {HTMLElement|null} leaderboardScreen @param {HTMLElement|null} restartBtn @param {HTMLElement|null} currentScoreEl @param {number} score @param {boolean} [preserveScroll=false] @param {boolean|undefined} [allowInitials] @param {HTMLElement|null} [gameOverScreen=null] */
   static showGameOver(
     leaderboardScreen,

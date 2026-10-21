@@ -34,9 +34,6 @@ export const InputBindings = {
     game.handleResize = game.handleResize.bind(game);
     game.handleGameOverFocusGuard = game.handleGameOverFocusGuard.bind(game);
     game.handleCanvasMouseDown = game.handleCanvasMouseDown.bind(game);
-    game.handlePauseKeyDown = game.handlePauseKeyDown.bind(game);
-    game.handlePauseScreenClick = game.handlePauseScreenClick.bind(game);
-    game.shouldTogglePause = game.shouldTogglePause.bind(game);
     game.handleScroll = game.handleScroll.bind(game);
     game.handleVisibilityChange = game.handleVisibilityChange.bind(game);
     game.shoot = game.shoot.bind(game);
@@ -97,9 +94,7 @@ export const InputBindings = {
             /** @type {HTMLButtonElement|null} */ (game.okBtn || null)
           ),
         handleScroll: game.handleScroll,
-        handlePauseKeyDown: game.handlePauseKeyDown,
       }
     );
-    if (game.pauseScreen) game.pauseScreen.addEventListener("click", game.handlePauseScreenClick);
   },
 };

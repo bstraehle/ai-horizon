@@ -79,7 +79,7 @@ import {
  *
  * Lifecycle states are governed by `GameStateMachine` (running, paused, game over, etc.).
  * Public API surface (selected):
- *  - startGame(), togglePause(), gameOver(), fullReset()
+ *  - startGame(), gameOver(), fullReset()
  *  - update(dt), draw(dt), drawFrame()
  *  - createScorePopup(x,y,score,opts)
  *
@@ -89,10 +89,6 @@ import {
 class AIHorizon {
   /** @type {AIHorizon|null} */
   static _instance = null;
-  /**
-   * Precomputed set of all pause/confirm codes for quick lookup.
-   */
-  static PAUSE_CONFIRM_CODES = new Set([...CONFIG.INPUT.PAUSE_CODES]);
   /**
    * Initialize game state and UI elements.
    * Sets up UI, game variables, and event listeners.
@@ -116,7 +112,6 @@ class AIHorizon {
       document.getElementById("leaderboardScreen")
     );
     this.gameOverScreen = /** @type {HTMLElement} */ (document.getElementById("gameOverScreen"));
-    this.pauseScreen = /** @type {HTMLElement} */ (document.getElementById("pauseScreen"));
     this.startBtn = /** @type {HTMLButtonElement} */ (document.getElementById("startBtn"));
     this.restartBtn = /** @type {HTMLButtonElement} */ (document.getElementById("restartBtn"));
     this.okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
@@ -172,8 +167,6 @@ class AIHorizon {
     this.mouseCapture = new MouseCapture(this.canvas, (locked) =>
       this.handleMouseCaptureChange(locked)
     );
-    /** performance.now() when a lost capture last paused the run (see handlePauseKeyDown). */
-    this._capturePausedAt = -Infinity;
     this.events = new EventBus();
     /** Synthesized sound effects; unlocked on Launch Mission, muted state persisted. */
     this.audio = new AudioManager();
@@ -509,51 +502,6 @@ class AIHorizon {
    */
 
   /**
-   * Global keydown handler for pause/resume toggling.
-   * @param {KeyboardEvent} e
-   */
-  handlePauseKeyDown(e) {
-    // The Esc that released a captured mouse already paused the run; don't let it also resume.
-    if (performance.now() - this._capturePausedAt < CONFIG.INPUT.CAPTURE_PAUSE_GUARD_MS) return;
-    if (this.shouldTogglePause(e)) {
-      e.preventDefault();
-      this.togglePause();
-    }
-  }
-
-  /**
-   * Determine if the pause state should toggle based on the event and current game state.
-   * Guard rails:
-   * - Ignores key repeats.
-   * - Only responds while running or paused.
-   * - Accepts any configured pause/confirm code.
-   * @param {KeyboardEvent} e Keyboard event to evaluate.
-   * @returns {boolean} True if pause should toggle.
-   */
-  shouldTogglePause(e) {
-    try {
-      const initialsScreen = /** @type {HTMLElement|null} */ (
-        document.getElementById("initialsScreen")
-      );
-      const gameOverVisible = !!(
-        this.leaderboardScreen && !this.leaderboardScreen.classList.contains("hidden")
-      );
-      const startVisible = !!(this.gameInfo && !this.gameInfo.classList.contains("hidden"));
-      const postGameVisible = !!(
-        this.gameOverScreen && !this.gameOverScreen.classList.contains("hidden")
-      );
-      const initialsVisible = !!(initialsScreen && !initialsScreen.classList.contains("hidden"));
-      if (gameOverVisible || postGameVisible || initialsVisible || startVisible) return false;
-    } catch (_) {
-      /* ignore */
-    }
-    if (!this.state.isRunning() && !this.state.isPaused()) return false;
-    if (e.repeat) return false;
-    const codeOrKey = e.code || e.key;
-    return AIHorizon.PAUSE_CONFIRM_CODES.has(codeOrKey);
-  }
-
-  /**
    * Keep focus on the restart button when the Game Over overlay is visible.
    * Prevents taps/clicks from removing focus on mobile.
    * @param {Event} e
@@ -791,26 +739,14 @@ class AIHorizon {
   }
 
   /**
-   * Capture gained: start steering from the ship so it doesn't jump. Capture lost while running
-   * (Esc, tab switch): pause, so Esc still means pause.
+   * Capture gained: start steering from the ship so it doesn't jump. Capture lost (Esc, tab
+   * switch): the run keeps going with the free cursor until a click captures the mouse again.
    * @param {boolean} locked
    */
   handleMouseCaptureChange(locked) {
-    if (locked) {
-      this.input.mouse.x = this.player.x + this.player.width / 2;
-      this.input.mouse.y = this.player.y + this.player.height / 2;
-      return;
-    }
-    if (!this.state.isRunning()) return;
-    this._capturePausedAt = performance.now();
-    this.togglePause();
-  }
-
-  /** Clicking the pause overlay resumes and captures the mouse again. */
-  handlePauseScreenClick() {
-    if (!this.state.isPaused()) return;
-    this.togglePause();
-    this.mouseCapture.request();
+    if (!locked) return;
+    this.input.mouse.x = this.player.x + this.player.width / 2;
+    this.input.mouse.y = this.player.y + this.player.height / 2;
   }
 
   /** Begin continuous fire (mouse), capturing the mouse if it isn't already. */
@@ -1150,23 +1086,6 @@ class AIHorizon {
   }
 
   /**
-   * Toggle pause state. Pausing gives a captured mouse back so the pause overlay can be clicked.
-   */
-  togglePause() {
-    if (this.state.isPaused()) {
-      this.state.resume();
-      GameUI.hidePause(this);
-      this.audio.resume();
-    } else if (this.state.isRunning()) {
-      this.state.pause();
-      this.mouseCapture.release();
-      GameUI.showPause(this);
-      this.audio.suspend();
-    }
-    this._pausedFrameRendered = false;
-  }
-
-  /**
    * End the game.
    */
   gameOver() {
@@ -1199,7 +1118,6 @@ class AIHorizon {
     this.mouseCapture.release();
     const oldHighScore = this.highScore;
     this.updateHighScore();
-    GameUI.hidePause(this);
     try {
       this._lastRunSummary = this._logRunSummary(accuracySummary, oldHighScore);
     } catch (_e) {

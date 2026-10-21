@@ -192,7 +192,6 @@ export function fullReset(game) {
 
   try {
     UIManager.hideGameOver(game.leaderboardScreen, game.gameOverScreen || null);
-    UIManager.hidePause(game.pauseScreen);
     if (game.gameInfo && game.gameInfo.classList.contains("hidden")) {
       game.gameInfo.classList.remove("hidden");
     }

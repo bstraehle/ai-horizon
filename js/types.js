@@ -191,7 +191,6 @@
  * @typedef {Object} GameInputHandlers
  * @property {(e:KeyboardEvent)=>void} handleKeyDown
  * @property {(e:KeyboardEvent)=>void} handleKeyUp
- * @property {(e:KeyboardEvent)=>void} handlePauseKeyDown
  * @property {()=>void} handleResize
  * @property {(e:MouseEvent)=>void} handleMouseMove
  * @property {()=>void} handleMouseDown

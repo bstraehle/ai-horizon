@@ -26,7 +26,6 @@ export class InputManager {
   ) {
     window.addEventListener("keydown", handlers.handleKeyDown);
     window.addEventListener("keyup", handlers.handleKeyUp);
-    window.addEventListener("keydown", handlers.handlePauseKeyDown);
     window.addEventListener("resize", handlers.handleResize);
     window.addEventListener("mousemove", handlers.handleMouseMove);
     canvas.addEventListener("mousedown", handlers.handleMouseDown);
