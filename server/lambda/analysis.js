@@ -12,7 +12,8 @@ const pollyClient = new PollyClient({
 });
 
 /**
- * Bedrock prompt; `%%prompt%%` is replaced with the run summary JSON, including the client's
+ * Bedrock prompt; `%%fact%%`, `%%opening%%` and `%%imagery%%` shape the headline (see
+ * `headlineFact` / `headlineStyle`) and `%%prompt%%` is the run summary JSON, including the client's
  * `verdict` and `insights` (see `missionVerdict` / `missionInsights` in
  * js/adapters/AIAnalysisAdapter.js). The client shows each weakness as its exact fact followed by
  * the model's `technique-N`; its offline debrief uses the same techniques in English.
@@ -43,18 +44,19 @@ The mission details include insights computed by the game: up to 3 weaknesses, t
 - asteroids (10 points): Shoot the asteroids in your path.
 <technique rules - end>
 <verdict rules - start>
-The mission details include a verdict decided by the game. The game puts the rating (e.g. "Commendation, pilot.") in front of the feedback headline, so do not write a rating yourself. The headline is read aloud by a text-to-speech voice, so write it for listening, as a strict but fair space force officer: 2 short plain sentences, first the most important fact of this mission (e.g. survivedSeconds, bonusAsteroidsKilled, shotsFiredAccuracy, playerFinaleBonus), then a brief remark or order matching the verdict. No questions, irony, sarcasm, jokes, or metaphors; avoid generic phrases such as "Great job" or "Keep it up".
-- commendation: sincere praise, e.g. "7 of 8 bonus asteroids destroyed. Outstanding shooting."
-- satisfactory: acknowledge, then push, e.g. "Full 90 seconds flown. Now hit the bonus asteroids."
-- reprimand: firm criticism, e.g. "You ejected after 41 seconds. Stay in the fight."
+The mission details include a verdict decided by the game. The game puts the rating (e.g. "Commendation, pilot.") in front of the feedback headline, so do not write a rating yourself. The headline is read aloud by a text-to-speech voice, so write it for listening, as a charismatic squadron commander with a vivid, energetic voice: 2 short sentences.
+Sentence 1 states exactly this fact of the mission, with its number as digits: %%fact%%. %%opening%%
+Sentence 2 is a memorable remark in the verdict's tone, built on this imagery: %%imagery%%. Use strong verbs; never mock the pilot; no questions, sarcasm, or generic praise.
+- commendation: proud, rousing praise for what the pilot just did; no orders, advice, or "next time";
+- satisfactory: credit, then a challenge for the next mission;
+- reprimand: firm but motivating, sending the pilot back out;
 - no verdict: choose the tone from survivedSeconds.
-The examples only show the structure: use the facts of this mission.
 <verdict rules - end>
 <mission details - start>
 %%prompt%%
 <mission details - end>
 <answer format - start>
-Write in the language of device.locale, with numbers as digits. Call things by their names in the scoring rules (stars, bonus stars, asteroids, hardened asteroids, bonus asteroids), never by colour. The headline has less than 10 words, each technique less than 12 words. Include one technique per weakness and leave out the rest.
+Write in the language of device.locale, with numbers as digits. Call things by their names in the scoring rules (stars, bonus stars, asteroids, hardened asteroids, bonus asteroids), never by colour. The headline has less than 16 words, each technique less than 12 words. Include one technique per weakness and leave out the rest.
 {
 "feedback": "👨‍🚀 <headline without the rating, see verdict rules>",
 "technique-1": "<technique for weakness 1, see technique rules>",
@@ -65,16 +67,94 @@ Write in the language of device.locale, with numbers as digits. Call things by t
 Your answer:`;
 
 /**
- * Fill {@link PROMPT} with the run summary. A replacer function keeps `$` sequences in the
- * summary literal.
- * @param {string} summary Run summary JSON (without the `speech` request).
- * @returns {string}
+ * How the headline's first sentence opens; one is picked at random per debrief (with
+ * {@link HEADLINE_IMAGERY}) because the model otherwise words the same fact the same way.
  */
-export function buildPrompt(summary) {
-  return PROMPT.replace("%%prompt%%", () => summary);
+export const HEADLINE_OPENINGS = [
+  "Open it with the number.",
+  "Open it with a vivid verb.",
+  "Open it with a two- or three-word exclamation in the verdict's tone, then the fact.",
+  "Phrase it as a radio call from the control tower.",
+];
+
+/**
+ * Imagery themes for the headline's closing remark; one is picked at random per debrief so
+ * repeat runs with the same verdict don't read alike (the model tends to reuse one phrasing).
+ */
+export const HEADLINE_IMAGERY = [
+  "engines and thrusters",
+  "the asteroid belt",
+  "the hangar and the ground crew",
+  "medals and the fleet watching",
+  "radar and targeting computers",
+  "comets and shooting stars",
+  "the next sortie at dawn",
+  "mission control on the radio",
+  "shields and armor plating",
+  "afterburners and raw speed",
+  "the squadron's history books",
+];
+
+/**
+ * Random headline style: an opening from {@link HEADLINE_OPENINGS} and imagery from
+ * {@link HEADLINE_IMAGERY}.
+ * @param {() => number} [random] Source of [0, 1) numbers (injectable for tests).
+ * @returns {{ opening: string, imagery: string }}
+ */
+export function headlineStyle(random = Math.random) {
+  /** @param {string[]} list */
+  const pick = (list) => list[Math.floor(random() * list.length)];
+  return { opening: pick(HEADLINE_OPENINGS), imagery: pick(HEADLINE_IMAGERY) };
 }
 
-/** Longest headline (after emoji removal) sent to Polly; Bedrock is asked for < 10 words. */
+/** Bonus asteroids that make a commendation about them (mirrors the client's VERDICT_BONUS_ASTEROIDS). */
+const FACT_BONUS_ASTEROIDS = 6;
+
+/**
+ * The fact the headline opens with, worked out here because the model often picks or computes
+ * the wrong one from the summary: seconds survived (reprimand), seconds left when going down in
+ * the finale or the full mission flown (satisfactory), bonus asteroids or shots fired accuracy
+ * (commendation).
+ * @param {any} summary Parsed run summary.
+ * @param {string|null} verdict
+ * @returns {string} English description for the prompt; the model words it in the player's language.
+ */
+export function headlineFact(summary, verdict) {
+  const timer = (summary && summary.timer) || {};
+  const stats = (summary && summary.stats) || {};
+  const total = Number.isFinite(timer.totalSeconds) ? timer.totalSeconds : 90;
+  const survived = timer.survivedSeconds;
+  if (!Number.isFinite(survived)) return "the most important number in the mission details";
+  if (verdict === "commendation") {
+    const bonus = stats.bonusAsteroidsKilled ?? 0;
+    if (bonus >= FACT_BONUS_ASTEROIDS) {
+      return `the pilot destroyed ${bonus} of ${stats.bonusAsteroidsEncountered ?? 8} bonus asteroids`;
+    }
+    return `the pilot hit ${Math.round(100 * (stats.shotsFiredAccuracy ?? 0))}% of their shots`;
+  }
+  if (survived >= total) return `the pilot flew the full ${total} seconds`;
+  if (verdict === "satisfactory") {
+    return `the pilot went down in the finale with ${total - survived} seconds left`;
+  }
+  return `the pilot survived ${survived} seconds`;
+}
+
+/**
+ * Fill {@link PROMPT} with the run summary, the headline fact and style. Replacer functions
+ * keep `$` sequences literal.
+ * @param {string} summary Run summary JSON (without the `speech` request).
+ * @param {string} fact Fact the headline opens with (see {@link headlineFact}).
+ * @param {{ opening: string, imagery: string }} style See {@link headlineStyle}.
+ * @returns {string}
+ */
+export function buildPrompt(summary, fact, { opening, imagery }) {
+  return PROMPT.replace("%%fact%%", () => fact)
+    .replace("%%opening%%", () => opening)
+    .replace("%%imagery%%", () => imagery)
+    .replace("%%prompt%%", () => summary);
+}
+
+/** Longest headline (after emoji removal) sent to Polly; Bedrock is asked for < 16 words. */
 const MAX_SPEECH_CHARS = 160;
 
 /**
@@ -357,7 +437,7 @@ export const handler = async (event) => {
         if (body) {
           const { prompt, voice, locale, verdict } = splitRequest(body);
           console.log("Bedrock request: ", prompt);
-          response = await analysis(prompt);
+          response = await analysis(prompt, verdict);
           console.log("Bedrock response: ", response);
           const rating = verdictRating(verdict, locale);
           if (rating) response = withRating(response, rating);
@@ -406,9 +486,16 @@ export const handler = async (event) => {
 /**
  * Analyze a game summary using Bedrock and return a structured response.
  * @param {string} body - The game summary / prompt to analyze
+ * @param {string|null} [verdict] The client's verdict (picks the headline fact).
  */
-async function analysis(body) {
-  const prompt = buildPrompt(body);
+async function analysis(body, verdict = null) {
+  let summary = null;
+  try {
+    summary = JSON.parse(body);
+  } catch {
+    /* not JSON: the fact falls back to a generic description */
+  }
+  const prompt = buildPrompt(body, headlineFact(summary, verdict), headlineStyle());
 
   const requestBody = {
     messages: [

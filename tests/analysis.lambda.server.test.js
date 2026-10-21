@@ -32,10 +32,14 @@ vi.mock("@aws-sdk/client-polly", () => ({
 process.env.MODEL_ID = "test-model";
 
 const {
+  HEADLINE_IMAGERY,
+  HEADLINE_OPENINGS,
   PROMPT,
   VERDICT_RATINGS,
   buildPrompt,
   handler,
+  headlineFact,
+  headlineStyle,
   selectVoice,
   speakableText,
   speechInput,
@@ -245,19 +249,67 @@ describe("analysis Lambda – verdict rating", () => {
 });
 
 describe("analysis Lambda – prompt", () => {
-  it("embeds the run summary verbatim, including `$` sequences", () => {
+  const STYLE = { opening: "Open it with the number.", imagery: "the asteroid belt" };
+
+  it("embeds the run summary, fact and style verbatim, including `$` sequences", () => {
     const summary = JSON.stringify({ verdict: "reprimand", note: "$& $1 $'" });
-    const prompt = buildPrompt(summary);
+    const prompt = buildPrompt(summary, "the pilot survived $1 seconds", STYLE);
     expect(prompt).toContain(`<mission details - start>\n${summary}\n<mission details - end>`);
-    expect(prompt).not.toContain("%%prompt%%");
+    expect(prompt).toContain(
+      "this fact of the mission, with its number as digits: the pilot survived $1 seconds. Open it with the number."
+    );
+    expect(prompt).toContain("built on this imagery: the asteroid belt.");
+    expect(prompt).not.toMatch(/%%\w+%%/);
+  });
+
+  it("states the verdict's key fact for the headline", () => {
+    /** @param {number} survivedSeconds @param {any} [stats] */
+    const run = (survivedSeconds, stats = {}) => ({
+      timer: { totalSeconds: 90, survivedSeconds },
+      stats,
+    });
+    expect(headlineFact(run(2), "reprimand")).toBe("the pilot survived 2 seconds");
+    expect(headlineFact(run(84), "satisfactory")).toBe(
+      "the pilot went down in the finale with 6 seconds left"
+    );
+    expect(headlineFact(run(90), "satisfactory")).toBe("the pilot flew the full 90 seconds");
+    expect(
+      headlineFact(
+        run(90, { bonusAsteroidsKilled: 7, bonusAsteroidsEncountered: 8 }),
+        "commendation"
+      )
+    ).toBe("the pilot destroyed 7 of 8 bonus asteroids");
+    expect(
+      headlineFact(run(90, { bonusAsteroidsKilled: 3, shotsFiredAccuracy: 0.614 }), "commendation")
+    ).toBe("the pilot hit 61% of their shots");
+    expect(headlineFact(null, null)).toBe("the most important number in the mission details");
+  });
+
+  it("picks the headline style from its lists", () => {
+    expect(headlineStyle(() => 0)).toEqual({
+      opening: HEADLINE_OPENINGS[0],
+      imagery: HEADLINE_IMAGERY[0],
+    });
+    expect(headlineStyle(() => 0.999)).toEqual({
+      opening: HEADLINE_OPENINGS.at(-1),
+      imagery: HEADLINE_IMAGERY.at(-1),
+    });
   });
 
   it("sends the filled prompt to Bedrock", async () => {
     bedrockSend.mockReset();
     bedrockSend.mockResolvedValue(bedrockReply(JSON.stringify(ANALYSIS)));
-    await post({ score: 1, verdict: "commendation" });
+    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    const summary = { timer: { totalSeconds: 90, survivedSeconds: 30 }, verdict: "reprimand" };
+    await post(summary);
+    random.mockRestore();
     const sent = JSON.parse(bedrockSend.mock.calls[0][0].params.body).messages[0].content[0].text;
-    expect(sent).toBe(buildPrompt(JSON.stringify({ score: 1, verdict: "commendation" })));
+    expect(sent).toBe(
+      buildPrompt(JSON.stringify(summary), "the pilot survived 30 seconds", {
+        opening: HEADLINE_OPENINGS[0],
+        imagery: HEADLINE_IMAGERY[0],
+      })
+    );
     expect(PROMPT).toContain("<verdict rules - start>");
   });
 

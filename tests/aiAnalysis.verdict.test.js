@@ -9,6 +9,7 @@ import {
   missionVerdict,
   VERDICT_BONUS_ASTEROIDS,
   VERDICT_SHOT_ACCURACY,
+  verdictLines,
 } from "../js/adapters/AIAnalysisAdapter.js";
 
 /**
@@ -82,12 +83,27 @@ describe("AIAnalysisAdapter verdict", () => {
     const adapter = new AIAnalysisAdapter();
     const title = async (/** @type {any} */ summary) =>
       (await adapter.analyze({ runSummary: summary })).title;
-    expect(await title(run(90, { bonusAsteroidsKilled: 8 }))).toMatch(/^👨‍🚀 Commendation/);
-    expect(await title(run(90))).toMatch(/^👨‍🚀 Satisfactory/);
-    expect(await title(run(41))).toBe(
-      "👨‍🚀 Reprimand, pilot. You ejected after 41 seconds. Stay in the fight."
+    expect(await title(run(90, { bonusAsteroidsKilled: 8 }))).toMatch(
+      /^👨‍🚀 Commendation, pilot\. .*8 bonus asteroids/
     );
+    expect(await title(run(90, { shotsFiredAccuracy: 0.61 }))).toMatch(
+      /^👨‍🚀 Commendation, pilot\. .*61%/
+    );
+    expect(await title(run(90))).toMatch(/^👨‍🚀 Satisfactory, pilot\. /);
+    expect(await title(run(84))).toMatch(/^👨‍🚀 Satisfactory, pilot\. .*6 seconds/);
+    expect(await title(run(41))).toMatch(/^👨‍🚀 Reprimand, pilot\. .*41 seconds/);
+    expect(await title(run(1))).toMatch(/\b1 second\b/);
     expect(await title(null)).toMatch(/^Mission debrief protocol concluded/);
+  });
+
+  it("varies the offline headline between runs but repeats it for the same run", async () => {
+    const adapter = new AIAnalysisAdapter();
+    const title = async (/** @type {any} */ summary) =>
+      (await adapter.analyze({ runSummary: summary })).title;
+    const lines = new Set(await Promise.all([20, 21, 22, 23].map((s) => title(run(s)))));
+    expect(lines.size).toBe(4);
+    expect(await title(run(33))).toBe(await title(run(33)));
+    for (const line of verdictLines("reprimand", run(33))) expect(line).toContain("33 seconds");
   });
 
   it("lays out the offline debrief as Well done / Next mission with exact facts", async () => {

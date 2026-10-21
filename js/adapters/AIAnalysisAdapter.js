@@ -551,20 +551,79 @@ export class AIAnalysisAdapter {
   }
 
   /**
-   * Offline headline in the tone of the run's {@link missionVerdict}.
+   * Offline headline in the tone of the run's {@link missionVerdict}; see {@link verdictLines}.
    * @param {any} runSummary
    * @returns {string}
    */
   _verdictTitle(runSummary) {
-    switch (missionVerdict(runSummary)) {
-      case "commendation":
-        return "👨‍🚀 Commendation, pilot. Full mission flown. Outstanding work.";
-      case "satisfactory":
-        return "👨‍🚀 Satisfactory, pilot. Solid flight. Push harder next time.";
-      case "reprimand":
-        return `👨‍🚀 Reprimand, pilot. You ejected after ${runSummary.timer.survivedSeconds} seconds. Stay in the fight.`;
-      default:
-        return "Mission debrief protocol concluded. Here are your performance insights:";
-    }
+    const verdict = missionVerdict(runSummary);
+    if (!verdict) return "Mission debrief protocol concluded. Here are your performance insights:";
+    const lines = verdictLines(verdict, runSummary);
+    const timer = runSummary.timer;
+    const score = (runSummary.score && runSummary.score.playerFinalScore) || 0;
+    const pick = Math.abs(Math.trunc(timer.survivedSeconds + score)) % lines.length;
+    return `👨‍🚀 ${VERDICT_RATINGS_EN[verdict]} ${lines[pick]}`;
   }
+}
+
+/** English ratings; the Lambda's VERDICT_RATINGS put the same words in front of the AI headline. */
+const VERDICT_RATINGS_EN = {
+  commendation: "Commendation, pilot.",
+  satisfactory: "Satisfactory, pilot.",
+  reprimand: "Reprimand, pilot.",
+};
+
+/**
+ * Offline headline lines (after the rating) for a verdict, each built on the run's key fact:
+ * seconds survived for a reprimand, the seconds left for a finale ejection, the full mission for
+ * a satisfactory full run, and bonus asteroids or accuracy for a commendation. The caller picks
+ * one from the run's numbers, so repeat runs read differently while a replayed (seeded) run
+ * stays identical.
+ * @param {Verdict} verdict
+ * @param {any} runSummary
+ * @returns {string[]}
+ */
+export function verdictLines(verdict, runSummary) {
+  const timer = runSummary.timer;
+  const stats = runSummary.stats || {};
+  const total = Number.isFinite(timer.totalSeconds) ? timer.totalSeconds : TIMER_SECONDS;
+  const s = timer.survivedSeconds;
+  const secs = (/** @type {number} */ n) => `${n} ${n === 1 ? "second" : "seconds"}`;
+  if (verdict === "reprimand") {
+    return [
+      `Down after ${secs(s)}. The asteroid field wants a rematch.`,
+      `${secs(s)} in the cockpit. Dodge first, glory second.`,
+      `You ejected after ${secs(s)}. That sky is still yours to take.`,
+      `Only ${secs(s)} flown, ${secs(total - s)} left unclaimed. Get back up there.`,
+    ];
+  }
+  if (verdict === "satisfactory") {
+    if (s < total) {
+      const left = secs(total - s);
+      return [
+        `Down with ${left} to go. Finish the job next time.`,
+        `You reached the finale and fell ${left} short. Hold the line.`,
+        `${left} from the finish line. Next time, bring it home.`,
+      ];
+    }
+    return [
+      `Full ${total} seconds flown. Now go hunting bonus asteroids.`,
+      `You went the distance. Next time, bring the fireworks.`,
+      `${total} seconds and still flying. Make every shot count next.`,
+    ];
+  }
+  const bonus = stats.bonusAsteroidsKilled ?? 0;
+  if (bonus >= VERDICT_BONUS_ASTEROIDS) {
+    return [
+      `${bonus} bonus asteroids vaporized. The whole fleet saw that.`,
+      `${bonus} bonus asteroids down. That is how legends fly.`,
+      `Full mission and ${bonus} bonus asteroids. Hangar bay is buzzing.`,
+    ];
+  }
+  const pct = Math.round(100 * (stats.shotsFiredAccuracy ?? 0));
+  return [
+    `${pct}% of your shots hit. Precision like that wins wars.`,
+    `${pct}% accuracy over the full mission. Textbook flying.`,
+    `Full mission at ${pct}% accuracy. Every shot had a target.`,
+  ];
 }
