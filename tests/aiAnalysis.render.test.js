@@ -80,7 +80,23 @@ describe("AIAnalysisManager.render", () => {
     expect(msg.querySelector(".transmission-label")?.textContent).toBe("📡 Eingehende Übertragung");
     expect(msg.querySelector(".transmission-from")?.textContent).toBe("Kommandantin Vega");
     expect(playTransmission).toHaveBeenCalledTimes(1);
-    expect(/** @type {HTMLButtonElement} */ (document.getElementById("okBtn")).disabled).toBe(true);
+    expect(msg.querySelector(".transmission")?.getAttribute("role")).toBe("status");
+    const okBtn = /** @type {HTMLButtonElement} */ (document.getElementById("okBtn"));
+    expect(okBtn.disabled).toBe(true);
+    expect(okBtn.hidden).toBe(true);
+  });
+
+  it("shows the Ok button again once the debrief arrives", async () => {
+    setReducedMotion(true);
+    const okBtn = /** @type {HTMLButtonElement} */ (document.getElementById("okBtn"));
+    okBtn.hidden = true;
+    okBtn.disabled = true;
+    const msg = /** @type {HTMLElement} */ (document.getElementById("msg"));
+    await new Promise((resolve) => {
+      AIAnalysisManager.render(msg, {}, RUN, false, resolve);
+    });
+    expect(okBtn.hidden).toBe(false);
+    expect(okBtn.disabled).toBe(false);
   });
 
   it("types the headline out and reveals the sections when it is complete", async () => {

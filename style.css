@@ -358,6 +358,10 @@ body {
 .initials-entry .action-button {
   margin-bottom: 0;
 }
+/* `display: block` above would override the hidden attribute (Ok hides during the transmission). */
+.action-button[hidden] {
+  display: none;
+}
 .post-game-message {
   color: var(--color-text-secondary);
   margin-bottom: var(--space-5);

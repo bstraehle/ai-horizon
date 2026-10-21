@@ -20,7 +20,8 @@ const SPEECH_TIMING_WAIT_MS = 1500;
  * Mirrors the online/offline gating style of LeaderboardManager.
  *
  * Presentation: while a remote debrief loads, the screen shows an "incoming transmission" from
- * Commander Vega (localized) with a radio crackle; the headline then types out in sync with the
+ * Commander Vega (localized) with a radio crackle, and the Ok button is hidden until the debrief
+ * arrives (then shown, enabled and focused); the headline then types out in sync with the
  * spoken clip (or at a reading pace without one, instantly under reduced motion), and the Well
  * done / Next mission sections appear when it is complete. Screen readers get the full headline
  * at once.
@@ -236,6 +237,7 @@ export class AIAnalysisManager {
         const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
         if (okBtn) {
           okBtn.disabled = false;
+          okBtn.hidden = false;
           okBtn.tabIndex = 0;
           try {
             okBtn.focus();
@@ -293,6 +295,7 @@ export class AIAnalysisManager {
       try {
         const p = document.createElement("p");
         p.className = "transmission";
+        p.setAttribute("role", "status");
         const label = document.createElement("span");
         label.className = "transmission-label";
         label.textContent = `📡 ${labels.transmission}`;
@@ -318,6 +321,7 @@ export class AIAnalysisManager {
         const okBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("okBtn"));
         if (okBtn) {
           okBtn.disabled = true;
+          okBtn.hidden = true;
           okBtn.tabIndex = -1;
           try {
             okBtn.blur();
@@ -326,7 +330,7 @@ export class AIAnalysisManager {
           }
         }
       } catch {
-        /* non-critical disable ok button during analysis */
+        /* non-critical hide of the ok button during the transmission */
       }
     }
 
