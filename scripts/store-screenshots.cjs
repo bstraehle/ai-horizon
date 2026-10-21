@@ -15,7 +15,8 @@
  *   1-initial.png      start screen (title + Launch Mission)
  *   2-midgame.png      gameplay; the latest of several takes (~6/9/12s in) made while the run was
  *                      still alive, so a short autopilot run still yields an in-game frame
- *   3-gameover.png     post-game debrief, captured once the AI analysis has finished
+ *   3-gameover.png     post-game debrief, captured once the AI analysis has finished and its
+ *                      headline has typed out
  *   4-leaderboard.png  leaderboard; initials are left empty so NO score is submitted
  *
  * Each size renders at a phone/tablet-like CSS viewport with an integer device scale, and passes the
@@ -73,9 +74,10 @@ const START_READY =
 /** Gameplay is live: the start overlay is gone and the game-over dialog has not appeared. */
 const RUNNING =
   "document.getElementById('gameInfo').hidden && document.getElementById('gameOverScreen').hidden";
-/** Game-over dialog is showing and the debrief has rendered (Ok re-enabled). */
+/** Game-over dialog is showing and the debrief has rendered, its headline fully typed out. */
 const DEBRIEF_READY =
-  "!document.getElementById('gameOverScreen').hidden && !document.getElementById('okBtn').disabled";
+  "!document.getElementById('gameOverScreen').hidden && !document.getElementById('okBtn').disabled" +
+  " && !!document.querySelector('#postGameMessage .debrief:not(.pending)')";
 /** Skip the optional initials step without submitting: an empty entry just advances. */
 const SKIP_INITIALS = `(() => {
   const screen = document.getElementById('initialsScreen');
