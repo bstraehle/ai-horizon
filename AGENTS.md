@@ -44,14 +44,20 @@ Only the 4K cut is kept (no 1080p version). With `npm run serve` running:
    (about 60 min; frame-stepped, so audio is captured as a sound-event log, not recorded). The
    post-run screens call the production analysis Lambda (a real AI debrief, never an initials
    submission). Once the debrief has arrived, the recorder replays the incoming transmission (2 s)
-   and the headline typing out (3.5 s) frame by frame in the game's own panel, so the post-run
-   timeline is fixed and its frames are logged (`[record] typing from frame …`). A fresh profile
-   flying the full mission gets Captain Altair's debut debrief. Keep the machine otherwise idle
-   (no second render or other heavy work): CPU contention can change the seeded run (seed 2024
-   then crashed at about 45 s instead of flying the full 90 s).
+   and the headline typing out frame by frame in the game's own panel; the segments' frames are
+   logged (`[record] typing from frame …`). A fresh profile flying the full mission gets Captain
+   Altair's debut debrief. Keep the machine otherwise idle (no second render or other heavy
+   work): CPU contention can change the seeded run (seed 2024 then crashed at about 45 s instead
+   of flying the full 90 s).
+   The recorder also captures the debrief's spoken clip from the AI response: the headline types
+   in sync with it, the voice meters follow it, and it is logged as the timeline's `comms` track.
 2. `node --experimental-websocket scripts/render-sfx.cjs --events=store-video/_sfx-3840x2160.json`
-3. `python store-video/narrate.py --raw store-video/_raw-3840x2160.mp4 --size 3840x2160 --out store-video/ai-horizon-3840x2160.mp4 --sfx store-video/_sfx-3840x2160.wav`
+   (writes the game sounds and, with a voice clip, `_sfx-3840x2160-comms.wav`: the commander's
+   voice through the game's radio chain).
+3. `python store-video/narrate.py --raw store-video/_raw-3840x2160.mp4 --size 3840x2160 --out store-video/ai-horizon-3840x2160.mp4 --sfx store-video/_sfx-3840x2160.wav --comms store-video/_sfx-3840x2160-comms.wav`
    (needs AWS credentials for Polly; `--sfx-lu` sets how far the game sits under the voice-over).
+   The commander's voice is mixed at narrator loudness and narration cues that would overlap it
+   start after it, so the video's length follows the clip.
 
 Frames are piped to ffmpeg (no temp PNGs). The MP4 exceeds GitHub's 100 MB file limit, so it is
 gitignored (its `.srt` is committed); upload it to YouTube instead. Narration cue times in
@@ -64,9 +70,9 @@ the frames from game over on), skip step 2 (the sound timeline is unchanged), ru
 `--raw` pointing at the new file, then move it over the old raw for next time. This only works
 when the game-over dialog's first frame and the sounds are unchanged (the splice checks that frame
 against the old video); otherwise do the full render. The 4K landscape screenshots
-(`store-screenshots/3840x2160`) are frames of the raw video: `4-gameover.png` is frame 6150 (the
-held debrief) and `5-leaderboard.png` frame 6450 (extract with
-`-vf "select=eq(n\,6150)" -frames:v 1 -pix_fmt rgb24`: 24-bit, no alpha).
+(`store-screenshots/3840x2160`) are frames of the raw video: `4-gameover.png` is frame 6720 (the
+held debrief) and `5-leaderboard.png` frame 7030 (extract with
+`-vf "select=eq(n\,6720)" -frames:v 1 -pix_fmt rgb24`: 24-bit, no alpha).
 
 ## Testing against production
 

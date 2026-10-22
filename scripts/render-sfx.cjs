@@ -7,13 +7,15 @@
  *       [--out=store-video/_sfx.wav] [--rate=48000] [--tail=3]
  *
  * Input is the JSON written by `record-autoplay.cjs --sfx=...` ({ duration, events: [{ at, method,
- * args }] }). js/managers/AudioManager.js is bundled with esbuild and run in headless Chrome on an
- * OfflineAudioContext whose `currentTime` is pinned to each event's `at` while that call schedules
- * its nodes, so every sound starts exactly on its video frame and uses the same synthesis,
- * panning, reverb and compression as the live game. The voice cap is disabled (offline rendering
- * reports `onended` only after scheduling finishes); per-sound throttling still applies. Output is
- * 16-bit stereo PCM covering `duration + tail` seconds, unmuted and unnormalised – level setting
- * and ducking under the voice-over happen in store-video/narrate.py.
+ * args }], comms?: [...] }). `comms` holds the debrief commander's voice (playSpeech with the
+ * clip), rendered through the same radio chain to its own `<out>-comms.wav` so narrate.py can mix
+ * it at voice-over level. js/managers/AudioManager.js is bundled with esbuild and run in
+ * headless Chrome on an OfflineAudioContext whose `currentTime` is pinned to each event's `at`
+ * while that call schedules its nodes, so every sound starts exactly on its video frame and uses
+ * the same synthesis, panning, reverb and compression as the live game. The voice cap is disabled
+ * (offline rendering reports `onended` only after scheduling finishes); per-sound throttling still
+ * applies. Output is 16-bit stereo PCM covering `duration + tail` seconds, unmuted and
+ * unnormalised – level setting and ducking under the voice-over happen in store-video/narrate.py.
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -27,13 +29,18 @@ const opt = (name, fallback) => {
 };
 const eventsPath = path.resolve(opt("events", "store-video/_sfx.json"));
 const out = path.resolve(opt("out", eventsPath.replace(/\.json$/i, ".wav")));
+/** The commander's voice track (the timeline's `comms` events), next to the effects WAV. */
+const commsOut = out.replace(/\.wav$/i, "-comms.wav");
 const rate = Number(opt("rate", "48000")) || 48000;
 const tail = Number(opt("tail", "3")) || 3;
 
-/** Page-side renderer: schedules every event, renders, and keeps 16-bit interleaved PCM. */
-const RENDER = (timeline, sampleRate, tailSec) => `(async () => {
-  const timeline = ${JSON.stringify(timeline)};
-  const length = Math.ceil((timeline.duration + ${tailSec}) * ${sampleRate});
+/**
+ * Page-side renderer: schedules every event (awaiting async ones such as playSpeech, whose MP3
+ * decode must finish while the clock is still pinned), renders, and keeps 16-bit interleaved PCM.
+ */
+const RENDER = (events, duration, sampleRate, tailSec) => `(async () => {
+  const events = ${JSON.stringify(events)};
+  const length = Math.ceil((${duration} + ${tailSec}) * ${sampleRate});
   let now = 0;
   class PinnedClock extends OfflineAudioContext {
     constructor() { super(2, length, ${sampleRate}); }
@@ -44,11 +51,11 @@ const RENDER = (timeline, sampleRate, tailSec) => `(async () => {
   const audio = new SfxBundle.AudioManager({ AudioContextCtor: PinnedClock, storage });
   audio.unlock();
   let played = 0;
-  for (const e of timeline.events) {
+  for (const e of events) {
     if (typeof audio[e.method] !== "function") continue;
     now = e.at;
     audio._voices = 0;
-    audio[e.method](...(e.args || []));
+    await audio[e.method](...(e.args || []));
     played++;
   }
   const rendered = await audio._ctx.startRendering();
@@ -107,20 +114,27 @@ async function main() {
   }).outputFiles[0].text;
 
   const { evaluate, close } = await connect({ url: "about:blank", width: 400, height: 300 });
-  try {
-    await evaluate(bundle);
-    const info = await evaluate(RENDER(timeline, rate, tail));
+  /** Render `events` to a WAV at `file`. */
+  const render = async (/** @type {any[]} */ events, /** @type {string} */ file) => {
+    const info = await evaluate(RENDER(events, timeline.duration, rate, tail));
     if (!info || !info.frames) throw new Error("offline render failed");
     const parts = [];
     for (let i = 0; i < info.chunks; i++) {
       parts.push(Buffer.from(await evaluate(`window.__sfxChunks[${i}]`), "base64"));
     }
     const data = Buffer.concat(parts);
-    fs.writeFileSync(out, Buffer.concat([wavHeader(data.length, 2, rate), data]));
+    fs.writeFileSync(file, Buffer.concat([wavHeader(data.length, 2, rate), data]));
     console.error(
-      `[render-sfx] ${info.played}/${timeline.events.length} events, ` +
-        `${(info.frames / rate).toFixed(1)}s, peak ${(20 * Math.log10(info.peak || 1e-9)).toFixed(1)} dBFS -> ${out}`
+      `[render-sfx] ${info.played}/${events.length} events, ` +
+        `${(info.frames / rate).toFixed(1)}s, peak ${(20 * Math.log10(info.peak || 1e-9)).toFixed(1)} dBFS -> ${file}`
     );
+  };
+  try {
+    await evaluate(bundle);
+    await render(timeline.events, out);
+    if (Array.isArray(timeline.comms) && timeline.comms.length) {
+      await render(timeline.comms, commsOut);
+    }
   } finally {
     close();
   }

@@ -47,10 +47,11 @@
       "text": "Fifteen seconds left. It's the finale, and every point now counts double!"
     },
     { "at": 86.5, "voice": "narrator", "text": "Survive to the end for the full score." },
+    { "at": 94.6, "voice": "host", "text": "Mission complete." },
     {
-      "at": 94.6,
+      "at": 97.0,
       "voice": "host",
-      "text": "Mission complete. Your AI commanders, Vega and Altair, powered by Amazon Bedrock and Amazon Polly, remember your missions and tell you how to improve."
+      "text": "Your AI commanders, Vega and Altair, powered by Amazon Bedrock and Amazon Polly, remember your missions and tell you how to improve."
     },
     {
       "at": 104.6,

@@ -19,19 +19,23 @@
  * scaled to the measured capture speed via the Animation domain.
  *
  * Sequence: title screen (held --hold s, with the remote high score loaded) → the run, stepped
- * frame by frame → game-over dialog with the animated "incoming transmission" (2s) → the AI
- * headline typing out (3.5s) and the Well done / Next mission sections fading in (0.5s) →
- * debrief held (3.5s) → Ok → initials prompt (2s) → leaderboard (3s). The post-run timeline is
- * fixed, so every cut of the same seed shares one narration timing. No score is submitted
- * (initials left empty). The default seed survived ~50s on the 360x640 viewport; other seeds
- * mostly die within 15s there.
+ * frame by frame → game-over dialog with the animated "incoming transmission" (2s, its signal
+ * locking at the end) → the AI headline typing out in sync with the commander's voice (its clip's
+ * length; 3.5s without one) and the Well done / Next mission sections fading in (0.5s) → debrief
+ * held (3.5s) → Ok → initials prompt (2s) → leaderboard (3s). No score is submitted (initials left
+ * empty). The default seed survived ~50s on the 360x640 viewport; other seeds mostly die within
+ * 15s there.
  *
- * Both are replayed by this script once the real debrief has arrived and typed out, since a slow
- * capture cannot follow the wall clock they run on: the transmission is saved at game over and
- * shown again in front of the debrief, then the recorder resets the headline's spans and reveals
- * it grapheme by grapheme, one step per output frame, in the game's own DOM and CSS (cursor
- * included). CSS animations (pulsing transmission, cursor, fade-in) are slowed to the measured
- * capture speed, as during the run.
+ * Commander's voice: the debrief's spoken clip is captured from the analysis response (DevTools
+ * Network domain); the voice meters follow its loudness, and with --sfx it is written to the
+ * timeline's `comms` list (playSpeech at the moment the signal locks) for render-sfx.cjs.
+ *
+ * The transmission and the typing are replayed by this script once the real debrief has arrived
+ * and typed out, since a slow capture cannot follow the wall clock they run on: the transmission
+ * is saved at game over and shown again in front of the debrief, then the recorder resets the
+ * headline's spans and reveals it grapheme by grapheme, one step per output frame, in the game's
+ * own DOM and CSS (cursor included). CSS animations (pulsing transmission, cursor, fade-in) are
+ * slowed to the measured capture speed, as during the run.
  *
  * Sound: screenshots carry no audio, so with --sfx the page runs with `soundlog=1` and every
  * sound-effect call made during the stepped run is written to that JSON as
@@ -161,7 +165,13 @@ const GAME_OVER_TAIL_S = 0.6;
 const TRANSMISSION_S = 2;
 /** The end of the transmission, with its signal locked (as the game shows it on arrival). */
 const SIGNAL_LOCK_S = 0.35;
+/** Headline typing when the debrief has no voice clip; with one, typing follows the voice. */
 const TYPING_S = 3.5;
+/**
+ * From AudioManager.playSpeech() to the voice: intro Quindar tone and squelch
+ * (CONFIG.AUDIO.RADIO.TONE_S + SQUELCH_S).
+ */
+const RADIO_LEAD_S = 0.25 + 0.12;
 const FADE_S = 0.5;
 const DEBRIEF_HOLD_S = 3.5;
 
@@ -199,14 +209,18 @@ const SHOW_DEBRIEF = `(() => {
 /**
  * Installs `window.__typeReplay` over the rendered debrief and resets it to an empty headline
  * with the sections hidden (no fade-out); returns the headline's grapheme count. `set(k)` shows
- * the first k graphemes (cursor while typing), `end()` shows all and fades the sections in.
+ * the first k graphemes (cursor while typing), `level(v)` drives the voice meters beside the
+ * commander's name (0-1, null to rest; added when `withMeters` and the page has none, since the
+ * headless page plays no audio), `end()` shows all, rests the meters and fades the sections in.
+ * @param {boolean} withMeters
  */
-const TYPE_REPLAY = `(() => {
+const typeReplay = (withMeters) => `(() => {
   const root = document.getElementById('postGameMessage');
   const typed = root.querySelector('.debrief-typed');
   const shown = root.querySelector('.debrief-typed-shown');
   const rest = root.querySelector('.debrief-typed-rest');
   const debrief = root.querySelector('.debrief');
+  const from = root.querySelector('.debrief-from');
   if (!typed || !shown || !rest || !debrief) return 0;
   const parts = Array.from(
     new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(shown.textContent + rest.textContent),
@@ -217,14 +231,78 @@ const TYPE_REPLAY = `(() => {
     rest.textContent = parts.slice(k).join('');
     typed.classList.toggle('typing', k < parts.length);
   };
+  let meters = Array.from(root.querySelectorAll('.voice-meter'));
+  if (${withMeters} && from && meters.length < 2) {
+    meters.forEach((m) => m.remove());
+    const make = (cls) => {
+      const m = document.createElement('span');
+      m.className = cls;
+      m.setAttribute('aria-hidden', 'true');
+      for (let i = 0; i < 3; i++) m.appendChild(document.createElement('i'));
+      return m;
+    };
+    meters = [make('voice-meter'), make('voice-meter mirrored')];
+    from.prepend(meters[0]);
+    from.append(meters[1]);
+  }
+  meters.forEach((m) => { m.hidden = !${withMeters}; });
+  const shape = [0.55, 0.9, 1.25];
+  const level = (v) => meters.forEach((m) => Array.from(m.children).forEach((bar, i) => {
+    if (v === null) return bar.style.removeProperty('--level');
+    const wobble = 0.85 + 0.3 * (((i * 7 + Math.round(v * 97)) % 5) / 4);
+    bar.style.setProperty('--level', Math.min(1, Math.max(0.15, v * shape[i] * wobble)).toFixed(2));
+  }));
   debrief.style.transition = 'none';
   debrief.classList.add('pending');
   void debrief.offsetWidth;
   debrief.style.transition = '';
   set(0);
-  window.__typeReplay = { set, end: () => { set(parts.length); debrief.classList.remove('pending'); } };
+  window.__typeReplay = {
+    set,
+    level,
+    end: () => { set(parts.length); level(null); debrief.classList.remove('pending'); },
+  };
   return parts.length;
 })()`;
+
+/**
+ * Decodes the debrief's narration clip in the page: its length and, per output frame, its
+ * loudness on the game's level-meter scale (RMS x 5, as AudioManager.speechLevel()).
+ * @param {string} base64 MP3
+ */
+const voiceEnvelope = (base64) => `(async () => {
+  const bin = atob(${JSON.stringify(base64)});
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const buffer = await new OfflineAudioContext(1, 1, 48000).decodeAudioData(bytes.buffer);
+  const data = buffer.getChannelData(0);
+  const step = buffer.sampleRate / ${fps};
+  const levels = [];
+  for (let s = 0; s < data.length; s += step) {
+    let sum = 0;
+    let n = 0;
+    for (let i = Math.floor(s); i < Math.min(data.length, s + step); i++, n++) sum += data[i] * data[i];
+    levels.push(Math.min(1, Math.sqrt(sum / Math.max(1, n)) * 5));
+  }
+  return { duration: buffer.duration, levels };
+})()`;
+
+/**
+ * The narration clip in an analysis response body (`{ audio, voice }`), or null. The body is the
+ * Lambda's JSON-encoded debrief string.
+ * @param {{ body?: string, base64Encoded?: boolean }|undefined} res Network.getResponseBody result
+ */
+function speechFrom(res) {
+  try {
+    const raw = res && res.base64Encoded ? Buffer.from(res.body, "base64").toString() : res?.body;
+    let parsed = JSON.parse(String(raw));
+    if (typeof parsed === "string") parsed = JSON.parse(parsed);
+    const speech = parsed && parsed.speech;
+    return speech && typeof speech.audio === "string" ? speech : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Locate ffmpeg: explicit flag, env, PATH, then the pinned local download. */
 async function resolveFfmpeg() {
@@ -457,7 +535,7 @@ async function main() {
   console.error(`[record] ${url} at ${width}x${height} @${scale}x, ${fps} fps`);
 
   // Start on about:blank so the clock shim is registered before the game script runs.
-  const { send, evaluate, close } = await connect({
+  const { send, evaluate, on, close } = await connect({
     url: "about:blank",
     width,
     height,
@@ -513,7 +591,21 @@ async function main() {
   /** Segment boundaries (output frame numbers), logged for picking screenshot frames. */
   const mark = (/** @type {string} */ name) =>
     console.error(`[record] ${name} from frame ${frameCount} (${(frameCount / fps).toFixed(2)}s)`);
+  // The commander's voice: the narration clip in the debrief response (a POST to the API).
+  /** @type {{ audio: string, voice?: string }|null} */
+  let clip = null;
+  const posts = new Set();
+  on("Network.requestWillBeSent", (p) => {
+    if (p.request.method === "POST" && p.request.url.includes("execute-api"))
+      posts.add(p.requestId);
+  });
+  on("Network.loadingFinished", async (p) => {
+    if (!posts.has(p.requestId)) return;
+    const res = await send("Network.getResponseBody", { requestId: p.requestId });
+    clip = speechFrom(res.result) || clip;
+  });
   try {
+    await send("Network.enable", { maxResourceBufferSize: 20e6, maxTotalBufferSize: 50e6 });
     await send("Page.addScriptToEvaluateOnNewDocument", { source: CLOCK_SHIM });
     await send("Animation.enable");
     await send("Page.navigate", { url });
@@ -578,13 +670,35 @@ async function main() {
     await evaluate(
       "document.querySelector('#postGameMessage .transmission').classList.add('locked')"
     );
+    // As in the game, the voice clip starts playing (call tone first) as the signal locks.
+    const commsAt = frameCount / fps;
     await grabLive(SIGNAL_LOCK_S);
     await evaluate(SHOW_DEBRIEF);
-    const graphemes = await evaluate(TYPE_REPLAY);
+    for (let i = 0; i < 50 && !clip; i++) await sleep(100);
+    /** @type {{ duration: number, levels: number[] }|null} */
+    const voice = clip ? await evaluate(voiceEnvelope(clip.audio)) : null;
+    const commander = await evaluate(
+      "document.getElementById('postGameMessage').classList.contains('commander-altair') ? 'altair' : 'vega'"
+    );
+    const graphemes = await evaluate(typeReplay(!!voice));
     if (!graphemes) throw new Error("debrief headline not found for the typing replay");
     mark("typing");
-    await grabLive(TYPING_S, async (i, n) => {
-      await evaluate(`__typeReplay.set(${Math.ceil(((i + 1) / n) * graphemes)})`);
+    console.error(
+      voice
+        ? `[record] ${commander}'s voice: ${voice.duration.toFixed(1)}s (typing follows it)`
+        : "[record] no voice clip in the debrief; typing at a fixed pace"
+    );
+    // Typing and meters follow the voice, which starts RADIO_LEAD_S after the call is placed.
+    const voiceDelay = commsAt + RADIO_LEAD_S - frameCount / fps;
+    await grabLive(voice ? voiceDelay + voice.duration : TYPING_S, async (i, n) => {
+      if (!voice) {
+        await evaluate(`__typeReplay.set(${Math.ceil(((i + 1) / n) * graphemes)})`);
+        return;
+      }
+      const t = (i + 1) / fps - voiceDelay;
+      const shown = Math.ceil(Math.min(1, Math.max(0, t / voice.duration)) * graphemes);
+      const level = t < 0 ? null : (voice.levels[Math.floor(t * fps)] ?? 0);
+      await evaluate(`__typeReplay.set(${shown}); __typeReplay.level(${level})`);
     });
     await evaluate("__typeReplay.end()");
     await grabLive(FADE_S);
@@ -607,12 +721,17 @@ async function main() {
         method: e.method,
         args: e.args,
       }));
+      // The commander's voice is its own track (`comms`), mixed at voice-over level by narrate.py.
+      const comms =
+        voice && clip ? [{ at: commsAt, method: "playSpeech", args: [clip.audio, commander] }] : [];
       fs.mkdirSync(path.dirname(sfxOut), { recursive: true });
       fs.writeFileSync(
         sfxOut,
-        JSON.stringify({ fps, duration: frameCount / fps, events }, null, 1)
+        JSON.stringify({ fps, duration: frameCount / fps, events, comms }, null, 1)
       );
-      console.error(`[record] wrote ${events.length} sound events to ${sfxOut}`);
+      console.error(
+        `[record] wrote ${events.length} sound events${comms.length ? " and the commander's voice" : ""} to ${sfxOut}`
+      );
     }
     console.error(
       `[record] ${frameCount} frames, ${(frameCount / fps).toFixed(1)}s; finishing encode (crf ${crf})`

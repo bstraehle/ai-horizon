@@ -23,10 +23,15 @@ then pass `--sfx store-video/_sfx-3840x2160.wav`. The effects are set `--sfx-lu`
 below the measured loudness of the voice-over cues and ducked further by a sidechain compressor
 keyed on the narration, so the voice stays clear (>= ~10 dB over the game) while the game is
 audible between and under the cues.
+
+Commander's voice (optional): render-sfx also writes `_sfx-....-comms.wav` when the recording
+captured the AI debrief's spoken clip; pass it as `--comms`. It is mixed at the voice-over's
+loudness, ducks the game like the narration, and any cue that would overlap it starts after it.
 """
 from __future__ import annotations
 
 import argparse
+import array
 import hashlib
 import json
 import re
@@ -88,8 +93,17 @@ def loudness(audio: Path) -> float:
     return float(json.loads(err[err.rindex("{"):err.rindex("}") + 1])["input_i"])
 
 
-def mix(narration: Path, sfx: Path | None, sfx_lu: float, out: Path) -> None:
-    """Narration alone, or narration over the effects bed ducked by the narration (float WAV)."""
+def busy_span(audio: Path, threshold: float = 0.02) -> tuple[float, float] | None:
+    """First and last moment (seconds) a track rises above `threshold` of full scale."""
+    samples = array.array("h", decode(audio))
+    limit = int(threshold * 32767)
+    loud = [i for i in range(0, len(samples), 48) if abs(samples[i]) > limit]
+    return (loud[0] / RATE, loud[-1] / RATE) if loud else None
+
+
+def mix(narration: Path, sfx: Path | None, sfx_lu: float, out: Path, comms: Path | None = None) -> None:
+    """Narration alone, or narration (plus the commander's comms track, at the same loudness)
+    over the effects bed, which both duck (float WAV)."""
     if sfx is None:
         cmd = [tool("ffmpeg"), "-y", "-v", "error", "-i", str(narration),
                "-af", "aformat=channel_layouts=stereo", "-c:a", "pcm_f32le", str(out)]
@@ -97,13 +111,25 @@ def mix(narration: Path, sfx: Path | None, sfx_lu: float, out: Path) -> None:
         voice = loudness(narration)
         sfx_lufs = voice - sfx_lu
         gain = sfx_lufs - loudness(sfx)
+        stereo = "aformat=sample_rates=48000:channel_layouts=stereo"
+        if comms is None:
+            voices = f"[0:a]{stereo},asplit=2[voice][key];"
+        else:
+            comms_gain = voice - loudness(comms)
+            voices = (
+                f"[0:a]{stereo}[narr];[2:a]{stereo},volume={comms_gain:.2f}dB,apad[comms];"
+                "[narr][comms]amix=inputs=2:duration=first:normalize=0,asplit=2[voice][key];"
+            )
+            print(f"commander's voice: {comms_gain:+.1f} dB to the voice-over's {voice:.1f} LUFS",
+                  file=sys.stderr)
         graph = (
-            "[0:a]aformat=sample_rates=48000:channel_layouts=stereo,asplit=2[voice][key];"
-            f"[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume={gain:.2f}dB,apad[bed];"
-            f"[bed][key]{DUCK}[ducked];"
-            "[voice][ducked]amix=inputs=2:duration=first:normalize=0[out]"
+            voices
+            + f"[1:a]{stereo},volume={gain:.2f}dB,apad[bed];"
+            + f"[bed][key]{DUCK}[ducked];"
+            + "[voice][ducked]amix=inputs=2:duration=first:normalize=0[out]"
         )
-        cmd = [tool("ffmpeg"), "-y", "-v", "error", "-i", str(narration), "-i", str(sfx),
+        inputs = ["-i", str(narration), "-i", str(sfx)] + (["-i", str(comms)] if comms else [])
+        cmd = [tool("ffmpeg"), "-y", "-v", "error", *inputs,
                "-filter_complex", graph, "-map", "[out]", "-c:a", "pcm_f32le", str(out)]
         print(f"effects bed: {gain:+.1f} dB to {sfx_lufs:.1f} LUFS ({sfx_lu:g} LU under the "
               f"{voice:.1f} LUFS voice-over), ducked while it speaks", file=sys.stderr)
@@ -124,20 +150,31 @@ def main() -> None:
     ap.add_argument("--crf", default="14")
     ap.add_argument("--sfx", default=None, help="game sound WAV from scripts/render-sfx.cjs")
     ap.add_argument("--sfx-lu", type=float, default=10.0, help="effects bed level below the voice-over (LU)")
+    ap.add_argument("--comms", default=None,
+                    help="the debrief commander's voice WAV (render-sfx's -comms.wav); mixed at "
+                         "voice-over level, and narration cues are moved out of its way")
     args = ap.parse_args()
 
     raw, out = Path(args.raw), Path(args.out)
     spec = json.loads(Path(args.script).read_text(encoding="utf-8"))
     engine, gap, tail = spec.get("engine", "neural"), spec.get("gap", 0.35), spec.get("tail", 1.0)
     voices = spec["voices"]
+    comms = Path(args.comms) if args.comms else None
+    busy = busy_span(comms) if comms else None
+    if busy:
+        print(f"commander speaks {busy[0]:.1f}s-{busy[1]:.1f}s", file=sys.stderr)
 
     cues, cursor = [], 0.0
     for cue in spec["cues"]:
         pcm = decode(synthesize(cue["text"], voices[cue["voice"]], engine, HERE / ".polly-cache"))
         start = max(cue["at"], cursor)
-        end = start + len(pcm) / 2 / RATE
+        length = len(pcm) / 2 / RATE
+        if busy and start < busy[1] and start + length > busy[0]:
+            start = busy[1] + gap
+        end = start + length
         if start > cue["at"] + 0.05:
-            print(f"note: cue at {cue['at']:.1f}s pushed to {start:.1f}s by the previous cue", file=sys.stderr)
+            print(f"note: cue at {cue['at']:.1f}s pushed to {start:.1f}s by the previous cue or "
+                  "the commander", file=sys.stderr)
         cues.append((start, end, cue["text"], pcm))
         cursor = end + gap
 
@@ -158,7 +195,7 @@ def main() -> None:
     )
 
     mixed = out.with_suffix(".mix.wav")
-    mix(wav, Path(args.sfx) if args.sfx else None, args.sfx_lu, mixed)
+    mix(wav, Path(args.sfx) if args.sfx else None, args.sfx_lu, mixed, comms)
     gain = TARGET_LUFS - loudness(mixed)
 
     w, h = args.size.split("x")
