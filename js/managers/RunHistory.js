@@ -9,9 +9,10 @@ import { commanderHooks, isCommander, pickCommander } from "./Commanders.js";
  *   One finished mission as remembered on this device.
  * @typedef {import("./Commanders.js").CastMemory} CastMemory
  * @typedef {import("./Commanders.js").CommanderId} CommanderId
- * @typedef {{ count: number, runs: RunEntry[], cast: CastMemory }} RunHistoryData
- *   `count` is every mission recorded; `runs` keeps only the most recent ones; `cast` remembers
- *   the debrief commanders (see Commanders.js).
+ * @typedef {{ count: number, runs: RunEntry[], best: number, cast: CastMemory }} RunHistoryData
+ *   `count` is every mission recorded; `runs` keeps only the most recent ones; `best` is the
+ *   all-time best score (kept apart, so personal bests stay right after older runs drop off);
+ *   `cast` remembers the debrief commanders (see Commanders.js).
  * @typedef {{ mission: number, hooks: string[], commander: CommanderId }} DebriefHistory
  *   Sent with the debrief request: the mission's number, its story hooks, and who debriefs it.
  */
@@ -48,6 +49,9 @@ export function ordinal(n) {
   return `${n}${suffix}`;
 }
 
+/** @param {{ score: number }[]} runs @returns {number} Their best score (0 without runs). */
+export const bestScore = (runs) => runs.reduce((best, e) => Math.max(best, e.score), 0);
+
 /** Mission counts worth a remark. */
 const MILESTONES = [10, 25, 50, 100, 200, 500];
 
@@ -58,10 +62,12 @@ const MILESTONES = [10, 25, 50, 100, 200, 500];
  * @param {RunEntry} entry The mission that just ended.
  * @param {RunEntry[]} previous Earlier missions on this device, oldest first.
  * @param {number} mission This mission's number (1 for the first ever).
- * @param {number} [max] Most hooks returned.
+ * @param {{ max?: number, best?: number }} [opts] `max`: most hooks returned; `best`: the
+ *   all-time best score before this mission (defaults to the best in `previous`).
  * @returns {string[]}
  */
-export function storyHooks(entry, previous, mission, max = 3) {
+export function storyHooks(entry, previous, mission, opts = {}) {
+  const { max = 3, best = bestScore(previous) } = opts;
   if (!previous.length) return mission <= 1 ? ["This is the pilot's first mission."] : [];
   /** @type {{ rank: number, text: string }[]} */
   const hooks = [];
@@ -77,7 +83,6 @@ export function storyHooks(entry, previous, mission, max = 3) {
   const last = previous[previous.length - 1];
   const pct = (/** @type {number} */ v) => Math.round(v * 100);
 
-  const best = Math.max(...previous.map((e) => e.score));
   if (best > 0 && entry.score > best) {
     add(
       100,
@@ -168,7 +173,13 @@ export class RunHistory {
     const runs = data && Array.isArray(data.runs) ? data.runs.filter(isEntry) : [];
     const count =
       data && Number.isFinite(data.count) ? Math.max(data.count, runs.length) : runs.length;
-    return { count, runs, cast: readCast(data && data.cast) };
+    const stored = data && Number.isFinite(data.best) ? data.best : 0;
+    return {
+      count,
+      runs,
+      best: Math.max(stored, bestScore(runs)),
+      cast: readCast(data && data.cast),
+    };
   }
 
   /**
@@ -180,11 +191,11 @@ export class RunHistory {
    * @returns {DebriefHistory}
    */
   debrief(entry, { record = true, locale = null } = {}) {
-    const { count, runs, cast } = this.read();
+    const { count, runs, best, cast } = this.read();
     const mission = count + 1;
-    const pick = pickCommander(entry, runs, cast, locale);
+    const pick = pickCommander(entry, runs, cast, locale, best);
     const { lead, tail } = commanderHooks(pick, entry, cast);
-    const hooks = [...lead, ...storyHooks(entry, runs, mission)]
+    const hooks = [...lead, ...storyHooks(entry, runs, mission, { best })]
       .slice(0, MAX_LEAD_AND_RUN_HOOKS)
       .concat(tail);
     if (record) {
@@ -193,6 +204,7 @@ export class RunHistory {
       this.storage.setJSON(this.key, {
         count: mission,
         runs: [...runs, entry].slice(-this.max),
+        best: Math.max(best, entry.score),
         cast: { last: pick.commander, ...(altairMet ? { altairMet: true } : {}) },
       });
     }

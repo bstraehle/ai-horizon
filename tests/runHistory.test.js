@@ -221,7 +221,7 @@ describe("RunHistory", () => {
       mission: 1,
       commander: "altair",
     });
-    expect(history.read()).toEqual({ count: 0, runs: [], cast: {} });
+    expect(history.read()).toEqual({ count: 0, runs: [], best: 0, cast: {} });
   });
 
   it("treats missing or corrupt storage as an empty history", () => {
@@ -230,6 +230,7 @@ describe("RunHistory", () => {
     expect(new RunHistory({ storage: new LocalStorageAdapter({ storage }) }).read()).toEqual({
       count: 0,
       runs: [],
+      best: 0,
       cast: {},
     });
     storage.setItem(
@@ -237,13 +238,36 @@ describe("RunHistory", () => {
       JSON.stringify({
         count: 9,
         runs: [{ score: "x" }, e({})],
+        best: "lots",
         cast: { last: "zorg", altairMet: "yes", line: "Hi.", lineBy: "altair" },
       })
     );
+    // Without a valid stored best (e.g. history from before it was kept), the runs' best counts.
     expect(new RunHistory({ storage: new LocalStorageAdapter({ storage }) }).read()).toEqual({
       count: 9,
       runs: [e({})],
+      best: 1000,
       cast: { line: "Hi.", lineBy: "altair" },
     });
+  });
+
+  it("keeps the all-time best after its mission drops out of the recent runs", () => {
+    const storage = memoryStorage();
+    const history = new RunHistory({ storage: new LocalStorageAdapter({ storage }), max: 2 });
+    history.debrief(full({ score: 9000 }));
+    history.debrief(e({ score: 100 }));
+    history.debrief(e({ score: 200 }));
+    expect(history.read().runs.map((r) => r.score)).toEqual([100, 200]);
+    expect(history.read().best).toBe(9000);
+    // 5000 beats every remembered run but not the all-time best: no false personal best.
+    const below = history.debrief(e({ score: 5000, verdict: "satisfactory" }));
+    expect(below.hooks.join(" ")).not.toMatch(/New personal best/);
+    expect(below.commander).toBe("vega");
+    const above = history.debrief(e({ score: 9500, verdict: "satisfactory" }));
+    expect(above.hooks[0]).toBe(
+      "New personal best: 9500 points, 500 more than the previous best of 9000."
+    );
+    expect(above.commander).toBe("altair");
+    expect(history.read().best).toBe(9500);
   });
 });

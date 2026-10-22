@@ -29,9 +29,10 @@
   --color-btn-gradient-hover-end: #777;
   --color-btn-gradient-hover-start: #555;
   --color-btn-gradient-start: #333;
-  /* Debrief commanders' names: Vega a blue-white star, Altair a warm gold. */
-  --color-commander-altair: #ffd27a;
-  --color-commander-vega: #9fd4ff;
+  /* Debrief commanders' names, from the game palette (CONFIG.COLORS): Altair the red accent of
+     bonus stars and asteroids, Vega the steel gray of stone asteroids. */
+  --color-commander-altair: #ff5c5c;
+  --color-commander-vega: #b9bfc9;
   --color-connection-online: var(--color-text);
   --color-connection-offline: var(--color-text);
   --color-text: #fff;

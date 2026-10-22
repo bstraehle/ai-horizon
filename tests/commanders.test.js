@@ -44,6 +44,10 @@ describe("pickCommander", () => {
     });
     const third = pickCommander(run({ score: 10 }), [run(), run()], { ...met, last: "vega" }, "en");
     expect(third.commander).toBe("vega");
+    // The all-time best counts, not just the recent runs passed in.
+    expect(
+      pickCommander(best, [run({ score: 4000 })], { ...met, last: "altair" }, "en", 6000).commander
+    ).toBe("vega");
     // Only the 2nd crash in a row: normal turn-taking.
     expect(
       pickCommander(run({ score: 10 }), [run()], { ...met, last: "vega" }, "en").commander

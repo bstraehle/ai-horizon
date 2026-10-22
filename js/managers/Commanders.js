@@ -71,14 +71,16 @@ export function isStarCrossedDay(t, timeZone) {
  * @param {MissionLike[]} previous Earlier missions on this device, oldest first.
  * @param {CastMemory} cast
  * @param {string|null|undefined} locale
+ * @param {number} [allTimeBest] Best score before this mission (defaults to the best in
+ *   `previous`, which only holds the most recent missions).
  * @returns {{ commander: CommanderId, debut: boolean }}
  */
-export function pickCommander(entry, previous, cast, locale) {
+export function pickCommander(entry, previous, cast, locale, allTimeBest) {
   const vega = { commander: /** @type {CommanderId} */ ("vega"), debut: false };
   const altair = { commander: /** @type {CommanderId} */ ("altair"), debut: false };
   if (!altairCanSpeak(locale)) return vega;
   if (!cast.altairMet) return entry.survived >= entry.total ? { ...altair, debut: true } : vega;
-  const best = previous.length ? Math.max(...previous.map((e) => e.score)) : 0;
+  const best = allTimeBest ?? previous.reduce((b, e) => Math.max(b, e.score), 0);
   if (best > 0 && entry.score > best) return altair;
   let crashes = 0;
   for (let i = previous.length - 1; i >= 0 && previous[i].verdict === "reprimand"; i--) crashes++;
