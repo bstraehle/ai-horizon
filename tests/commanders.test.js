@@ -35,10 +35,14 @@ describe("pickCommander", () => {
     });
   });
 
-  it("gives the first full mission to Altair as his debut", () => {
+  it("gives the first full mission to Altair as his debut, once the AI debrief is online", () => {
     expect(pickCommander(full(), [run(), run()], {}, "en-US")).toEqual({
       commander: "altair",
       debut: true,
+    });
+    expect(pickCommander(full(), [run()], {}, "en-US", undefined, false)).toEqual({
+      commander: "vega",
+      debut: false,
     });
   });
 

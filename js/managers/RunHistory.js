@@ -15,8 +15,9 @@ import { commanderHooks, isCommander, isOverallRecord, pickCommander } from "./C
  *   `count` is every mission recorded; `runs` keeps only the most recent ones; `best` is the
  *   all-time best score (kept apart, so personal bests stay right after older runs drop off);
  *   `cast` remembers the debrief commanders (see Commanders.js).
- * @typedef {{ mission: number, hooks: string[], commander: CommanderId }} DebriefHistory
- *   Sent with the debrief request: the mission's number, its story hooks, and who debriefs it.
+ * @typedef {{ mission: number, hooks: string[], commander: CommanderId, debut: boolean }} DebriefHistory
+ *   Sent with the debrief request: the mission's number, its story hooks, and who debriefs it;
+ *   `debut` (kept on the device) marks Altair's introduction.
  */
 
 /** Most story hooks about the run and the commanders' debut / star-crossed day together. */
@@ -197,13 +198,14 @@ export class RunHistory {
    * commander who debriefs it (see Commanders.js), then remember both unless `record` is false
    * (e.g. autopilot runs).
    * @param {RunEntry} entry
-   * @param {{ record?: boolean, locale?: string|null }} [opts]
+   * @param {{ record?: boolean, locale?: string|null, online?: boolean }} [opts] `online`: the
+   *   AI debrief is available (Altair's debut waits for it).
    * @returns {DebriefHistory}
    */
-  debrief(entry, { record = true, locale = null } = {}) {
+  debrief(entry, { record = true, locale = null, online = true } = {}) {
     const { count, runs, best, cast } = this.read();
     const mission = count + 1;
-    const pick = pickCommander(entry, runs, cast, locale, best);
+    const pick = pickCommander(entry, runs, cast, locale, best, online);
     const { lead, tail } = commanderHooks(pick, entry, cast);
     const hooks = [...lead, ...storyHooks(entry, runs, mission, { best })]
       .slice(0, MAX_LEAD_AND_RUN_HOOKS)
@@ -219,7 +221,18 @@ export class RunHistory {
         cast: { ...(lastFull ? { lastFull } : {}), ...(altairMet ? { altairMet: true } : {}) },
       });
     }
-    return { mission, hooks, commander: pick.commander };
+    return { mission, hooks, commander: pick.commander, debut: pick.debut };
+  }
+
+  /**
+   * Undo Altair's debut when its debrief fell back to the offline text (the request failed), so
+   * he introduces himself on the next full mission instead.
+   */
+  cancelDebut() {
+    const data = /** @type {any} */ (this.storage.getJSON(this.key, null));
+    if (!data || typeof data !== "object") return;
+    const { altairMet: _met, lastFull: _last, ...cast } = readCast(data.cast);
+    this.storage.setJSON(this.key, { ...data, cast });
   }
 
   /**

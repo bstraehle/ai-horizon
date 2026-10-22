@@ -4,10 +4,10 @@
  * Commander Vega (she/her) is the gruff veteran mentor; Captain Altair (he/him) is the hotshot
  * ace (their personas live in server/lambda/analysis.js, their voices and radio tones in
  * CONFIG.AUDIO.COMMANDERS). Vega debriefs every mission that ends before the full 90 seconds,
- * record or not. Altair debriefs the pilot's first full mission (his debut) and every full
- * mission that sets a record, personal or overall (the leaderboard's top score); other full
- * missions alternate between the two. Languages without a male Polly voice keep Vega, so a
- * character never switches voice.
+ * record or not. Altair debriefs the pilot's first full mission with the AI debrief online (his
+ * debut; offline full missions before it stay Vega's) and every full mission that sets a record,
+ * personal or overall (the leaderboard's top score); other full missions alternate between the
+ * two. Languages without a male Polly voice keep Vega, so a character never switches voice.
  */
 
 /** @typedef {"vega"|"altair"} CommanderId */
@@ -80,13 +80,15 @@ export function isStarCrossedDay(t, timeZone) {
  * @param {string|null|undefined} locale
  * @param {number} [allTimeBest] Best score before this mission (defaults to the best in
  *   `previous`, which only holds the most recent missions).
+ * @param {boolean} [online] Whether the AI debrief is available; Altair's debut waits for it, so
+ *   his introduction is never spent on an offline line.
  * @returns {{ commander: CommanderId, debut: boolean }}
  */
-export function pickCommander(entry, previous, cast, locale, allTimeBest) {
+export function pickCommander(entry, previous, cast, locale, allTimeBest, online = true) {
   const vega = { commander: /** @type {CommanderId} */ ("vega"), debut: false };
   const altair = { commander: /** @type {CommanderId} */ ("altair"), debut: false };
   if (!altairCanSpeak(locale) || entry.survived < entry.total) return vega;
-  if (!cast.altairMet) return { ...altair, debut: true };
+  if (!cast.altairMet) return online ? { ...altair, debut: true } : vega;
   const best = allTimeBest ?? previous.reduce((b, e) => Math.max(b, e.score), 0);
   if ((best > 0 && entry.score > best) || isOverallRecord(entry)) return altair;
   // Full missions take turns; without a remembered one, the last was Altair's debut.

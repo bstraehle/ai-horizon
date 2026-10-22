@@ -122,10 +122,12 @@ export const GameUI = {
             } else {
               game._lastAIAnalysis = "";
             }
-            // The next debrief can refer back to what this commander said.
+            // The next debrief can refer back to what this commander said; a debut that fell
+            // back to the offline text is undone, so Altair introduces himself next time.
             const { _lastHistory: history, runHistory } = game;
-            if (result.isRemote && history && runHistory && !game.devTools?.autopilot) {
-              runHistory.rememberDebrief(history.commander, result.title);
+            if (history && runHistory && !game.devTools?.autopilot) {
+              if (result.isRemote) runHistory.rememberDebrief(history.commander, result.title);
+              else if (history.debut) runHistory.cancelDebut();
             }
           },
           game._lastHistory || null

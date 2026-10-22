@@ -98,10 +98,10 @@ const TOPICS = {
 /**
  * Request fields for the device's debrief history: the mission number and story hooks as
  * `history`, and the commander who speaks as `commander`.
- * @param {{ mission?: number, hooks?: string[], commander?: string }} history
+ * @param {{ mission?: number, hooks?: string[], commander?: string, debut?: boolean }} history
  * @returns {{ history: { mission?: number, hooks?: string[] }, commander?: string }}
  */
-function historyFields({ commander, ...rest }) {
+function historyFields({ commander, debut: _debut, ...rest }) {
   return { history: rest, ...(commander ? { commander } : {}) };
 }
 
@@ -590,18 +590,21 @@ export class AIAnalysisAdapter {
             ],
           },
         ];
-    return { title: this._verdictTitle(payload.runSummary), sections };
+    const commander = payload.history && payload.history.commander === "altair" ? "altair" : "vega";
+    return { title: this._verdictTitle(payload.runSummary, commander), sections };
   }
 
   /**
-   * Offline headline in the tone of the run's {@link missionVerdict}; see {@link verdictLines}.
+   * Offline headline in the tone of the run's {@link missionVerdict}, in the voice of the
+   * commander who debriefs it; see {@link verdictLines}.
    * @param {any} runSummary
+   * @param {"vega"|"altair"} [commander]
    * @returns {string}
    */
-  _verdictTitle(runSummary) {
+  _verdictTitle(runSummary, commander = "vega") {
     const verdict = missionVerdict(runSummary);
     if (!verdict) return "Mission debrief protocol concluded. Here are your performance insights:";
-    const lines = verdictLines(verdict, runSummary);
+    const lines = verdictLines(verdict, runSummary, commander);
     const timer = runSummary.timer;
     const score = (runSummary.score && runSummary.score.playerFinalScore) || 0;
     const pick = Math.abs(Math.trunc(timer.survivedSeconds + score)) % lines.length;
@@ -621,17 +624,21 @@ const VERDICT_RATINGS_EN = {
  * seconds survived for a reprimand, the seconds left for a finale ejection, the full mission for
  * a satisfactory full run, and bonus asteroids or accuracy for a commendation. The caller picks
  * one from the run's numbers, so repeat runs read differently while a replayed (seeded) run
- * stays identical.
+ * stays identical. Commander Vega's lines are dry; Captain Altair, who only debriefs full
+ * missions (see managers/Commanders.js), has cocky ones of his own for those.
  * @param {Verdict} verdict
  * @param {any} runSummary
+ * @param {"vega"|"altair"} [commander]
  * @returns {string[]}
  */
-export function verdictLines(verdict, runSummary) {
+export function verdictLines(verdict, runSummary, commander = "vega") {
   const timer = runSummary.timer;
   const stats = runSummary.stats || {};
   const total = Number.isFinite(timer.totalSeconds) ? timer.totalSeconds : TIMER_SECONDS;
   const s = timer.survivedSeconds;
   const secs = (/** @type {number} */ n) => `${n} ${n === 1 ? "second" : "seconds"}`;
+  const altair = commander === "altair" && s >= total ? altairLines(verdict, total, stats) : null;
+  if (altair) return altair;
   if (verdict === "reprimand") {
     return [
       `Down after ${secs(s)}. The asteroid field wants a rematch.`,
@@ -668,5 +675,38 @@ export function verdictLines(verdict, runSummary) {
     `${pct}% of your shots hit. Precision like that wins wars.`,
     `${pct}% accuracy over the full mission. Textbook flying.`,
     `Full mission at ${pct}% accuracy. Every shot had a target.`,
+  ];
+}
+
+/**
+ * Captain Altair's offline lines for a full mission (see {@link verdictLines}), or null for a
+ * verdict he has none for.
+ * @param {Verdict} verdict
+ * @param {number} total Mission length (seconds).
+ * @param {any} stats
+ * @returns {string[]|null}
+ */
+function altairLines(verdict, total, stats) {
+  if (verdict === "satisfactory") {
+    return [
+      `Full ${total} seconds, hotshot. Now go hunt some bonus asteroids!`,
+      `You went the distance. Next run, bring the fireworks!`,
+      `${total} seconds and still flying. Vega owes me a coffee.`,
+    ];
+  }
+  if (verdict !== "commendation") return null;
+  const bonus = stats.bonusAsteroidsKilled ?? 0;
+  if (bonus >= VERDICT_BONUS_ASTEROIDS) {
+    return [
+      `${bonus} bonus asteroids vaporized. Now that's flying with style!`,
+      `${bonus} bonus asteroids down. Even Vega cracked a smile.`,
+      `Full mission and ${bonus} bonus asteroids. The leaderboard just got nervous!`,
+    ];
+  }
+  const pct = Math.round(100 * (stats.shotsFiredAccuracy ?? 0));
+  return [
+    `${pct}% of your shots hit. Ace material, pilot!`,
+    `${pct}% accuracy. Vega calls it discipline, I call it style.`,
+    `${pct}% on target. Bring that aim to the leaderboard!`,
   ];
 }

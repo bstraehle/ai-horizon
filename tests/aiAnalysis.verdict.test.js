@@ -106,6 +106,24 @@ describe("AIAnalysisAdapter verdict", () => {
     for (const line of verdictLines("reprimand", run(33))) expect(line).toContain("33 seconds");
   });
 
+  it("gives Captain Altair his own offline lines on full missions", async () => {
+    const full = { ...run(90), stats: { bonusAsteroidsKilled: 7, bonusAsteroidsEncountered: 8 } };
+    const altair = verdictLines("commendation", full, "altair");
+    expect(altair).not.toEqual(verdictLines("commendation", full));
+    for (const line of altair) expect(line).toContain("7 bonus asteroids");
+    expect(verdictLines("satisfactory", run(90), "altair").join(" ")).toMatch(/hotshot/);
+    // Crashes are Vega's: her lines, whoever is asked.
+    expect(verdictLines("reprimand", run(33), "altair")).toEqual(
+      verdictLines("reprimand", run(33))
+    );
+    const adapter = new AIAnalysisAdapter();
+    const { title } = await adapter.analyze({
+      runSummary: full,
+      history: { mission: 3, hooks: [], commander: "altair" },
+    });
+    expect(altair.some((line) => title.endsWith(line))).toBe(true);
+  });
+
   it("lays out the offline debrief as Well done / Next mission with exact facts", async () => {
     const adapter = new AIAnalysisAdapter();
     const { sections } = await adapter.analyze({ runSummary: REAL_RUN });

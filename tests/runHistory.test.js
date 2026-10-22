@@ -146,6 +146,7 @@ describe("RunHistory", () => {
       mission: 1,
       hooks: ["This is the pilot's first mission."],
       commander: "vega",
+      debut: false,
     });
     expect(history.debrief(e({ score: 200 })).hooks[0]).toMatch(/^New personal best: 200/);
     const third = history.debrief(e({ score: 150 }));
@@ -243,8 +244,33 @@ describe("RunHistory", () => {
     expect(history.debrief(full({}), { record: false })).toMatchObject({
       mission: 1,
       commander: "altair",
+      debut: true,
     });
     expect(history.read()).toEqual({ count: 0, runs: [], best: 0, cast: {} });
+  });
+
+  it("holds Altair's debut for an online debrief, and undoes one that fell back offline", () => {
+    const history = new RunHistory({
+      storage: new LocalStorageAdapter({ storage: memoryStorage() }),
+    });
+    // Offline full missions before his debut stay Vega's and don't use it up.
+    const offline = history.debrief(full({ score: 100 }), { online: false });
+    expect(offline).toMatchObject({ commander: "vega", debut: false });
+    expect(history.read().cast.altairMet).toBeUndefined();
+    // Online, but the request failed: the debut is undone, so the next full mission is it again.
+    expect(history.debrief(full({ score: 50 }))).toMatchObject({
+      commander: "altair",
+      debut: true,
+    });
+    history.cancelDebut();
+    expect(history.read().cast).toEqual({});
+    expect(history.debrief(full({ score: 60 }))).toMatchObject({
+      commander: "altair",
+      debut: true,
+    });
+    expect(history.read().cast).toEqual({ lastFull: "altair", altairMet: true });
+    // After the debut, offline full missions take turns as usual.
+    expect(history.debrief(full({ score: 10 }), { online: false }).commander).toBe("vega");
   });
 
   it("treats missing or corrupt storage as an empty history", () => {

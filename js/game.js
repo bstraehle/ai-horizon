@@ -1141,6 +1141,7 @@ class AIHorizon {
         ? this.runHistory.debrief(entry, {
             record: !(this.devTools && this.devTools.autopilot),
             locale: (device && device.locale) || null,
+            online: AIAnalysisManager.IS_REMOTE,
           })
         : null;
     } catch (_e) {
