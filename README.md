@@ -2,7 +2,7 @@
 
 **Play now:** [agentmode.dev](https://www.agentmode.dev) (browser, installable) · [Google Play](https://play.google.com/store/apps/details?id=dev.agentmode.aihorizon)
 
-**Architecture:** [watch the architecture video on YouTube](https://www.youtube.com/watch?v=zHNJO3Quy4g&list=PLJk1nicp9M5s)
+**Architecture:** [watch the architecture video on YouTube](https://www.youtube.com/watch?v=zHNJO3Quy4g&list=PLBeZM2WRa9Jw)
 
 An arcade-style space shooter for the browser: collect stars, blast asteroids, and beat the 90-second clock. Built with vanilla JavaScript and HTML5 Canvas, installable as a PWA, and backed by an optional serverless AWS leaderboard with AI run analysis.
 
