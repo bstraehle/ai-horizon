@@ -19,6 +19,28 @@ const SPEECH_TIMING_WAIT_MS = 1500;
  * Polly can pass the default 8 s, and the incoming transmission covers the wait.
  */
 const ANALYSIS_TIMEOUT_MS = 15000;
+/** Signal bars while the transmission is incoming, and how long they show "locked" on arrival. */
+const SIGNAL_BARS = 6;
+const SIGNAL_LOCK_MS = 350;
+/** Voice meter bars on each side of the commander's name, their relative heights, rest level. */
+const METER_SHAPE = [0.55, 0.9, 1.25];
+const METER_REST = 0.15;
+/** How long the meter keeps reading after the voice should have ended. */
+const METER_TAIL_MS = 400;
+
+/**
+ * Element with `count` empty `<i>` bars.
+ * @param {string} className
+ * @param {number} count
+ * @returns {HTMLSpanElement}
+ */
+function barsElement(className, count) {
+  const el = document.createElement("span");
+  el.className = className;
+  el.setAttribute("aria-hidden", "true");
+  for (let i = 0; i < count; i++) el.appendChild(document.createElement("i"));
+  return el;
+}
 
 /**
  * The commander who debriefs (see managers/Commanders.js); Commander Vega without history.
@@ -33,12 +55,13 @@ const commanderOf = (history) => (history && history.commander === "altair" ? "a
  *
  * Presentation: while a remote debrief loads, the screen shows an "incoming transmission" from
  * the mission's commander, Commander Vega or Captain Altair (localized, each with an accent colour
- * via `commander-<id>` on the container), with their call tone and a radio crackle; the outcome
- * title and the Ok button are hidden until the debrief arrives (then shown, Ok enabled and
- * focused). The headline then types out in
- * sync with the spoken clip (or at a reading pace without one, instantly under reduced motion),
- * and the Well done / Next mission sections appear when it is complete. Screen readers get the
- * full headline at once.
+ * via `commander-<id>` on the container), with their call tone, a radio crackle, and signal bars
+ * that light up one by one, the last searching until the debrief arrives and the signal shows
+ * "locked" for a moment; the outcome title and the Ok button are hidden until the debrief arrives
+ * (then shown, Ok enabled and focused). While the commander speaks, voice meters beside the name
+ * follow the narration's loudness. The headline then types out in sync with the spoken clip (or
+ * at a reading pace without one, instantly under reduced motion), and the Well done / Next
+ * mission sections appear when it is complete. Screen readers get the full headline at once.
  */
 export class AIAnalysisManager {
   static IS_REMOTE = true;
@@ -59,6 +82,8 @@ export class AIAnalysisManager {
   static _cache = null;
   /** Headline reveal in progress (cancelled by the next render). */
   static _reveal = null;
+  /** Voice meter animation in progress (stopped by the next render). */
+  static _meter = null;
 
   /**
    * Create an AIAnalysisAdapter with appropriate remote configuration.
@@ -152,6 +177,67 @@ export class AIAnalysisManager {
   }
 
   /**
+   * Show the incoming transmission's signal as locked for a moment before the debrief replaces
+   * it (no pause without a transmission on screen or under reduced motion).
+   * @param {HTMLElement} container
+   * @returns {Promise<void>}
+   */
+  static async _lockSignal(container) {
+    const transmission = container.querySelector(".transmission");
+    if (!transmission || prefersReducedMotion()) return;
+    transmission.classList.add("locked");
+    await new Promise((resolve) => setTimeout(resolve, SIGNAL_LOCK_MS));
+  }
+
+  /**
+   * Drive the voice meters beside the commander's name from the narration's loudness until the
+   * voice has ended (per its timing), then let them rest. Hidden when the clip never plays.
+   * @param {HTMLElement[]} meters
+   * @param {Promise<{delay:number,duration:number}|null>} speechTiming
+   * @returns {{ stop: () => void }}
+   */
+  static _startMeter(meters, speechTiming) {
+    const audio = AIAnalysisManager.audio;
+    const bars = meters.map((m) => Array.from(m.children));
+    const raf =
+      typeof requestAnimationFrame === "function"
+        ? requestAnimationFrame
+        : (/** @type {() => void} */ fn) => setTimeout(fn, 16);
+    let stopped = false;
+    let endAt = Infinity;
+    const stop = () => {
+      stopped = true;
+      for (const bar of bars.flat()) bar.style.removeProperty("--level");
+    };
+    Promise.resolve(speechTiming).then((t) => {
+      if (!t) {
+        for (const m of meters) m.hidden = true;
+        stop();
+        return;
+      }
+      endAt = performance.now() + (t.delay + t.duration) * 1000 + METER_TAIL_MS;
+    });
+    const tick = () => {
+      if (stopped) return;
+      if (performance.now() > endAt) {
+        stop();
+        return;
+      }
+      const level = audio && typeof audio.speechLevel === "function" ? audio.speechLevel() : 0;
+      for (const side of bars) {
+        side.forEach((bar, i) => {
+          const jitter = 0.8 + Math.random() * 0.4;
+          const value = Math.min(1, Math.max(METER_REST, level * METER_SHAPE[i] * jitter));
+          bar.style.setProperty("--level", value.toFixed(2));
+        });
+      }
+      raf(tick);
+    };
+    raf(tick);
+    return { stop };
+  }
+
+  /**
    * How to type the headline: in sync with the voice when its timing arrives in time, otherwise
    * at a reading pace; instantly under reduced motion.
    * @param {string} title
@@ -207,6 +293,8 @@ export class AIAnalysisManager {
     container.classList.add(`commander-${commander}`);
     if (AIAnalysisManager._reveal) AIAnalysisManager._reveal.cancel();
     AIAnalysisManager._reveal = null;
+    if (AIAnalysisManager._meter) AIAnalysisManager._meter.stop();
+    AIAnalysisManager._meter = null;
 
     const clear = () => {
       try {
@@ -226,6 +314,23 @@ export class AIAnalysisManager {
         const from = document.createElement("p");
         from.className = "debrief-from";
         from.textContent = sender;
+        // Voice meters flank the name while the commander speaks (keeps the name centred).
+        const audio = AIAnalysisManager.audio;
+        if (
+          payload?.speechTiming &&
+          audio &&
+          typeof audio.speechLevel === "function" &&
+          !prefersReducedMotion()
+        ) {
+          const left = barsElement("voice-meter", METER_SHAPE.length);
+          const right = barsElement("voice-meter mirrored", METER_SHAPE.length);
+          from.prepend(left);
+          from.append(right);
+          AIAnalysisManager._meter = AIAnalysisManager._startMeter(
+            [left, right],
+            payload.speechTiming
+          );
+        }
         const headline = document.createElement("p");
         headline.className = "debrief-headline";
         const spoken = document.createElement("span");
@@ -335,14 +440,10 @@ export class AIAnalysisManager {
         const label = document.createElement("span");
         label.className = "transmission-label";
         label.textContent = `📡 ${labels.transmission}`;
-        const dots = document.createElement("span");
-        dots.className = "transmission-dots";
-        dots.setAttribute("aria-hidden", "true");
-        dots.textContent = "…";
         const from = document.createElement("span");
         from.className = "transmission-from";
-        from.textContent = sender;
-        p.append(label, dots, from);
+        from.append(sender, barsElement("transmission-signal", SIGNAL_BARS));
+        p.append(label, from);
         container.appendChild(p);
         AIAnalysisManager._setHeadlineHidden(true);
       } catch {
@@ -379,7 +480,8 @@ export class AIAnalysisManager {
       ...(history ? { history } : {}),
     });
     if (maybe && typeof maybe.then === "function") {
-      maybe.then((res) => {
+      maybe.then(async (res) => {
+        await AIAnalysisManager._lockSignal(container);
         doRender(res);
         if (onComplete && typeof onComplete === "function") {
           try {

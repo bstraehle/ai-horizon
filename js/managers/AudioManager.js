@@ -11,6 +11,9 @@ function commanderTones(commander) {
   return commander === "altair" ? altair : vega;
 }
 
+/** Scales the voice's RMS (speech peaks around 0.1-0.2) to the 0-1 range of speechLevel(). */
+const SPEECH_METER_GAIN = 5;
+
 /** Major-pentatonic steps (semitones above C6) climbed by consecutive star pickups. */
 const STAR_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
 
@@ -43,7 +46,8 @@ const STAR_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
  *  - playSpeech(base64Mp3): decodes and plays the clip through the master bus (so mute applies)
  *    as a radio transmission (Quindar tones, squelch, band-limited voice, hiss), starting after
  *    the loud part of a fatal crash, and reports when the voice starts and how long it lasts
- *    (the headline types along with it); stopSpeech() cancels it (new run).
+ *    (the headline types along with it); stopSpeech() cancels it (new run); speechLevel()
+ *    reads the voice's loudness for the level meter.
  *
  * Lifecycle & policy
  *  - The AudioContext is created lazily by `unlock()`, which callers invoke from a user gesture
@@ -91,8 +95,10 @@ export class AudioManager {
     /** Context time before which narration should not start (end of a crash's loud part). */
     this._fatalEndsAt = 0;
     /**
-     * Current narration: the voice source and the gain all of its transmission nodes feed.
-     * @type {{ src: AudioBufferSourceNode, out: GainNode }|null}
+     * Current narration: the voice source, the gain all of its transmission nodes feed, and the
+     * analyser (with its sample buffer) behind speechLevel().
+     * @type {{ src: AudioBufferSourceNode, out: GainNode, analyser: AnalyserNode,
+     *   samples: Float32Array<ArrayBuffer> }|null}
      */
     this._speech = null;
     /** Incremented to invalidate in-flight narration decodes. */
@@ -421,12 +427,30 @@ export class AudioManager {
       const src = ctx.createBufferSource();
       src.buffer = buffer;
       src.connect(this._radioBand(gain));
+      // Taps the clean voice for speechLevel() (a level meter); feeds nothing audible.
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      src.connect(analyser);
       src.start(voiceAt);
-      this._speech = { src, out };
+      this._speech = { src, out, analyser, samples: new Float32Array(analyser.fftSize) };
       return { delay: Math.max(0, voiceAt - ctx.currentTime), duration: voiceEnd - voiceAt };
     } catch {
       return null;
     }
+  }
+
+  /**
+   * How loud the narration voice is right now, from 0 (silent, or no narration) to 1, for a
+   * level meter next to the speaking commander's name.
+   * @returns {number}
+   */
+  speechLevel() {
+    const speech = this._speech;
+    if (!speech) return 0;
+    speech.analyser.getFloatTimeDomainData(speech.samples);
+    let sum = 0;
+    for (const v of speech.samples) sum += v * v;
+    return Math.min(1, Math.sqrt(sum / speech.samples.length) * SPEECH_METER_GAIN);
   }
 
   /** Stop current narration (voice and transmission sounds) and cancel any clip still decoding. */

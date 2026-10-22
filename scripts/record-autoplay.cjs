@@ -159,6 +159,8 @@ const DEBRIEF_ARRIVED = "!!document.querySelector('#postGameMessage .debrief')";
 /** Post-run timeline, in seconds of video (fixed, see the header), from the game-over frame. */
 const GAME_OVER_TAIL_S = 0.6;
 const TRANSMISSION_S = 2;
+/** The end of the transmission, with its signal locked (as the game shows it on arrival). */
+const SIGNAL_LOCK_S = 0.35;
 const TYPING_S = 3.5;
 const FADE_S = 0.5;
 const DEBRIEF_HOLD_S = 3.5;
@@ -572,7 +574,11 @@ async function main() {
     await sleep(200);
     if (!(await evaluate(SHOW_TRANSMISSION))) throw new Error("could not replay the transmission");
     mark("transmission");
-    await grabLive(TRANSMISSION_S);
+    await grabLive(TRANSMISSION_S - SIGNAL_LOCK_S);
+    await evaluate(
+      "document.querySelector('#postGameMessage .transmission').classList.add('locked')"
+    );
+    await grabLive(SIGNAL_LOCK_S);
     await evaluate(SHOW_DEBRIEF);
     const graphemes = await evaluate(TYPE_REPLAY);
     if (!graphemes) throw new Error("debrief headline not found for the typing replay");

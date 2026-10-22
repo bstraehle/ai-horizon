@@ -105,6 +105,15 @@ function makeFakeContext({ stereo = true } = {}) {
       this.convolvers.push(c);
       return c;
     }
+    /** Analyser whose samples all equal `voiceSample` (a steady voice of that amplitude). */
+    createAnalyser() {
+      return {
+        connect: vi.fn(),
+        fftSize: 2048,
+        getFloatTimeDomainData: (/** @type {Float32Array} */ out) => out.fill(this.voiceSample),
+      };
+    }
+    voiceSample = 0;
     /** @param {number} channels @param {number} len */
     createBuffer(channels, len) {
       const data = Array.from({ length: channels }, () => new Float32Array(len));
@@ -367,6 +376,18 @@ describe("AudioManager", () => {
       altair.introHz,
       altair.outroHz,
     ]);
+  });
+
+  it("reads the narration voice's loudness for the level meter", async () => {
+    const { audio, ctx } = unlocked();
+    expect(audio.speechLevel()).toBe(0);
+    await audio.playSpeech(Buffer.from([1]).toString("base64"));
+    ctx.voiceSample = 0.1;
+    expect(audio.speechLevel()).toBeCloseTo(0.5);
+    ctx.voiceSample = 0.9;
+    expect(audio.speechLevel()).toBe(1);
+    audio.stopSpeech();
+    expect(audio.speechLevel()).toBe(0);
   });
 
   it("skips narration when muted, locked, or invalid, and stopSpeech cancels it", async () => {

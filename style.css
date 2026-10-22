@@ -385,9 +385,87 @@ body {
 .post-game-message .transmission-label {
   animation: transmission-pulse 1.2s ease-in-out infinite;
 }
-.post-game-message .transmission-dots {
-  animation: transmission-pulse 0.6s steps(2, jump-none) infinite;
-  margin-left: calc(-1 * var(--space-2));
+/* Signal strength beside the commander's name while the transmission is incoming: the bars light
+   up one by one and the last keeps searching; when the debrief arrives the signal locks (all bars
+   in the commander's colour). */
+.post-game-message .transmission-signal {
+  align-items: flex-end;
+  display: inline-flex;
+  gap: 2px;
+  height: 1em;
+  margin-left: var(--space-2);
+}
+.post-game-message .transmission-signal i {
+  animation: signal-on 0.15s ease-out var(--signal-delay, 0s) forwards;
+  background: currentColor;
+  border-radius: 1px;
+  height: var(--signal-height, 100%);
+  opacity: 0.2;
+  width: 3px;
+}
+.post-game-message .transmission-signal i:nth-child(1) {
+  --signal-delay: 0.2s;
+  --signal-height: 30%;
+}
+.post-game-message .transmission-signal i:nth-child(2) {
+  --signal-delay: 0.55s;
+  --signal-height: 44%;
+}
+.post-game-message .transmission-signal i:nth-child(3) {
+  --signal-delay: 0.9s;
+  --signal-height: 58%;
+}
+.post-game-message .transmission-signal i:nth-child(4) {
+  --signal-delay: 1.25s;
+  --signal-height: 72%;
+}
+.post-game-message .transmission-signal i:nth-child(5) {
+  --signal-delay: 1.6s;
+  --signal-height: 86%;
+}
+.post-game-message .transmission-signal i:nth-child(6) {
+  animation: transmission-pulse 0.5s steps(2, jump-none) 1.95s infinite;
+}
+.post-game-message .transmission.locked .transmission-label,
+.post-game-message .transmission.locked .transmission-signal i {
+  animation: none;
+  opacity: 1;
+}
+.post-game-message.commander-vega .transmission.locked .transmission-signal {
+  color: var(--color-commander-vega);
+}
+.post-game-message.commander-altair .transmission.locked .transmission-signal {
+  color: var(--color-commander-altair);
+}
+@keyframes signal-on {
+  to {
+    opacity: 1;
+  }
+}
+/* Voice meters on both sides of the speaking commander's name, driven by the narration's
+   loudness (--level, set per frame by AIAnalysisManager). */
+.post-game-message .voice-meter {
+  align-items: flex-end;
+  display: inline-flex;
+  gap: 2px;
+  height: 0.9em;
+  margin: 0 var(--space-2);
+  vertical-align: -0.1em;
+}
+.post-game-message .voice-meter.mirrored {
+  flex-direction: row-reverse;
+}
+.post-game-message .voice-meter[hidden] {
+  display: none;
+}
+.post-game-message .voice-meter i {
+  background: currentColor;
+  border-radius: 1px;
+  height: 100%;
+  transform: scaleY(var(--level, 0.15));
+  transform-origin: bottom;
+  transition: transform 60ms linear;
+  width: 3px;
 }
 .post-game-message .transmission-from,
 .post-game-message .debrief-from {
@@ -417,7 +495,6 @@ body {
   margin-bottom: 0;
 }
 .post-game-message .transmission-label,
-.post-game-message .transmission-dots,
 .post-game-message .transmission-from {
   text-box: trim-both cap alphabetic;
 }
@@ -760,5 +837,9 @@ body.about-body,
     animation: none !important;
     scroll-behavior: auto !important;
     transition: none !important;
+  }
+  /* Without the light-up animation the signal bars show at full strength. */
+  .post-game-message .transmission-signal i {
+    opacity: 1;
   }
 }

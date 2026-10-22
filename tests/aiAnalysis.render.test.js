@@ -155,4 +155,81 @@ describe("AIAnalysisManager.render", () => {
     expect(box.classList.contains("typing")).toBe(false);
     expect(debrief.classList.contains("pending")).toBe(false);
   });
+
+  it("shows signal bars while waiting and locks them before the debrief arrives", async () => {
+    setReducedMotion(false);
+    vi.useFakeTimers();
+    AIAnalysisManager.audio = null;
+    const msg = /** @type {HTMLElement} */ (document.getElementById("msg"));
+    AIAnalysisManager.render(msg, {}, RUN, true);
+    const signal = /** @type {HTMLElement} */ (msg.querySelector(".transmission-signal"));
+    expect(signal.querySelectorAll("i")).toHaveLength(6);
+    expect(signal.getAttribute("aria-hidden")).toBe("true");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(msg.querySelector(".transmission")?.classList.contains("locked")).toBe(true);
+    expect(msg.querySelector(".debrief")).toBeNull();
+    await vi.advanceTimersByTimeAsync(350);
+    expect(msg.querySelector(".transmission")).toBeNull();
+    expect(msg.querySelector(".debrief")).not.toBeNull();
+  });
+
+  describe("voice meters", () => {
+    const payload = (/** @type {any} */ speechTiming) => ({
+      title: "👨‍🚀 Satisfactory, pilot. Clean run.",
+      sections: [],
+      isRemote: true,
+      speechTiming,
+    });
+
+    beforeEach(() => {
+      setReducedMotion(false);
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance", "Date"] });
+      AIAnalysisManager.audio = /** @type {any} */ ({
+        supported: true,
+        muted: false,
+        speechLevel: () => 0.6,
+        playSpeech: vi.fn(),
+      });
+    });
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it("flank the commander's name and follow the voice until it ends", async () => {
+      vi.spyOn(AIAnalysisManager, "analyze").mockResolvedValue(
+        /** @type {any} */ (payload(Promise.resolve({ delay: 0.2, duration: 1 })))
+      );
+      const msg = /** @type {HTMLElement} */ (document.getElementById("msg"));
+      AIAnalysisManager.render(msg, {}, RUN, false);
+      await vi.advanceTimersByTimeAsync(0);
+      const from = /** @type {HTMLElement} */ (msg.querySelector(".debrief-from"));
+      const meters = from.querySelectorAll(".voice-meter");
+      expect(meters).toHaveLength(2);
+      expect(from.firstElementChild).toBe(meters[0]);
+      expect(from.lastElementChild).toBe(meters[1]);
+      expect(meters[1].classList.contains("mirrored")).toBe(true);
+      expect(from.textContent).toBe("Commander Vega");
+      await vi.advanceTimersByTimeAsync(100);
+      const levels = () =>
+        Array.from(from.querySelectorAll("i"), (i) => i.style.getPropertyValue("--level"));
+      expect(levels().every((l) => Number(l) > 0.15)).toBe(true);
+      // Voice ends at 1.2 s, plus the meter's short tail: the bars come to rest.
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(levels().every((l) => l === "")).toBe(true);
+    });
+
+    it("are hidden when the clip never plays, and absent without a clip", async () => {
+      const analyze = vi.spyOn(AIAnalysisManager, "analyze");
+      analyze.mockResolvedValue(/** @type {any} */ (payload(Promise.resolve(null))));
+      const msg = /** @type {HTMLElement} */ (document.getElementById("msg"));
+      AIAnalysisManager.render(msg, {}, RUN, false);
+      await vi.advanceTimersByTimeAsync(0);
+      const meters = Array.from(msg.querySelectorAll(".voice-meter"));
+      expect(meters.map((m) => /** @type {HTMLElement} */ (m).hidden)).toEqual([true, true]);
+
+      analyze.mockResolvedValue(/** @type {any} */ (payload(undefined)));
+      AIAnalysisManager.render(msg, {}, RUN, false);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(msg.querySelectorAll(".voice-meter")).toHaveLength(0);
+    });
+  });
 });
