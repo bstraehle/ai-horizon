@@ -111,7 +111,7 @@ describe("AIAnalysisManager narration", () => {
     await expect(result.speechTiming).resolves.toEqual({ delay: 0.4, duration: 2.5 });
   });
 
-  it("requests Captain Altair's voice and call tone when he debriefs", async () => {
+  it("requests Captain Altair's voice and radio tones when he debriefs", async () => {
     const { audio, adapter } = setup();
     const history = { mission: 5, hooks: [], commander: "altair" };
     await AIAnalysisManager.analyze({ runSummary: { score: 1 }, history });

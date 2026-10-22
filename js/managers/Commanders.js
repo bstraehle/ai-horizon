@@ -2,7 +2,7 @@
  * The two debrief commanders and who radios the pilot after a mission.
  *
  * Commander Vega (she/her) is the gruff veteran mentor; Captain Altair (he/him) is the hotshot
- * ace (their personas live in server/lambda/analysis.js, their voices and call tones in
+ * ace (their personas live in server/lambda/analysis.js, their voices and radio tones in
  * CONFIG.AUDIO.COMMANDERS). Vega debriefs alone until the pilot's first full mission, which is
  * Altair's debut; from then on they take turns, except that a new personal best always goes to
  * Altair and a third early crash in a row always goes to Vega. Languages without a male Polly

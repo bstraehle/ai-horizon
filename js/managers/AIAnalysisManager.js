@@ -55,11 +55,11 @@ const commanderOf = (history) => (history && history.commander === "altair" ? "a
  *
  * Presentation: while a remote debrief loads, the screen shows an "incoming transmission" from
  * the mission's commander, Commander Vega or Captain Altair (localized, each with an accent colour
- * via `commander-<id>` on the container), with their call tone, a radio crackle, and signal bars
- * that light up one by one, the last searching until the debrief arrives and the signal shows
- * "locked" for a moment; the outcome title and the Ok button are hidden until the debrief arrives
- * (then shown, Ok enabled and focused). While the commander speaks, voice meters beside the name
- * follow the narration's loudness. The headline then types out in sync with the spoken clip (or
+ * via `commander-<id>` on the container), with a radio crackle and signal bars that light up one
+ * by one, the last searching until the debrief arrives and the signal shows "locked" for a
+ * moment; the outcome title and the Ok button are hidden until the debrief arrives (then shown,
+ * Ok enabled and focused). While the commander speaks, voice meters beside the name follow the
+ * narration's loudness. The headline then types out in sync with the spoken clip (or
  * at a reading pace without one, instantly under reduced motion), and the Well done / Next
  * mission sections appear when it is complete. Screen readers get the full headline at once.
  */
@@ -70,7 +70,7 @@ export class AIAnalysisManager {
    * Sound engine used to narrate the Game Over headline (set by the game). Speech is requested
    * from the server – which invokes Amazon Polly – only when this is set, supported, unmuted and
    * remote mode is on.
-   * @type {{ supported: boolean, muted: boolean, playTransmission?: (commander: string) => void,
+   * @type {{ supported: boolean, muted: boolean, playTransmission?: () => void,
    *   playSpeech: (base64: string, commander: string) =>
    *     Promise<{ delay: number, duration: number }|null> }|null}
    */
@@ -452,7 +452,7 @@ export class AIAnalysisManager {
       try {
         const audio = AIAnalysisManager.audio;
         if (audio && typeof audio.playTransmission === "function") {
-          audio.playTransmission(commander);
+          audio.playTransmission();
         }
       } catch {
         /* sound optional */

@@ -429,7 +429,7 @@ export const CONFIG = deepFreeze({
     STAR_STREAK_WINDOW_MS: 700,
     /**
      * The two debrief commanders (see managers/Commanders.js): each keeps one Polly voice gender
-     * and its own Quindar tone pitch, so players hear who is calling before the voice starts.
+     * and its own pitch for the Quindar tones that open and close the voice.
      */
     COMMANDERS: {
       vega: { voice: "female", introHz: 2525, outroHz: 2475 },
@@ -445,10 +445,6 @@ export const CONFIG = deepFreeze({
       HISS_GAIN: 0.025,
       TONE_S: 0.25,
       TONE_GAIN: 0.05,
-      /** Call chirp while the debrief loads: two short blips, the second this much higher. */
-      CHIRP_S: 0.06,
-      CHIRP_GAP_S: 0.05,
-      CHIRP_RISE: 1.26,
       SQUELCH_S: 0.12,
       SQUELCH_GAIN: 0.35,
     },

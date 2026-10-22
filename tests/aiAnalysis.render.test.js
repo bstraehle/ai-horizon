@@ -82,7 +82,7 @@ describe("AIAnalysisManager.render", () => {
     expect(msg.querySelector(".transmission-label")?.textContent).toBe("📡 Eingehende Übertragung");
     expect(msg.querySelector(".transmission-from")?.textContent).toBe("Kommandantin Vega");
     expect(msg.classList.contains("commander-vega")).toBe(true);
-    expect(playTransmission).toHaveBeenCalledWith("vega");
+    expect(playTransmission).toHaveBeenCalledTimes(1);
     expect(msg.querySelector(".transmission")?.getAttribute("role")).toBe("status");
     const okBtn = /** @type {HTMLButtonElement} */ (document.getElementById("okBtn"));
     expect(okBtn.disabled).toBe(true);
@@ -90,7 +90,7 @@ describe("AIAnalysisManager.render", () => {
     expect(/** @type {HTMLElement} */ (document.getElementById("gameOverTitle")).hidden).toBe(true);
   });
 
-  it("names Captain Altair, in his colour and with his call tone, when he debriefs", async () => {
+  it("names Captain Altair, in his colour, when he debriefs", async () => {
     const playTransmission = vi.fn();
     AIAnalysisManager.audio = /** @type {any} */ ({
       supported: true,
@@ -104,7 +104,7 @@ describe("AIAnalysisManager.render", () => {
     AIAnalysisManager.render(msg, {}, { ...RUN, device: { locale: "ko-KR" } }, true, null, history);
     expect(msg.querySelector(".transmission-from")?.textContent).toBe("알타이르 대위");
     expect(msg.className).toBe("commander-altair");
-    expect(playTransmission).toHaveBeenCalledWith("altair");
+    expect(playTransmission).toHaveBeenCalledTimes(1);
     setReducedMotion(true);
     await new Promise((resolve) => {
       AIAnalysisManager.render(msg, {}, RUN, false, resolve, history);
