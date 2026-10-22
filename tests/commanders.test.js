@@ -21,37 +21,50 @@ const run = (o = {}) => ({
   ...o,
 });
 const met = { altairMet: true };
+/** A full 90-second mission. @param {object} o */
+const full = (o = {}) => run({ survived: 90, verdict: "satisfactory", ...o });
 
 describe("pickCommander", () => {
-  it("keeps Vega until the first full mission, which is Altair's debut", () => {
+  it("gives every mission under 90 seconds to Vega, records included", () => {
     expect(pickCommander(run(), [], {}, "en-US")).toEqual({ commander: "vega", debut: false });
-    expect(pickCommander(run({ survived: 90 }), [run()], {}, "en-US")).toEqual({
+    const crashRecord = run({ score: 9000, top: 8000, survived: 85 });
+    expect(pickCommander(crashRecord, [run()], met, "en").commander).toBe("vega");
+    expect(pickCommander(crashRecord, [run()], {}, "en")).toEqual({
+      commander: "vega",
+      debut: false,
+    });
+  });
+
+  it("gives the first full mission to Altair as his debut", () => {
+    expect(pickCommander(full(), [run(), run()], {}, "en-US")).toEqual({
       commander: "altair",
       debut: true,
     });
   });
 
-  it("alternates once Altair has been introduced", () => {
-    expect(pickCommander(run(), [run()], { ...met, last: "vega" }, "en").commander).toBe("altair");
-    expect(pickCommander(run(), [run()], { ...met, last: "altair" }, "en").commander).toBe("vega");
+  it("alternates full missions, picking up after the last full one", () => {
+    const pick = (/** @type {any} */ lastFull) =>
+      pickCommander(full({ score: 10 }), [run()], { ...met, lastFull }, "en").commander;
+    expect(pick("altair")).toBe("vega");
+    expect(pick("vega")).toBe("altair");
+    // Not remembered (history from before): the last full mission was Altair's debut.
+    expect(pick(undefined)).toBe("vega");
   });
 
-  it("gives a new personal best to Altair and a 3rd early crash in a row to Vega", () => {
-    const best = run({ score: 5000, verdict: "satisfactory" });
-    expect(pickCommander(best, [run({ score: 4000 })], { ...met, last: "altair" }, "en")).toEqual({
+  it("gives full missions with a personal best or overall record to Altair", () => {
+    const cast = { ...met, lastFull: /** @type {const} */ ("altair") };
+    const best = full({ score: 5000 });
+    expect(pickCommander(best, [run({ score: 4000 })], cast, "en")).toEqual({
       commander: "altair",
       debut: false,
     });
-    const third = pickCommander(run({ score: 10 }), [run(), run()], { ...met, last: "vega" }, "en");
-    expect(third.commander).toBe("vega");
     // The all-time best counts, not just the recent runs passed in.
-    expect(
-      pickCommander(best, [run({ score: 4000 })], { ...met, last: "altair" }, "en", 6000).commander
-    ).toBe("vega");
-    // Only the 2nd crash in a row: normal turn-taking.
-    expect(
-      pickCommander(run({ score: 10 }), [run()], { ...met, last: "vega" }, "en").commander
-    ).toBe("altair");
+    expect(pickCommander(best, [run({ score: 4000 })], cast, "en", 6000).commander).toBe("vega");
+    // Beating the leaderboard's top score is a record even below the personal best.
+    const overall = full({ score: 5000, top: 4500 });
+    expect(pickCommander(overall, [run({ score: 4000 })], cast, "en", 6000).commander).toBe(
+      "altair"
+    );
   });
 
   it("never picks Altair where he has no voice", () => {
@@ -59,8 +72,10 @@ describe("pickCommander", () => {
     expect(altairCanSpeak("pl_PL")).toBe(false);
     expect(altairCanSpeak("ko-KR")).toBe(true);
     expect(altairCanSpeak(null)).toBe(true);
-    const best = run({ score: 5000, survived: 90 });
-    expect(pickCommander(best, [run()], { ...met, last: "vega" }, "nl-NL").commander).toBe("vega");
+    const best = full({ score: 5000 });
+    expect(pickCommander(best, [run()], { ...met, lastFull: "vega" }, "nl-NL").commander).toBe(
+      "vega"
+    );
   });
 });
 

@@ -38,7 +38,7 @@ describe("runEntry", () => {
   it("keeps what the commander needs from a run summary", () => {
     const summary = {
       timer: { totalSeconds: 90, survivedSeconds: 90 },
-      score: { playerFinalScore: 8700 },
+      score: { playerFinalScore: 8700, leaderBoardHighScore: 14415 },
       stats: { bonusAsteroidsKilled: 7, shotsFiredAccuracy: 0.55 },
     };
     expect(runEntry(summary, 5)).toEqual({
@@ -49,6 +49,7 @@ describe("runEntry", () => {
       verdict: "commendation",
       accuracy: 0.55,
       bonus: 7,
+      top: 14415,
     });
     expect(runEntry({ timer: { survivedSeconds: null } })).toBeNull();
     expect(runEntry(null)).toBeNull();
@@ -154,7 +155,7 @@ describe("RunHistory", () => {
     expect(stored.runs.map((r) => r.score)).toEqual([200, 150]);
   });
 
-  it("introduces Altair after the first full mission, then the commanders take turns", () => {
+  it("introduces Altair on the first full mission, then full missions take turns", () => {
     const history = new RunHistory({
       storage: new LocalStorageAdapter({ storage: memoryStorage() }),
     });
@@ -163,11 +164,33 @@ describe("RunHistory", () => {
     const debut = history.debrief(full({ score: 300 }));
     expect(debut.commander).toBe("altair");
     expect(debut.hooks[0]).toMatch(/^Captain Altair's first debrief with this pilot/);
-    expect(history.read().cast).toEqual({ last: "altair", altairMet: true });
-    const next = history.debrief(e({ score: 200 }));
-    expect(next.commander).toBe("vega");
-    expect(next.hooks.join(" ")).not.toMatch(/first debrief/);
-    expect(history.debrief(e({ score: 100 })).commander).toBe("altair");
+    expect(history.read().cast).toEqual({ lastFull: "altair", altairMet: true });
+    // Crashes are always Vega's and leave the full-mission turn alone.
+    const crash = history.debrief(e({ score: 200 }));
+    expect(crash.commander).toBe("vega");
+    expect(crash.hooks.join(" ")).not.toMatch(/first debrief/);
+    expect(history.read().cast.lastFull).toBe("altair");
+    expect(history.debrief(full({ score: 100 })).commander).toBe("vega");
+    expect(history.debrief(e({ score: 100 })).commander).toBe("vega");
+    expect(history.debrief(full({ score: 100 })).commander).toBe("altair");
+    expect(history.debrief(full({ score: 100 })).commander).toBe("vega");
+  });
+
+  it("gives an overall record to Altair on a full mission, and to Vega on a crash", () => {
+    const history = new RunHistory({
+      storage: new LocalStorageAdapter({ storage: memoryStorage() }),
+    });
+    history.debrief(full({ score: 9000 }));
+    history.debrief(full({ score: 100 }));
+    expect(history.read().cast.lastFull).toBe("vega");
+    // Below the personal best of 9000, but above the leaderboard's top score.
+    const crash = history.debrief(e({ score: 5000, top: 4000 }));
+    expect(crash.commander).toBe("vega");
+    expect(crash.hooks[0]).toBe(
+      "New overall record: 5000 points beats the leaderboard's top score of 4000."
+    );
+    expect(history.debrief(full({ score: 100 })).commander).toBe("altair");
+    expect(history.debrief(full({ score: 6000, top: 5000 })).commander).toBe("altair");
   });
 
   it("quotes the last debrief once, and only after it was remembered", () => {
@@ -260,10 +283,10 @@ describe("RunHistory", () => {
     expect(history.read().runs.map((r) => r.score)).toEqual([100, 200]);
     expect(history.read().best).toBe(9000);
     // 5000 beats every remembered run but not the all-time best: no false personal best.
-    const below = history.debrief(e({ score: 5000, verdict: "satisfactory" }));
+    const below = history.debrief(full({ score: 5000 }));
     expect(below.hooks.join(" ")).not.toMatch(/New personal best/);
     expect(below.commander).toBe("vega");
-    const above = history.debrief(e({ score: 9500, verdict: "satisfactory" }));
+    const above = history.debrief(full({ score: 9500 }));
     expect(above.hooks[0]).toBe(
       "New personal best: 9500 points, 500 more than the previous best of 9000."
     );

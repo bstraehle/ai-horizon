@@ -3,10 +3,11 @@
  *
  * Commander Vega (she/her) is the gruff veteran mentor; Captain Altair (he/him) is the hotshot
  * ace (their personas live in server/lambda/analysis.js, their voices and radio tones in
- * CONFIG.AUDIO.COMMANDERS). Vega debriefs alone until the pilot's first full mission, which is
- * Altair's debut; from then on they take turns, except that a new personal best always goes to
- * Altair and a third early crash in a row always goes to Vega. Languages without a male Polly
- * voice keep Vega, so a character never switches voice.
+ * CONFIG.AUDIO.COMMANDERS). Vega debriefs every mission that ends before the full 90 seconds,
+ * record or not. Altair debriefs the pilot's first full mission (his debut) and every full
+ * mission that sets a record, personal or overall (the leaderboard's top score); other full
+ * missions alternate between the two. Languages without a male Polly voice keep Vega, so a
+ * character never switches voice.
  */
 
 /** @typedef {"vega"|"altair"} CommanderId */
@@ -22,14 +23,20 @@ const MAX_QUOTE_CHARS = 140;
 
 /**
  * @typedef {{ t: number, score: number, survived: number, total: number,
- *   verdict: string|null }} MissionLike The fields of a RunEntry used here.
- * @typedef {{ last?: CommanderId, altairMet?: boolean, line?: string, lineBy?: CommanderId }} CastMemory
- *   Stored with the run history: who spoke last, whether Altair has been introduced, and the
- *   last debrief headline and its speaker.
+ *   verdict: string|null, top?: number }} MissionLike The fields of a RunEntry used here.
+ * @typedef {{ lastFull?: CommanderId, altairMet?: boolean, line?: string, lineBy?: CommanderId }} CastMemory
+ *   Stored with the run history: who debriefed the last full mission, whether Altair has been
+ *   introduced, and the last debrief headline and its speaker.
  */
 
 /** @param {unknown} id @returns {id is CommanderId} */
 export const isCommander = (id) => id === "vega" || id === "altair";
+
+/**
+ * Whether a mission beat the leaderboard's top score (as known when it ended).
+ * @param {{ score: number, top?: number }} entry
+ */
+export const isOverallRecord = (entry) => !!entry.top && entry.top > 0 && entry.score > entry.top;
 
 /**
  * Whether the locale's language has a male narrator voice (otherwise only Vega speaks).
@@ -78,14 +85,12 @@ export function isStarCrossedDay(t, timeZone) {
 export function pickCommander(entry, previous, cast, locale, allTimeBest) {
   const vega = { commander: /** @type {CommanderId} */ ("vega"), debut: false };
   const altair = { commander: /** @type {CommanderId} */ ("altair"), debut: false };
-  if (!altairCanSpeak(locale)) return vega;
-  if (!cast.altairMet) return entry.survived >= entry.total ? { ...altair, debut: true } : vega;
+  if (!altairCanSpeak(locale) || entry.survived < entry.total) return vega;
+  if (!cast.altairMet) return { ...altair, debut: true };
   const best = allTimeBest ?? previous.reduce((b, e) => Math.max(b, e.score), 0);
-  if (best > 0 && entry.score > best) return altair;
-  let crashes = 0;
-  for (let i = previous.length - 1; i >= 0 && previous[i].verdict === "reprimand"; i--) crashes++;
-  if (entry.verdict === "reprimand" && crashes >= 2) return vega;
-  return cast.last === "vega" ? altair : vega;
+  if ((best > 0 && entry.score > best) || isOverallRecord(entry)) return altair;
+  // Full missions take turns; without a remembered one, the last was Altair's debut.
+  return (cast.lastFull ?? "altair") === "altair" ? vega : altair;
 }
 
 /**

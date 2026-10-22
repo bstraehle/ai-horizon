@@ -1,12 +1,14 @@
 import { LocalStorageAdapter } from "../adapters/LocalStorageAdapter.js";
 import { missionVerdict } from "../adapters/AIAnalysisAdapter.js";
 import { CONFIG } from "../constants.js";
-import { commanderHooks, isCommander, pickCommander } from "./Commanders.js";
+import { commanderHooks, isCommander, isOverallRecord, pickCommander } from "./Commanders.js";
 
 /**
  * @typedef {{ t: number, score: number, survived: number, total: number,
- *   verdict: "commendation"|"satisfactory"|"reprimand"|null, accuracy: number, bonus: number }} RunEntry
- *   One finished mission as remembered on this device.
+ *   verdict: "commendation"|"satisfactory"|"reprimand"|null, accuracy: number, bonus: number,
+ *   top?: number }} RunEntry
+ *   One finished mission as remembered on this device; `top` is the leaderboard's top score when
+ *   it ended (0 when unknown), so beating it is an overall record.
  * @typedef {import("./Commanders.js").CastMemory} CastMemory
  * @typedef {import("./Commanders.js").CommanderId} CommanderId
  * @typedef {{ count: number, runs: RunEntry[], best: number, cast: CastMemory }} RunHistoryData
@@ -39,6 +41,7 @@ export function runEntry(summary, now = Date.now()) {
     verdict: missionVerdict(summary),
     accuracy: num(stats.shotsFiredAccuracy),
     bonus: num(stats.bonusAsteroidsKilled),
+    top: num(summary.score && summary.score.leaderBoardHighScore),
   };
 }
 
@@ -68,9 +71,16 @@ const MILESTONES = [10, 25, 50, 100, 200, 500];
  */
 export function storyHooks(entry, previous, mission, opts = {}) {
   const { max = 3, best = bestScore(previous) } = opts;
-  if (!previous.length) return mission <= 1 ? ["This is the pilot's first mission."] : [];
+  const record = isOverallRecord(entry)
+    ? [
+        `New overall record: ${entry.score} points beats the leaderboard's top score of ${entry.top}.`,
+      ]
+    : [];
+  if (!previous.length) {
+    return [...record, ...(mission <= 1 ? ["This is the pilot's first mission."] : [])];
+  }
   /** @type {{ rank: number, text: string }[]} */
-  const hooks = [];
+  const hooks = record.map((text) => ({ rank: 110, text }));
   const add = (/** @type {number} */ rank, /** @type {string} */ text) =>
     hooks.push({ rank, text });
   const full = (/** @type {RunEntry} */ e) => e.survived >= e.total;
@@ -143,7 +153,7 @@ const isEntry = (e) =>
 function readCast(cast) {
   if (!cast || typeof cast !== "object") return {};
   return {
-    ...(isCommander(cast.last) ? { last: cast.last } : {}),
+    ...(isCommander(cast.lastFull) ? { lastFull: cast.lastFull } : {}),
     ...(cast.altairMet === true ? { altairMet: true } : {}),
     ...(typeof cast.line === "string" && isCommander(cast.lineBy)
       ? { line: cast.line, lineBy: cast.lineBy }
@@ -201,11 +211,12 @@ export class RunHistory {
     if (record) {
       // The quoted line belongs to the mission before; rememberDebrief() stores this one's.
       const altairMet = cast.altairMet || pick.debut;
+      const lastFull = entry.survived >= entry.total ? pick.commander : cast.lastFull;
       this.storage.setJSON(this.key, {
         count: mission,
         runs: [...runs, entry].slice(-this.max),
         best: Math.max(best, entry.score),
-        cast: { last: pick.commander, ...(altairMet ? { altairMet: true } : {}) },
+        cast: { ...(lastFull ? { lastFull } : {}), ...(altairMet ? { altairMet: true } : {}) },
       });
     }
     return { mission, hooks, commander: pick.commander };
