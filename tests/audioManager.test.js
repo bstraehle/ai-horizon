@@ -334,14 +334,17 @@ describe("AudioManager", () => {
     const fatalEnd = 10 + CONFIG.AUDIO.SPEECH_AFTER_FATAL_S;
     const first = created(ctx, () => audio.playTransmission("altair"));
     expect(first.src).toBeGreaterThan(1);
-    // The caller's call tone, then squelch and crackle.
-    const tone = ctx.oscillators[ctx.oscillators.length - 1];
-    expect(tone.frequency.set[0]).toBe(CONFIG.AUDIO.COMMANDERS.altair.introHz);
-    expect(tone.start.mock.calls[0][0]).toBeCloseTo(fatalEnd);
+    // The caller's call chirp (two short rising blips in their pitch), then squelch and crackle.
+    const { CHIRP_S, CHIRP_GAP_S, CHIRP_RISE } = CONFIG.AUDIO.RADIO;
+    const f = CONFIG.AUDIO.COMMANDERS.altair.introHz;
+    const chirp = ctx.oscillators.slice(-2);
+    expect(chirp.map((/** @type {any} */ o) => o.frequency.set[0])).toEqual([f, f * CHIRP_RISE]);
+    expect(chirp[0].start.mock.calls[0][0]).toBeCloseTo(fatalEnd);
+    expect(chirp[1].start.mock.calls[0][0]).toBeCloseTo(fatalEnd + CHIRP_S + CHIRP_GAP_S);
     const starts = ctx.sources
       .slice(-first.src)
       .map((/** @type {any} */ s) => s.start.mock.calls[0][0]);
-    expect(Math.min(...starts)).toBeCloseTo(fatalEnd + CONFIG.AUDIO.RADIO.TONE_S);
+    expect(Math.min(...starts)).toBeCloseTo(fatalEnd + 2 * CHIRP_S + CHIRP_GAP_S);
     expect(created(ctx, () => audio.playTransmission()).src).toBe(0);
     const muted = unlocked({ muted: true });
     expect(created(muted.ctx, () => muted.audio.playTransmission()).src).toBe(0);

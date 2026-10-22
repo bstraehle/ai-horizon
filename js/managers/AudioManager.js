@@ -41,7 +41,7 @@ const STAR_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
  *    screech, huge sub drop, long rumble and debris. Bypasses the voice cap so it always plays.
  *
  * Narration (Game Over headline spoken by Amazon Polly, synthesized server-side)
- *  - playTransmission(commander): a radio channel opening (the commander's call tone, squelch
+ *  - playTransmission(commander): a radio channel opening (the commander's call chirp, squelch
  *    and crackle) while the debrief loads.
  *  - playSpeech(base64Mp3): decodes and plays the clip through the master bus (so mute applies)
  *    as a radio transmission (Quindar tones, squelch, band-limited voice, hiss), starting after
@@ -362,9 +362,9 @@ export class AudioManager {
   }
 
   /**
-   * A radio channel opening while the debrief is on its way: the calling commander's call tone,
-   * squelch, then a few crackles of static. Starts after the loud part of a fatal crash, like the
-   * narration.
+   * A radio channel opening while the debrief is on its way: the calling commander's call chirp
+   * (two short rising blips in their pitch, unlike the steady beeps framing the voice), squelch,
+   * then a few crackles of static. Starts after the loud part of a fatal crash, like the narration.
    * @param {string} [commander] "vega" or "altair" (see CONFIG.AUDIO.COMMANDERS).
    */
   playTransmission(commander = "vega") {
@@ -372,8 +372,11 @@ export class AudioManager {
     if (now === null) return;
     const t = Math.max(now, this._fatalEndsAt);
     const bus = this._bus(0, 0.05);
-    this._radioTone(commanderTones(commander).introHz, t, bus);
-    const open = t + CONFIG.AUDIO.RADIO.TONE_S;
+    const { CHIRP_S, CHIRP_GAP_S, CHIRP_RISE } = CONFIG.AUDIO.RADIO;
+    const f = commanderTones(commander).introHz;
+    this._radioTone(f, t, bus, CHIRP_S);
+    this._radioTone(f * CHIRP_RISE, t + CHIRP_S + CHIRP_GAP_S, bus, CHIRP_S);
+    const open = t + 2 * CHIRP_S + CHIRP_GAP_S;
     this._squelch(open, bus);
     const crackles = 5 + Math.floor(this._random() * 4);
     for (let i = 0; i < crackles; i++) {
@@ -492,22 +495,24 @@ export class AudioManager {
   }
 
   /**
-   * Steady sine beep (Quindar tone) of `CONFIG.AUDIO.RADIO.TONE_S` with click-free edges.
+   * Steady sine beep (Quindar tone) with click-free edges, `CONFIG.AUDIO.RADIO.TONE_S` long
+   * unless `duration` is given.
    * @param {number} f
    * @param {number} t
    * @param {AudioNode} out
+   * @param {number} [duration]
    * @private
    */
-  _radioTone(f, t, out) {
+  _radioTone(f, t, out, duration = CONFIG.AUDIO.RADIO.TONE_S) {
     const ctx = /** @type {AudioContext} */ (this._ctx);
-    const { TONE_S, TONE_GAIN } = CONFIG.AUDIO.RADIO;
+    const { TONE_GAIN } = CONFIG.AUDIO.RADIO;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(TONE_GAIN, t + 0.01);
-    g.gain.setValueAtTime(TONE_GAIN, t + TONE_S - 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + TONE_S);
+    g.gain.setValueAtTime(TONE_GAIN, t + duration - 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
     g.connect(out);
-    this._tone("sine", f, f, t, TONE_S, g);
+    this._tone("sine", f, f, t, duration, g);
   }
 
   /**

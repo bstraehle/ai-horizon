@@ -445,6 +445,10 @@ export const CONFIG = deepFreeze({
       HISS_GAIN: 0.025,
       TONE_S: 0.25,
       TONE_GAIN: 0.05,
+      /** Call chirp while the debrief loads: two short blips, the second this much higher. */
+      CHIRP_S: 0.06,
+      CHIRP_GAP_S: 0.05,
+      CHIRP_RISE: 1.26,
       SQUELCH_S: 0.12,
       SQUELCH_GAIN: 0.35,
     },
