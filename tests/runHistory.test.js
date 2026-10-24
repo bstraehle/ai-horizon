@@ -106,9 +106,9 @@ describe("storyHooks", () => {
     ]);
   });
 
-  it("notices a return after a break and mission milestones", () => {
-    const back = storyHooks(e({ score: 10, t: 1_010 * DAY }), [e({ t: 1_000 * DAY })], 10);
-    expect(back).toEqual(["First mission in 10 days.", "This is the pilot's 10th mission."]);
+  it("notices mission milestones", () => {
+    const tenth = storyHooks(e({ score: 10, t: 1_010 * DAY }), [e({ t: 1_000 * DAY })], 10);
+    expect(tenth).toEqual(["This is the pilot's 10th mission."]);
   });
 
   it("returns at most 3 hooks, most interesting first", () => {
@@ -144,7 +144,10 @@ describe("RunHistory", () => {
     const history = new RunHistory({ storage: new LocalStorageAdapter({ storage }), max: 2 });
     expect(history.debrief(e({ score: 100 }))).toEqual({
       mission: 1,
-      hooks: ["This is the pilot's first mission."],
+      hooks: [
+        "This is the pilot's first mission.",
+        expect.stringMatching(/^The pilot's local time: \w+day, /),
+      ],
       commander: "vega",
       debut: false,
     });
@@ -222,10 +225,42 @@ describe("RunHistory", () => {
     const debut = history.debrief(
       full({ verdict: "commendation", score: 9000, bonus: 7, accuracy: 0.9 })
     );
-    expect(debut.hooks).toHaveLength(4);
+    expect(debut.hooks).toHaveLength(5);
     expect(debut.hooks[0]).toMatch(/^Captain Altair's first debrief/);
     expect(debut.hooks[1]).toMatch(/^New personal best/);
-    expect(debut.hooks[3]).toMatch(/^Last mission, Commander Vega/);
+    expect(debut.hooks[3]).toMatch(/^The pilot's local time:/);
+    expect(debut.hooks[4]).toMatch(/^Last mission, Commander Vega/);
+  });
+
+  it("recaps the last session on the first mission of a new day", () => {
+    const history = new RunHistory({
+      storage: new LocalStorageAdapter({ storage: memoryStorage() }),
+      timeZone: "UTC",
+    });
+    // Saturday evening: three missions, the last a crash.
+    const sat = Date.UTC(2026, 9, 24, 19);
+    history.debrief(full({ t: sat, score: 4000 }));
+    history.debrief(e({ t: sat + 600_000, score: 8200 }));
+    const third = history.debrief(e({ t: sat + 1_200_000, score: 900, survived: 41 }));
+    expect(third.hooks.join(" ")).not.toMatch(/First mission today/);
+    expect(third.hooks.at(-1)).toBe(
+      "The pilot's local time: Saturday, evening; allude to it lightly, never as a clock time. This is mission 3 today."
+    );
+    expect(history.read().day).toEqual({ date: "2026-10-24", missions: 3, best: 8200 });
+    // Sunday early morning: where the pilot left off.
+    const sun = history.debrief(e({ t: Date.UTC(2026, 9, 25, 6, 30), score: 300 }));
+    expect(sun.hooks[0]).toBe(
+      "First mission today. The pilot's last session was yesterday in the evening: 3 missions, best 8200 points, ending with a crash after 41 seconds."
+    );
+    expect(sun.hooks).toContain(
+      "The pilot's local time: Sunday, early morning; allude to it lightly, never as a clock time."
+    );
+    expect(history.read().day).toEqual({ date: "2026-10-25", missions: 1, best: 300 });
+    // After a longer break the recap names the day.
+    const later = history.debrief(full({ t: Date.UTC(2026, 10, 6, 23), score: 100 }));
+    expect(later.hooks[0]).toMatch(
+      /^First mission today\. The pilot's last session was 12 days ago, on Sunday early in the morning: 1 mission, best 300 points, ending with a crash after 40 seconds\.$/
+    );
   });
 
   it("keeps Commander Vega for languages without a male voice", () => {

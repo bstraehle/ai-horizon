@@ -169,11 +169,12 @@ describe("analysis Lambda – Polly narration", () => {
   });
 
   it("limits the client's story hooks in count and length", () => {
-    expect(storyHooks({ hooks: ["  a  ", 5, "", "b", "c", "d", "e"] })).toEqual([
+    expect(storyHooks({ hooks: ["  a  ", 5, "", "b", "c", "d", "e", "f"] })).toEqual([
       "a",
       "b",
       "c",
       "d",
+      "e",
     ]);
     expect(storyHooks({ hooks: ["x".repeat(500)] })[0]).toHaveLength(200);
     expect(storyHooks(null)).toEqual([]);

@@ -2,6 +2,7 @@ import { LocalStorageAdapter } from "../adapters/LocalStorageAdapter.js";
 import { missionVerdict } from "../adapters/AIAnalysisAdapter.js";
 import { CONFIG } from "../constants.js";
 import { commanderHooks, isCommander, isOverallRecord, pickCommander } from "./Commanders.js";
+import { nextDay, sessionRecap, timeOfDayHook } from "./DailyHooks.js";
 
 /**
  * @typedef {{ t: number, score: number, survived: number, total: number,
@@ -11,10 +12,13 @@ import { commanderHooks, isCommander, isOverallRecord, pickCommander } from "./C
  *   it ended (0 when unknown), so beating it is an overall record.
  * @typedef {import("./Commanders.js").CastMemory} CastMemory
  * @typedef {import("./Commanders.js").CommanderId} CommanderId
- * @typedef {{ count: number, runs: RunEntry[], best: number, cast: CastMemory }} RunHistoryData
+ * @typedef {import("./DailyHooks.js").DaySummary} DaySummary
+ * @typedef {{ count: number, runs: RunEntry[], best: number, cast: CastMemory,
+ *   day?: DaySummary }} RunHistoryData
  *   `count` is every mission recorded; `runs` keeps only the most recent ones; `best` is the
  *   all-time best score (kept apart, so personal bests stay right after older runs drop off);
- *   `cast` remembers the debrief commanders (see Commanders.js).
+ *   `cast` remembers the debrief commanders (see Commanders.js); `day` sums up the last day
+ *   flown, for the next day's session recap (see DailyHooks.js).
  * @typedef {{ mission: number, hooks: string[], commander: CommanderId, debut: boolean }} DebriefHistory
  *   Sent with the debrief request: the mission's number, its story hooks, and who debriefs it;
  *   `debut` (kept on the device) marks Altair's introduction.
@@ -136,8 +140,6 @@ export function storyHooks(entry, previous, mission, opts = {}) {
       `Accuracy ${pct(entry.accuracy)}%, up from an average of ${pct(avg)}% over the last ${recent.length} missions.`
     );
   }
-  const days = Math.floor((entry.t - last.t) / 86_400_000);
-  if (days >= 7) add(45, `First mission in ${days} days.`);
   if (MILESTONES.includes(mission)) add(40, `This is the pilot's ${ordinal(mission)} mission.`);
 
   return hooks
@@ -170,12 +172,14 @@ function readCast(cast) {
  */
 export class RunHistory {
   /**
-   * @param {{ storage?: LocalStorageAdapter, key?: string, max?: number }} [opts]
+   * @param {{ storage?: LocalStorageAdapter, key?: string, max?: number, timeZone?: string }} [opts]
+   *   `timeZone` for the day-based hooks (defaults to the device's).
    */
   constructor(opts = {}) {
     this.storage = opts.storage || new LocalStorageAdapter();
     this.key = opts.key || CONFIG.HISTORY.STORAGE_KEY;
     this.max = opts.max || CONFIG.HISTORY.MAX_RUNS;
+    this.timeZone = opts.timeZone;
   }
 
   /** @returns {RunHistoryData} Stored history; empty when missing or corrupt. */
@@ -185,11 +189,18 @@ export class RunHistory {
     const count =
       data && Number.isFinite(data.count) ? Math.max(data.count, runs.length) : runs.length;
     const stored = data && Number.isFinite(data.best) ? data.best : 0;
+    const day = data && data.day;
+    const validDay =
+      day &&
+      typeof day.date === "string" &&
+      Number.isFinite(day.missions) &&
+      Number.isFinite(day.best);
     return {
       count,
       runs,
       best: Math.max(stored, bestScore(runs)),
       cast: readCast(data && data.cast),
+      ...(validDay ? { day: { date: day.date, missions: day.missions, best: day.best } } : {}),
     };
   }
 
@@ -203,13 +214,20 @@ export class RunHistory {
    * @returns {DebriefHistory}
    */
   debrief(entry, { record = true, locale = null, online = true } = {}) {
-    const { count, runs, best, cast } = this.read();
+    const { count, runs, best, cast, day } = this.read();
     const mission = count + 1;
     const pick = pickCommander(entry, runs, cast, locale, best, online);
     const { lead, tail } = commanderHooks(pick, entry, cast);
-    const hooks = [...lead, ...storyHooks(entry, runs, mission, { best })]
+    // First mission of a new day: the commander recaps where the pilot left off.
+    const recap = sessionRecap(entry, runs, day || null, this.timeZone);
+    const today = nextDay(entry, day || null, this.timeZone);
+    const hooks = [
+      ...lead,
+      ...(recap ? [recap] : []),
+      ...storyHooks(entry, runs, mission, { best }),
+    ]
       .slice(0, MAX_LEAD_AND_RUN_HOOKS)
-      .concat(tail);
+      .concat(timeOfDayHook(entry, today.missions, this.timeZone), tail);
     if (record) {
       // The quoted line belongs to the mission before; rememberDebrief() stores this one's.
       const altairMet = cast.altairMet || pick.debut;
@@ -219,6 +237,7 @@ export class RunHistory {
         runs: [...runs, entry].slice(-this.max),
         best: Math.max(best, entry.score),
         cast: { ...(lastFull ? { lastFull } : {}), ...(altairMet ? { altairMet: true } : {}) },
+        day: today,
       });
     }
     return { mission, hooks, commander: pick.commander, debut: pick.debut };

@@ -167,7 +167,7 @@ export const HEADLINE_IMAGERY = [
 ];
 
 /** Most story hooks passed to the model, and their longest accepted length (client input). */
-const MAX_HOOKS = 4;
+const MAX_HOOKS = 5;
 const MAX_HOOK_CHARS = 200;
 
 /**
