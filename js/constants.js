@@ -454,7 +454,7 @@ export const CONFIG = deepFreeze({
   /** Recent missions remembered on this device for the debrief's story hooks (RunHistory). */
   HISTORY: {
     STORAGE_KEY: "aiHorizonRunHistory",
-    MAX_RUNS: 20,
+    MAX_RUNS: 25,
   },
   SHARE: {
     URL: "https://www.agentmode.dev/",
