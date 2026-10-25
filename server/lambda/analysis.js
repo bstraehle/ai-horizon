@@ -1,5 +1,6 @@
 import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 import { PollyClient, SynthesizeSpeechCommand } from "@aws-sdk/client-polly";
+import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 
 const bedrockClient = new BedrockRuntimeClient({
   region: "us-west-2",
@@ -11,23 +12,30 @@ const pollyClient = new PollyClient({
   maxAttempts: 2,
 });
 
+const secretsClient = new SecretsManagerClient({
+  region: "us-west-2",
+  maxAttempts: 2,
+});
+
 /**
  * System prompts: the two recurring debrief characters ({@link PERSONAS}). Kept in code (with {@link PROMPT}) rather than an
  * environment variable because Lambda caps all environment variables at 4 KB combined.
  */
 const GAME_INTRO =
-  "AI HORIZON is an arcade space shooter: a pilot has 90 seconds to collect stars and destroy asteroids, and one asteroid collision ends the mission. After every mission Commander Vega or Captain Altair radios the pilot a short debrief; they take turns.";
+  "AI HORIZON is an arcade space shooter: a pilot has 90 seconds to collect stars and destroy asteroids, and one asteroid collision ends the mission. After every mission Commander Vega or Captain “Altair” Straehle radios the pilot a short debrief; they take turns.";
 const SHARED_RULES = `You know this pilot. The game tells you what changed since their earlier missions ("story hooks"), including what was said in the last debrief; noticing it is what makes the debriefs worth waiting for.
 You speak straight to the pilot in short spoken sentences for a text-to-speech voice. Never invent numbers, events, or history: use only the facts you are given.`;
 
 /**
  * The two debrief commanders (the client picks one per mission and sends `commander`): a system
- * prompt each, the Polly voice gender that keeps each character's voice consistent, and the
- * headline's shape and style, so they also sound different on paper: Vega clipped (2 sentences),
- * Altair longer and brasher (3-4). `headline.sentences` / `headline.chars` are enforced by
- * {@link tidyHeadline}.
+ * prompt each, the voice that keeps each character's voice consistent (Altair's custom ElevenLabs
+ * voice `elevenlabs`, see {@link ELEVENLABS}; otherwise, and as his fallback, a Polly voice of the
+ * `voice` gender), and the headline's shape and style, so they also sound different on paper:
+ * Vega clipped (2 sentences), Altair longer and brasher (3-4). `headline.sentences` /
+ * `headline.chars` are enforced by {@link tidyHeadline}.
  * @typedef {{ shape: string, style: string, sentences: number, chars: number }} HeadlineShape
- * @type {Record<"vega"|"altair", { system: string, voice: "female"|"male", headline: HeadlineShape }>}
+ * @typedef {{ system: string, voice: "female"|"male", elevenlabs?: string, headline: HeadlineShape }} Persona
+ * @type {Record<"vega"|"altair", Persona>}
  */
 export const PERSONAS = {
   vega: {
@@ -40,12 +48,13 @@ export const PERSONAS = {
       chars: 180,
     },
     system: `You are Commander Vega (she/her), the veteran squadron commander. ${GAME_INTRO}
-Captain Altair (he/him) is the squadron's hotshot ace; you respect his flying and roll your eyes at his showing off.
+Captain Straehle (he/him), call sign “Altair”, is the squadron's hotshot ace; on the radio you call him Altair. You respect his flying and roll your eyes at his showing off.
 Personality: a gruff but warm mentor with dry humour who drills survival and discipline. Proud of real progress, impatient with carelessness, never a cheerleader, never cruel.
 ${SHARED_RULES}`,
   },
   altair: {
     voice: "male",
+    elevenlabs: "AYZwqKNJgPfbTjp3GbCG",
     headline: {
       shape: "3 or 4 short, punchy sentences, at most 45 words in total",
       style:
@@ -53,7 +62,7 @@ ${SHARED_RULES}`,
       sentences: 4,
       chars: 300,
     },
-    system: `You are Captain Altair (he/him), the squadron's hotshot ace. ${GAME_INTRO}
+    system: `You are Captain Straehle (he/him), call sign “Altair”, the squadron's hotshot ace. On the radio you go by Altair; you give your full name only when you introduce yourself. ${GAME_INTRO}
 Commander Vega (she/her) is the squadron's gruff veteran mentor; you respect her and sometimes tease her, but never undermine her.
 Personality: an upbeat, competitive, quick-witted ace who lives for scores, records, bonus asteroids, style and the leaderboard. You hype real achievements and turn setbacks into a challenge; never cruel, never fake.
 ${SHARED_RULES}`,
@@ -276,7 +285,7 @@ export function buildPrompt(
     .replace("%%language%%", () => language);
 }
 
-/** Longest headline (after emoji removal and the rating) sent to Polly. */
+/** Longest headline (after emoji removal and the rating) sent to the voice. */
 const MAX_SPEECH_CHARS = 340;
 
 /**
@@ -327,7 +336,8 @@ export function withTidyHeadline(analysisText, shape) {
 
 /**
  * Amazon Polly generative voices (all available in us-west-2), one per gender where Polly offers
- * one. Locales missing a gender fall back to the other gender; unlisted languages get no speech.
+ * one. Locales missing a gender use their language default's; unlisted languages get no Polly
+ * speech.
  * @type {Record<string, { female?: string, male?: string }>}
  */
 export const GENERATIVE_VOICES = {
@@ -370,31 +380,38 @@ const LANGUAGE_DEFAULTS = {
 };
 
 /**
- * Pick a generative voice for the player's locale, preferring the requested gender.
+ * Pick a generative voice of the requested gender for the player's locale: the exact locale's,
+ * else its language default's (so a male commander in en-IE speaks with en-US Matthew). A
+ * commander never switches gender, so there is no voice when the language has none of that gender.
  * Missing locale defaults to en-US (Bedrock then answers in English).
  * @param {string|null|undefined} locale BCP 47 tag, e.g. "de-DE".
- * @param {string} preferred "female" or "male".
+ * @param {string} gender "female" or "male".
  * @returns {{ voiceId: string, gender: "female"|"male" }|null} null when no voice exists.
  */
-export function selectVoice(locale, preferred) {
-  if (preferred !== "female" && preferred !== "male") return null;
+export function selectVoice(locale, gender) {
+  if (gender !== "female" && gender !== "male") return null;
   const tag = typeof locale === "string" && locale.trim() ? locale.trim() : "en-US";
   const [lang = "", region = ""] = tag.replace(/_/g, "-").split("-");
   const exact = region ? `${lang.toLowerCase()}-${region.toUpperCase()}` : "";
   const fallback = /** @type {Record<string, string>} */ (LANGUAGE_DEFAULTS)[lang.toLowerCase()];
-  // The exact locale first, then the language default, for the requested gender before the other
-  // (so a male commander in en-IE speaks with en-US Matthew rather than switching to a woman).
-  const tables = [GENERATIVE_VOICES[exact], fallback ? GENERATIVE_VOICES[fallback] : undefined];
-  /** @type {"female"|"male"} */
-  const other = preferred === "male" ? "female" : "male";
-  for (const gender of [preferred, other]) {
-    for (const voices of tables) {
-      const voiceId = voices && voices[gender];
-      if (voiceId) return { voiceId, gender };
-    }
+  for (const voices of [GENERATIVE_VOICES[exact], fallback && GENERATIVE_VOICES[fallback]]) {
+    const voiceId = voices && voices[gender];
+    if (voiceId) return { voiceId, gender };
   }
   return null;
 }
+
+/**
+ * The ISO 639-1 language of a BCP 47 locale ("de_AT" → "de"); missing locale → English, like the
+ * voice.
+ * @param {string|null|undefined} locale
+ * @returns {string}
+ */
+const localeLanguage = (locale) =>
+  (typeof locale === "string" && locale.trim() ? locale.trim() : "en")
+    .replace(/_/g, "-")
+    .split("-")[0]
+    .toLowerCase();
 
 /** Verdicts the client may send (see `missionVerdict` in js/adapters/AIAnalysisAdapter.js). */
 const VERDICTS = ["commendation", "satisfactory", "reprimand"];
@@ -460,9 +477,7 @@ export const VERDICT_RATINGS = {
  */
 export function verdictRating(verdict, locale) {
   if (!verdict || !VERDICTS.includes(verdict)) return null;
-  const tag = typeof locale === "string" && locale.trim() ? locale.trim() : "en";
-  const lang = tag.replace(/_/g, "-").split("-")[0].toLowerCase();
-  const ratings = VERDICT_RATINGS[lang];
+  const ratings = VERDICT_RATINGS[localeLanguage(locale)];
   return ratings ? ratings[verdict] : null;
 }
 
@@ -518,16 +533,27 @@ export function speechInput(text, rating) {
 }
 
 /**
- * Headline text suitable for speech: emoji removed, whitespace collapsed, length capped.
+ * Spellings the voices read better than the real ones (speech only; the headline on screen keeps
+ * the real spelling): Captain Straehle's surname with its final e sounded.
+ * @type {[RegExp, string][]}
+ */
+const SPOKEN_SPELLINGS = [[/\bStraehle\b/g, "Straehleh"]];
+
+/**
+ * Headline text suitable for speech: emoji removed, whitespace collapsed, length capped, and
+ * {@link SPOKEN_SPELLINGS} applied.
  * @param {unknown} text
  * @returns {string}
  */
 export function speakableText(text) {
-  return String(text ?? "")
-    .replace(/\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}]|\u200d|\uFE0F/gu, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, MAX_SPEECH_CHARS);
+  return SPOKEN_SPELLINGS.reduce(
+    (spoken, [word, spelling]) => spoken.replace(word, spelling),
+    String(text ?? "")
+      .replace(/\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}]|\u200d|\uFE0F/gu, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, MAX_SPEECH_CHARS)
+  );
 }
 
 /**
@@ -558,22 +584,102 @@ export function splitRequest(body) {
 }
 
 /**
- * Add `speech: { voice, gender, format, audio }` (base64 MP3 of the spoken `feedback`) to the
- * analysis JSON. A headline that starts with `rating` is spoken as SSML (see {@link speechInput}).
- * Returns the analysis unchanged when there is no feedback, no voice for the locale, or Polly
- * fails – speech is optional and must never break the debrief.
- * @param {string} analysisText Analysis JSON string (after {@link withRating}).
- * @param {string} voice Requested gender ("female" | "male").
- * @param {string|null} locale
- * @param {string|null} [rating] Rating at the start of the headline, if any.
- * @returns {Promise<string>}
+ * ElevenLabs text to speech for commanders with a custom voice ({@link PERSONAS} `elevenlabs`):
+ * the model, the MP3 format (64 kbps is plenty for the game's 300-3400 Hz radio voice and halves
+ * the response), and how long to wait before falling back to Polly (the client gives the whole
+ * debrief 15 s). The API key comes from the Secrets Manager secret named by the
+ * `ELEVENLABS_SECRET_ID` env var, JSON `{ apiToken, apiTokenRegion }`; the region picks the API
+ * host ({@link ELEVENLABS_HOSTS}). Without the env var those commanders speak with Polly.
  */
-export async function withSpeech(analysisText, voice, locale, rating = null) {
+export const ELEVENLABS = { model: "eleven_v4", format: "mp3_44100_64", timeoutMs: 8000 };
+
+/** ElevenLabs API host per `apiTokenRegion`; other regions use the global host. */
+const ELEVENLABS_HOSTS = /** @type {Record<string, string>} */ ({
+  us: "https://api.us.elevenlabs.io",
+  eu: "https://api.eu.residency.elevenlabs.io",
+  in: "https://api.in.residency.elevenlabs.io",
+  sg: "https://api.sg.residency.elevenlabs.io",
+});
+
+/**
+ * The ElevenLabs key and host, read once per container (per secret); a failed read is retried on
+ * the next request.
+ * @type {{ id: string, value: Promise<{ key: string, host: string }> }|null}
+ */
+let elevenLabsSecret = null;
+
+/** @returns {Promise<{ key: string, host: string }|null>} null when no secret is configured. */
+function elevenLabsCredentials() {
+  const id = process.env.ELEVENLABS_SECRET_ID;
+  if (!id) return Promise.resolve(null);
+  if (elevenLabsSecret?.id !== id) {
+    const value = secretsClient.send(new GetSecretValueCommand({ SecretId: id })).then((res) => {
+      const { apiToken, apiTokenRegion } = JSON.parse(res.SecretString || "{}");
+      if (!apiToken) throw new Error("ElevenLabs secret has no apiToken");
+      return {
+        key: String(apiToken),
+        host: ELEVENLABS_HOSTS[apiTokenRegion] || "https://api.elevenlabs.io",
+      };
+    });
+    const entry = { id, value };
+    value.catch(() => {
+      if (elevenLabsSecret === entry) elevenLabsSecret = null;
+    });
+    elevenLabsSecret = entry;
+  }
+  return elevenLabsSecret.value;
+}
+
+/** @typedef {{ voice: string, gender: string, format: "mp3", audio: string }} Speech */
+
+/**
+ * The headline spoken by an ElevenLabs voice ({@link ELEVENLABS}) in the player's language, or
+ * null without a key or when ElevenLabs fails or is too slow. Plain text: the model takes no SSML.
+ * @param {string} text Speakable headline.
+ * @param {string} voiceId
+ * @param {"female"|"male"} gender The voice's gender, reported like Polly's.
+ * @param {string|null} locale
+ * @returns {Promise<Speech|null>}
+ */
+async function elevenLabsSpeech(text, voiceId, gender, locale) {
   try {
-    const parsed = JSON.parse(analysisText);
-    const text = speakableText(parsed && parsed.feedback);
-    const selected = text ? selectVoice(locale, voice) : null;
-    if (!selected) return analysisText;
+    const credentials = await elevenLabsCredentials();
+    if (!credentials) return null;
+    const url = `${credentials.host}/v1/text-to-speech/${voiceId}?output_format=${ELEVENLABS.format}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "xi-api-key": credentials.key, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        model_id: ELEVENLABS.model,
+        language_code: localeLanguage(locale),
+      }),
+      signal: AbortSignal.timeout(ELEVENLABS.timeoutMs),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
+    const bytes = Buffer.from(await res.arrayBuffer());
+    console.log("ElevenLabs speech: ", voiceId, bytes.length, "bytes");
+    return { voice: voiceId, gender, format: "mp3", audio: bytes.toString("base64") };
+  } catch (error) {
+    console.error("ElevenLabs error:", error instanceof Error ? error.message : String(error));
+    return null;
+  }
+}
+
+/**
+ * The headline spoken by a Polly generative voice of `gender` (see {@link selectVoice}); a
+ * headline that starts with `rating` is spoken as SSML (see {@link speechInput}). Null when the
+ * locale has no such voice or Polly fails.
+ * @param {string} text Speakable headline.
+ * @param {"female"|"male"} gender
+ * @param {string|null} locale
+ * @param {string|null} rating
+ * @returns {Promise<Speech|null>}
+ */
+async function pollySpeech(text, gender, locale, rating) {
+  const selected = selectVoice(locale, gender);
+  if (!selected) return null;
+  try {
     const result = await pollyClient.send(
       new SynthesizeSpeechCommand({
         Engine: "generative",
@@ -584,18 +690,47 @@ export async function withSpeech(analysisText, voice, locale, rating = null) {
       })
     );
     const bytes = await result.AudioStream.transformToByteArray();
-    parsed.speech = {
+    console.log("Polly speech: ", selected.voiceId, bytes.length, "bytes");
+    return {
       voice: selected.voiceId,
       gender: selected.gender,
       format: "mp3",
       audio: Buffer.from(bytes).toString("base64"),
     };
-    console.log("Polly speech: ", selected.voiceId, bytes.length, "bytes");
-    return JSON.stringify(parsed);
   } catch (error) {
     console.error("Polly error:", error instanceof Error ? error.message : String(error));
+    return null;
+  }
+}
+
+/**
+ * Add `speech: { voice, gender, format, audio }` (base64 MP3 of the spoken `feedback`) to the
+ * analysis JSON, in the commander's voice: the custom ElevenLabs voice when the persona has one
+ * ({@link elevenLabsSpeech}), else (or when it fails) Polly ({@link pollySpeech}). Returns the
+ * analysis unchanged when there is no feedback or no voice speaks it – speech is optional and must
+ * never break the debrief.
+ * @param {string} analysisText Analysis JSON string (after {@link withRating}).
+ * @param {Pick<Persona, "voice"|"elevenlabs">} persona The speaking commander's voices.
+ * @param {string|null} locale
+ * @param {string|null} [rating] Rating at the start of the headline, if any.
+ * @returns {Promise<string>}
+ */
+export async function withSpeech(analysisText, persona, locale, rating = null) {
+  let parsed;
+  try {
+    parsed = JSON.parse(analysisText);
+  } catch {
     return analysisText;
   }
+  const text = speakableText(parsed && parsed.feedback);
+  if (!text) return analysisText;
+  const speech =
+    (persona.elevenlabs &&
+      (await elevenLabsSpeech(text, persona.elevenlabs, persona.voice, locale))) ||
+    (await pollySpeech(text, persona.voice, locale, rating));
+  if (!speech) return analysisText;
+  parsed.speech = speech;
+  return JSON.stringify(parsed);
 }
 
 /**
@@ -619,9 +754,9 @@ export const handler = async (event) => {
           console.log("Bedrock response: ", response);
           const rating = verdictRating(verdict, locale);
           if (rating) response = withRating(response, rating);
-          // Each commander keeps one voice gender, whatever the client asked for.
+          // Each commander keeps their own voice, whatever gender the client asked for.
           if (voice) {
-            response = await withSpeech(response, PERSONAS[commander].voice, locale, rating);
+            response = await withSpeech(response, PERSONAS[commander], locale, rating);
           }
         } else {
           return { statusCode: 400, body: JSON.stringify({ message: "Missing request body" }) };

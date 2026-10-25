@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const bedrockSend = vi.fn();
 const pollySend = vi.fn();
+const secretsSend = vi.fn();
 
 vi.mock("@aws-sdk/client-bedrock-runtime", () => ({
   BedrockRuntimeClient: class {
@@ -29,10 +30,24 @@ vi.mock("@aws-sdk/client-polly", () => ({
   },
 }));
 
+vi.mock("@aws-sdk/client-secrets-manager", () => ({
+  SecretsManagerClient: class {
+    send(/** @type {any} */ cmd) {
+      return secretsSend(cmd);
+    }
+  },
+  GetSecretValueCommand: class {
+    constructor(/** @type {any} */ params) {
+      this.params = params;
+    }
+  },
+}));
+
 process.env.MODEL_ID = "test-model";
 
 const {
   DEBRIEF_TOOL,
+  ELEVENLABS,
   HEADLINE_IMAGERY,
   PERSONAS,
   PROMPT,
@@ -93,9 +108,11 @@ describe("analysis Lambda – Polly narration", () => {
     expect(selectVoice("en-IE", "male")).toEqual({ voiceId: "Matthew", gender: "male" });
     expect(selectVoice("de-AT", "male")?.voiceId).toBe("Daniel");
     expect(selectVoice("en-IE", "female")?.voiceId).toBe("Niamh");
-    // No male voice for the language at all → female even when male is requested.
-    expect(selectVoice("nl-NL", "male")).toEqual({ voiceId: "Laura", gender: "female" });
-    expect(selectVoice("pl-PL", "male")?.voiceId).toBe("Ola");
+    // No male voice for the language at all → none: a commander never switches gender.
+    expect(selectVoice("nl-NL", "male")).toBeNull();
+    expect(selectVoice("pl-PL", "male")).toBeNull();
+    expect(selectVoice("nl-BE", "female")?.voiceId).toBe("Lisa");
+    expect(selectVoice("pl-PL", "female")).toEqual({ voiceId: "Ola", gender: "female" });
     // Language-only / unknown region → language default.
     expect(selectVoice("en-CA", "male")?.voiceId).toBe("Matthew");
     expect(selectVoice("fr", "female")?.voiceId).toBe("Lea");
@@ -112,6 +129,10 @@ describe("analysis Lambda – Polly narration", () => {
     expect(speakableText("👨‍🚀 Survive  90s 🔥")).toBe("Survive 90s");
     expect(speakableText("x".repeat(500))).toHaveLength(340);
     expect(speakableText(undefined)).toBe("");
+    // Captain Straehle's surname is spoken with its final e.
+    expect(speakableText("👨‍🚀 Captain Straehle here. Straehles fly.")).toBe(
+      "Captain Straehleh here. Straehles fly."
+    );
   });
 
   it("keeps the speech, history and commander requests out of the mission details", () => {
@@ -161,7 +182,8 @@ describe("analysis Lambda – Polly narration", () => {
     await post({ score: 1, device: { locale: "en-US" }, speech: { voice: "male" } });
     const system = (/** @type {number} */ n) => bedrockSend.mock.calls[n][0].params.system[0].text;
     expect(system(0)).toBe(PERSONAS.altair.system);
-    expect(system(0)).toMatch(/^You are Captain Altair/);
+    expect(system(0)).toMatch(/^You are Captain Straehle \(he\/him\), call sign “Altair”/);
+    expect(system(1)).toContain("on the radio you call him Altair");
     expect(system(1)).toBe(PERSONAS.vega.system);
     expect(system(1)).toBe(SYSTEM_PROMPT);
     expect(sentPrompt()).not.toContain("altair");
@@ -226,6 +248,120 @@ describe("analysis Lambda – Polly narration", () => {
     expect(status).toBe(200);
     expect(analysis).toEqual(ANALYSIS);
     errorSpy.mockRestore();
+  });
+});
+
+describe("analysis Lambda – Captain Altair's ElevenLabs voice", () => {
+  const fetchMock = vi.fn();
+  /** @type {any} */
+  let errorSpy;
+
+  /** The secret's JSON, as stored. @param {any} value */
+  const secret = (value) => ({ SecretString: JSON.stringify(value) });
+  const audioReply = () => new Response(new Uint8Array([4, 5, 6]), { status: 200 });
+
+  beforeEach(() => {
+    bedrockSend.mockReset();
+    pollySend.mockReset();
+    secretsSend.mockReset();
+    fetchMock.mockReset();
+    bedrockSend.mockResolvedValue(bedrockReply(JSON.stringify(ANALYSIS)));
+    pollySend.mockResolvedValue({
+      AudioStream: { transformToByteArray: async () => new Uint8Array([1, 2, 3]) },
+    });
+    secretsSend.mockResolvedValue(secret({ apiToken: "test-key", apiTokenRegion: "us" }));
+    fetchMock.mockImplementation(async () => audioReply());
+    vi.stubGlobal("fetch", fetchMock);
+    process.env.ELEVENLABS_SECRET_ID = "test-secret";
+    errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    return () => {
+      vi.unstubAllGlobals();
+      delete process.env.ELEVENLABS_SECRET_ID;
+      errorSpy.mockRestore();
+    };
+  });
+
+  /** @param {string} locale @param {string} [verdict] */
+  const altair = (locale, verdict) =>
+    post({ score: 1, verdict, device: { locale }, commander: "altair", speech: { voice: "male" } });
+
+  it("speaks Altair's headline with his custom voice in the player's language", async () => {
+    const { analysis } = await altair("de-DE", "commendation");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(
+      `https://api.us.elevenlabs.io/v1/text-to-speech/${PERSONAS.altair.elevenlabs}?output_format=${ELEVENLABS.format}`
+    );
+    expect(init.method).toBe("POST");
+    expect(init.headers["xi-api-key"]).toBe("test-key");
+    // Plain text (the model takes no SSML), rating included.
+    expect(JSON.parse(init.body)).toEqual({
+      text: "Belobigung, Pilot. Survive the full 90 seconds to score",
+      model_id: "eleven_v4",
+      language_code: "de",
+    });
+    expect(analysis.speech).toEqual({
+      voice: PERSONAS.altair.elevenlabs,
+      gender: "male",
+      format: "mp3",
+      audio: Buffer.from([4, 5, 6]).toString("base64"),
+    });
+    expect(pollySend).not.toHaveBeenCalled();
+  });
+
+  it("gives Altair a voice where Polly has no male one, and reads the key once", async () => {
+    expect((await altair("nl-NL")).analysis.speech.voice).toBe(PERSONAS.altair.elevenlabs);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).language_code).toBe("nl");
+    expect((await altair("pl_PL")).analysis.speech.voice).toBe(PERSONAS.altair.elevenlabs);
+    expect(secretsSend.mock.calls.length).toBeLessThanOrEqual(1);
+    expect(pollySend).not.toHaveBeenCalled();
+  });
+
+  it("keeps Commander Vega on Polly", async () => {
+    const { analysis } = await post({
+      score: 1,
+      device: { locale: "en-US" },
+      speech: { voice: "female" },
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(analysis.speech.voice).toBe("Ruth");
+  });
+
+  it("falls back to a male Polly voice, or none, when ElevenLabs fails", async () => {
+    fetchMock.mockImplementation(async () => new Response('{"detail":"quota"}', { status: 401 }));
+    expect((await altair("en-GB")).analysis.speech).toMatchObject({
+      voice: "Brian",
+      gender: "male",
+    });
+    fetchMock.mockRejectedValue(new DOMException("timed out", "TimeoutError"));
+    expect((await altair("en-US")).analysis.speech.voice).toBe("Matthew");
+    // Never a woman's voice for Altair: no male Polly voice in Dutch means no speech.
+    const dutch = await altair("nl-NL");
+    expect(dutch.status).toBe(200);
+    expect(dutch.analysis).toEqual(ANALYSIS);
+    expect(errorSpy).toHaveBeenCalledWith("ElevenLabs error:", expect.stringContaining("401"));
+  });
+
+  it("uses Polly when the secret cannot be read, and retries it on the next request", async () => {
+    process.env.ELEVENLABS_SECRET_ID = "other-secret";
+    secretsSend.mockRejectedValueOnce(new Error("AccessDeniedException"));
+    expect((await altair("en-US")).analysis.speech.voice).toBe("Matthew");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect((await altair("en-US")).analysis.speech.voice).toBe(PERSONAS.altair.elevenlabs);
+    expect(secretsSend.mock.calls.map((c) => c[0].params)).toEqual([
+      { SecretId: "other-secret" },
+      { SecretId: "other-secret" },
+    ]);
+  });
+
+  it("uses the global API host for other key regions and Polly without a configured secret", async () => {
+    process.env.ELEVENLABS_SECRET_ID = "global-secret";
+    secretsSend.mockResolvedValue(secret({ apiToken: "k2" }));
+    await altair("en-US");
+    expect(fetchMock.mock.calls[0][0]).toMatch(/^https:\/\/api\.elevenlabs\.io\/v1\//);
+    delete process.env.ELEVENLABS_SECRET_ID;
+    expect((await altair("en-US")).analysis.speech.voice).toBe("Matthew");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

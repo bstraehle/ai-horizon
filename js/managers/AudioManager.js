@@ -40,7 +40,8 @@ const STAR_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
  *  - playFatal(): the player's ship is hit – hull crack, distorted crunch, descending metal
  *    screech, huge sub drop, long rumble and debris. Bypasses the voice cap so it always plays.
  *
- * Narration (Game Over headline spoken by Amazon Polly, synthesized server-side)
+ * Narration (Game Over headline in the commander's voice, synthesized server-side: Amazon Polly
+ * for Vega, ElevenLabs for Altair)
  *  - playTransmission(): a radio channel opening (squelch and crackle) while the debrief loads.
  *  - playSpeech(base64Mp3): decodes and plays the clip through the master bus (so mute applies)
  *    as a radio transmission (Quindar tones, squelch, band-limited voice, hiss), starting after

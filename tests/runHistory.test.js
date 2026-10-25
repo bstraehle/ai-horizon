@@ -167,7 +167,7 @@ describe("RunHistory", () => {
     expect(history.debrief(e({ score: 400 })).commander).toBe("vega");
     const debut = history.debrief(full({ score: 300 }));
     expect(debut.commander).toBe("altair");
-    expect(debut.hooks[0]).toMatch(/^Captain Altair's first debrief with this pilot/);
+    expect(debut.hooks[0]).toMatch(/^Captain “Altair” Straehle's first debrief with this pilot/);
     expect(history.read().cast).toEqual({ lastFull: "altair", altairMet: true });
     // Crashes are always Vega's and leave the full-mission turn alone.
     const crash = history.debrief(e({ score: 200 }));
@@ -226,7 +226,7 @@ describe("RunHistory", () => {
       full({ verdict: "commendation", score: 9000, bonus: 7, accuracy: 0.9 })
     );
     expect(debut.hooks).toHaveLength(5);
-    expect(debut.hooks[0]).toMatch(/^Captain Altair's first debrief/);
+    expect(debut.hooks[0]).toMatch(/^Captain “Altair” Straehle's first debrief/);
     expect(debut.hooks[1]).toMatch(/^New personal best/);
     expect(debut.hooks[3]).toMatch(/^The pilot's local time:/);
     expect(debut.hooks[4]).toMatch(/^Last mission, Commander Vega/);
@@ -261,15 +261,6 @@ describe("RunHistory", () => {
     expect(later.hooks[0]).toMatch(
       /^First mission today\. The pilot's last session was 12 days ago, on Sunday early in the morning: 1 mission, best 300 points, ending with a crash after 40 seconds\.$/
     );
-  });
-
-  it("keeps Commander Vega for languages without a male voice", () => {
-    const history = new RunHistory({
-      storage: new LocalStorageAdapter({ storage: memoryStorage() }),
-    });
-    expect(history.debrief(full({}), { locale: "nl-NL" }).commander).toBe("vega");
-    expect(history.debrief(full({}), { locale: "pl-PL" }).commander).toBe("vega");
-    expect(history.debrief(full({}), { locale: "de-DE" }).commander).toBe("altair");
   });
 
   it("can describe a mission without remembering it (autopilot)", () => {

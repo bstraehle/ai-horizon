@@ -765,7 +765,7 @@ body.about-body,
   padding-left: 1.2em;
   text-align: left;
 }
-.about-content ul.instructions .action-link {
+.about-content .instructions .action-link {
   display: inline;
   font-weight: inherit;
   margin-top: 0;

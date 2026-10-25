@@ -102,14 +102,14 @@ describe("AIAnalysisManager.render", () => {
     msg.classList.add("commander-vega");
     const history = { mission: 4, hooks: [], commander: /** @type {const} */ ("altair") };
     AIAnalysisManager.render(msg, {}, { ...RUN, device: { locale: "ko-KR" } }, true, null, history);
-    expect(msg.querySelector(".transmission-from")?.textContent).toBe("알타이르 대위");
+    expect(msg.querySelector(".transmission-from")?.textContent).toBe("“알타이르” Straehle 대위");
     expect(msg.className).toBe("commander-altair");
     expect(playTransmission).toHaveBeenCalledTimes(1);
     setReducedMotion(true);
     await new Promise((resolve) => {
       AIAnalysisManager.render(msg, {}, RUN, false, resolve, history);
     });
-    expect(msg.querySelector(".debrief-from")?.textContent).toBe("Captain Altair");
+    expect(msg.querySelector(".debrief-from")?.textContent).toBe("Captain “Altair” Straehle");
   });
 
   it("shows the title and the Ok button again once the debrief arrives", async () => {

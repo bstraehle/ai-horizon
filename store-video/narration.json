@@ -1,6 +1,9 @@
 {
   "engine": "neural",
-  "voices": { "host": "Joanna", "narrator": "Matthew" },
+  "voices": {
+    "host": "Joanna",
+    "narrator": { "elevenlabs": "AYZwqKNJgPfbTjp3GbCG", "model": "eleven_v4" }
+  },
   "gap": 0.4,
   "tail": 1.5,
   "cues": [
@@ -51,7 +54,7 @@
     {
       "at": 97.0,
       "voice": "host",
-      "text": "Your AI commanders, Vega and Altair, powered by Amazon Bedrock and Amazon Polly, remember your missions and tell you how to improve."
+      "text": "Your AI commanders, Vega and Altair, powered by Amazon Bedrock, Amazon Polly and ElevenLabs, remember your missions and tell you how to improve."
     },
     {
       "at": 104.6,

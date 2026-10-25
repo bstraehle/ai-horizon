@@ -92,7 +92,8 @@ const TOPICS = {
  *   altair: string, seconds: (done: number, total: number) => string,
  *   points: (n: number) => string, topics: Record<InsightTopic, string> }} DebriefLabels
  *   `transmission` labels the "incoming transmission" while the debrief loads; `vega` / `altair`
- *   name its sender, Commander Vega or Captain Altair (the personas in server/lambda/analysis.js).
+ *   name its sender, Commander Vega or Captain “Altair” Straehle (the personas in
+ *   server/lambda/analysis.js).
  */
 
 /**
@@ -117,7 +118,7 @@ export const DEBRIEF_LABELS = {
     nextMission: "Next mission",
     transmission: "Incoming transmission",
     vega: "Commander Vega",
-    altair: "Captain Altair",
+    altair: "Captain “Altair” Straehle",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} points`,
     topics: {
@@ -136,7 +137,7 @@ export const DEBRIEF_LABELS = {
     nextMission: "Volgende missie",
     transmission: "Inkomende transmissie",
     vega: "Commandant Vega",
-    altair: "Kapitein Altair",
+    altair: "Kapitein “Altair” Straehle",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} punten`,
     topics: {
@@ -155,7 +156,7 @@ export const DEBRIEF_LABELS = {
     nextMission: "Prochaine mission",
     transmission: "Transmission entrante",
     vega: "Commandante Vega",
-    altair: "Capitaine Altair",
+    altair: "Capitaine « Altair » Straehle",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} points`,
     topics: {
@@ -174,7 +175,7 @@ export const DEBRIEF_LABELS = {
     nextMission: "Nächste Mission",
     transmission: "Eingehende Übertragung",
     vega: "Kommandantin Vega",
-    altair: "Kapitän Altair",
+    altair: "Kapitän „Altair“ Straehle",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} Punkte`,
     topics: {
@@ -193,7 +194,7 @@ export const DEBRIEF_LABELS = {
     nextMission: "Prossima missione",
     transmission: "Trasmissione in arrivo",
     vega: "Comandante Vega",
-    altair: "Capitano Altair",
+    altair: "Capitano “Altair” Straehle",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} punti`,
     topics: {
@@ -212,7 +213,7 @@ export const DEBRIEF_LABELS = {
     nextMission: "다음 임무",
     transmission: "교신 수신 중",
     vega: "베가 사령관",
-    altair: "알타이르 대위",
+    altair: "“알타이르” Straehle 대위",
     seconds: (d, t) => `${d} / ${t}초`,
     points: (n) => `${n}점`,
     topics: {
@@ -231,7 +232,7 @@ export const DEBRIEF_LABELS = {
     nextMission: "Następna misja",
     transmission: "Transmisja przychodząca",
     vega: "Komandor Vega",
-    altair: "Kapitan Altair",
+    altair: "Kapitan „Altair” Straehle",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} pkt`,
     topics: {
@@ -250,7 +251,7 @@ export const DEBRIEF_LABELS = {
     nextMission: "Próxima missão",
     transmission: "Recebendo transmissão",
     vega: "Comandante Vega",
-    altair: "Capitão Altair",
+    altair: "Capitão “Altair” Straehle",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} pontos`,
     topics: {
@@ -269,7 +270,7 @@ export const DEBRIEF_LABELS = {
     nextMission: "Próxima misión",
     transmission: "Transmisión entrante",
     vega: "Comandante Vega",
-    altair: "Capitán Altair",
+    altair: "Capitán «Altair» Straehle",
     seconds: (d, t) => `${d} / ${t} s`,
     points: (n) => `${n} puntos`,
     topics: {
@@ -467,7 +468,8 @@ export class AIAnalysisAdapter {
    * `commander`) when given; the model returns the headline
    * and one technique per weakness, and the sections are built here from the insights' exact
    * facts with {@link debriefLabels} for the player's locale. When `speech: { voice }` is given,
-   * it is sent too so the server can return the headline spoken by Amazon Polly. The audio is
+   * it is sent too so the server can return the headline spoken in the commander's voice (Amazon
+   * Polly for Vega, ElevenLabs for Altair; see server/lambda/analysis.js). The audio is
    * returned as `speech` and removed from `rawResponse`, which is persisted with leaderboard
    * entries.
    * @param {object} input

@@ -15,8 +15,9 @@ const TYPE_MAX_MS = 3500;
 /** Longest wait for the narration clip's timing before typing without it. */
 const SPEECH_TIMING_WAIT_MS = 1500;
 /**
- * Longest wait for the remote debrief before the offline one: a cold Lambda plus Bedrock and
- * Polly can pass the default 8 s, and the incoming transmission covers the wait.
+ * Longest wait for the remote debrief before the offline one: a cold Lambda plus Bedrock and the
+ * voice (Polly or ElevenLabs) can pass the default 8 s, and the incoming transmission covers the
+ * wait.
  */
 const ANALYSIS_TIMEOUT_MS = 15000;
 /** Signal bars while the transmission is incoming, and how long they show "locked" on arrival. */
@@ -68,8 +69,8 @@ export class AIAnalysisManager {
 
   /**
    * Sound engine used to narrate the Game Over headline (set by the game). Speech is requested
-   * from the server – which invokes Amazon Polly – only when this is set, supported, unmuted and
-   * remote mode is on.
+   * from the server – which invokes a text-to-speech service – only when this is set, supported,
+   * unmuted and remote mode is on.
    * @type {{ supported: boolean, muted: boolean, playTransmission?: () => void,
    *   playSpeech: (base64: string, commander: string) =>
    *     Promise<{ delay: number, duration: number }|null> }|null}
@@ -120,7 +121,7 @@ export class AIAnalysisManager {
 
   /**
    * Speech request for this debrief (the commander's voice), or null when sound is
-   * off/unsupported or not remote (so Polly is never invoked).
+   * off/unsupported or not remote (so no voice is synthesized).
    * @param {"vega"|"altair"} commander
    * @returns {{ voice: string }|null}
    */

@@ -1,22 +1,23 @@
 /**
  * The two debrief commanders and who radios the pilot after a mission.
  *
- * Commander Vega (she/her) is the gruff veteran mentor; Captain Altair (he/him) is the hotshot
- * ace (their personas live in server/lambda/analysis.js, their voices and radio tones in
- * CONFIG.AUDIO.COMMANDERS). Vega debriefs every mission that ends before the full 90 seconds,
- * record or not. Altair debriefs the pilot's first full mission with the AI debrief online (his
- * debut; offline full missions before it stay Vega's) and every full mission that sets a record,
- * personal or overall (the leaderboard's top score); other full missions alternate between the
- * two. Languages without a male Polly voice keep Vega, so a character never switches voice.
+ * Commander Vega (she/her) is the gruff veteran mentor; Captain Straehle (he/him), call sign
+ * "Altair", is the hotshot ace (their personas and voices live in server/lambda/analysis.js:
+ * Vega's an Amazon Polly voice, Altair's a custom ElevenLabs voice that speaks every language;
+ * their radio tones in CONFIG.AUDIO.COMMANDERS). Vega debriefs every mission that ends before the
+ * full 90 seconds, record or not. Altair debriefs the pilot's first full mission with the AI
+ * debrief online (his debut; offline full missions before it stay Vega's) and every full mission
+ * that sets a record, personal or overall (the leaderboard's top score); other full missions
+ * alternate between the two.
  */
 
 /** @typedef {"vega"|"altair"} CommanderId */
 
-/** Display names in the English story hooks (the commanders word them in the player's language). */
-const NAMES = { vega: "Commander Vega", altair: "Captain Altair" };
-
-/** Debrief languages without a male Polly voice (see GENERATIVE_VOICES in analysis.js). */
-const VEGA_ONLY_LANGUAGES = ["nl", "pl"];
+/**
+ * Display names in the English story hooks (the commanders word them in the player's language).
+ * Altair is Captain Straehle's call sign, so the star-crossed legend of Vega and Altair still fits.
+ */
+const NAMES = { vega: "Commander Vega", altair: "Captain “Altair” Straehle" };
 
 /** Longest quoted line from the last debrief in a story hook. */
 const MAX_QUOTE_CHARS = 140;
@@ -37,17 +38,6 @@ export const isCommander = (id) => id === "vega" || id === "altair";
  * @param {{ score: number, top?: number }} entry
  */
 export const isOverallRecord = (entry) => !!entry.top && entry.top > 0 && entry.score > entry.top;
-
-/**
- * Whether the locale's language has a male narrator voice (otherwise only Vega speaks).
- * @param {string|null|undefined} locale
- */
-export function altairCanSpeak(locale) {
-  const lang = String(locale || "en")
-    .split(/[-_]/)[0]
-    .toLowerCase();
-  return !VEGA_ONLY_LANGUAGES.includes(lang);
-}
 
 /**
  * The 7th day of the 7th month, in the Gregorian (Tanabata) or Chinese lunisolar calendar
@@ -77,17 +67,16 @@ export function isStarCrossedDay(t, timeZone) {
  * @param {MissionLike} entry
  * @param {MissionLike[]} previous Earlier missions on this device, oldest first.
  * @param {CastMemory} cast
- * @param {string|null|undefined} locale
  * @param {number} [allTimeBest] Best score before this mission (defaults to the best in
  *   `previous`, which only holds the most recent missions).
  * @param {boolean} [online] Whether the AI debrief is available; Altair's debut waits for it, so
  *   his introduction is never spent on an offline line.
  * @returns {{ commander: CommanderId, debut: boolean }}
  */
-export function pickCommander(entry, previous, cast, locale, allTimeBest, online = true) {
+export function pickCommander(entry, previous, cast, allTimeBest, online = true) {
   const vega = { commander: /** @type {CommanderId} */ ("vega"), debut: false };
   const altair = { commander: /** @type {CommanderId} */ ("altair"), debut: false };
-  if (!altairCanSpeak(locale) || entry.survived < entry.total) return vega;
+  if (entry.survived < entry.total) return vega;
   if (!cast.altairMet) return online ? { ...altair, debut: true } : vega;
   const best = allTimeBest ?? previous.reduce((b, e) => Math.max(b, e.score), 0);
   if ((best > 0 && entry.score > best) || isOverallRecord(entry)) return altair;
@@ -107,7 +96,7 @@ export function commanderHooks(pick, entry, cast) {
   const lead = [];
   if (pick.debut) {
     lead.push(
-      `Captain Altair's first debrief with this pilot: Commander Vega handed the pilot over to him after their first full ${entry.total}-second mission. Briefly introduce yourself.`
+      `${NAMES.altair}'s first debrief with this pilot: Commander Vega handed the pilot over to him after their first full ${entry.total}-second mission. Briefly introduce yourself with your rank, name and call sign.`
     );
   }
   if (isStarCrossedDay(entry.t)) {

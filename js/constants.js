@@ -428,8 +428,8 @@ export const CONFIG = deepFreeze({
     },
     STAR_STREAK_WINDOW_MS: 700,
     /**
-     * The two debrief commanders (see managers/Commanders.js): each keeps one Polly voice gender
-     * and its own pitch for the Quindar tones that open and close the voice.
+     * The two debrief commanders (see managers/Commanders.js): each keeps one voice gender (the
+     * server picks the voice) and its own pitch for the Quindar tones that open and close it.
      */
     COMMANDERS: {
       vega: { voice: "female", introHz: 2525, outroHz: 2475 },

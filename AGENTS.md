@@ -26,13 +26,20 @@
    commander, Vega and Altair) / `PROMPT` constants in `server/lambda/analysis.js` (not env vars:
    Lambda caps all env vars at 4 KB), so prompt changes need a code redeploy. The client picks the
    commander (`js/managers/Commanders.js`) and sends it as `commander`; each persona has a fixed
-   Polly voice gender and its own headline shape (Vega 2 sentences, Altair 3-4, enforced by
-   `tidyHeadline`), and languages without a male generative voice (nl, pl) keep Vega. The model
-   writes a `draft` and then the proofread `feedback`; the draft is dropped before responding. The
-   Lambda's only env var is `MODEL_ID`: it calls the Converse API with a forced tool call, so any
-   Converse model with tool use works (`us.anthropic.claude-haiku-4-5-20251001-v1:0`).
-   The function role's inline policy must allow `bedrock:InvokeModel` on that model in every region
-   its cross-region profile routes to. To try prompt changes before deploying, run the exported
+   voice and its own headline shape (Vega 2 sentences, Altair 3-4, enforced by `tidyHeadline`).
+   Vega speaks with a Polly generative voice; Altair with the owner's custom ElevenLabs voice
+   (`PERSONAS.altair.elevenlabs`, model `ELEVENLABS.model` = `eleven_v4`, in every language),
+   falling back to a male Polly voice (none in nl/pl: then the debrief is text only) when
+   ElevenLabs fails or takes over `ELEVENLABS.timeoutMs`. The model writes a `draft` and then the
+   proofread `feedback`; the draft is dropped before responding. Env vars: `MODEL_ID` (it calls
+   the Converse API with a forced tool call, so any Converse model with tool use works:
+   `us.anthropic.claude-haiku-4-5-20251001-v1:0`) and `ELEVENLABS_SECRET_ID` (the Secrets Manager
+   secret `Eleven_Labs`, JSON `{ apiToken, apiTokenRegion }`; unset → Altair uses Polly). Note
+   `update-function-configuration --environment` replaces all env vars, so always pass both.
+   The function role's inline policies must allow `bedrock:InvokeModel` on that model in every
+   region its cross-region profile routes to, `polly:SynthesizeSpeech`, and
+   `secretsmanager:GetSecretValue` on the secret plus `kms:Decrypt` on its customer-managed key
+   (via Secrets Manager). To try prompt changes before deploying, run the exported
    prompt helpers against `aws bedrock-runtime converse` (Windows CLI: pass `file://` JSON with
    non-ASCII escaped and set `PYTHONUTF8=1`).
 
@@ -55,7 +62,10 @@ Only the 4K cut is kept (no 1080p version). With `npm run serve` running:
    (writes the game sounds and, with a voice clip, `_sfx-3840x2160-comms.wav`: the commander's
    voice through the game's radio chain).
 3. `python store-video/narrate.py --raw store-video/_raw-3840x2160.mp4 --size 3840x2160 --out store-video/ai-horizon-3840x2160.mp4 --sfx store-video/_sfx-3840x2160.wav --comms store-video/_sfx-3840x2160-comms.wav`
-   (needs AWS credentials for Polly; `--sfx-lu` sets how far the game sits under the voice-over).
+   (needs AWS credentials for Polly, which voices the host, and an ElevenLabs API key for the
+   narrator, the owner's custom voice on `eleven_v4`: `ELEVENLABS_API_KEY` or
+   `.secrets/api_key.txt`, gitignored; clips are cached in `store-video/.elevenlabs-cache/`, so
+   delete one to re-generate it; `--sfx-lu` sets how far the game sits under the voice-over).
    The commander's voice is mixed at narrator loudness and narration cues that would overlap it
    start after it, so the video's length follows the clip.
 
@@ -70,9 +80,11 @@ the frames from game over on), skip step 2 (the sound timeline is unchanged), ru
 `--raw` pointing at the new file, then move it over the old raw for next time. This only works
 when the game-over dialog's first frame and the sounds are unchanged (the splice checks that frame
 against the old video); otherwise do the full render. The 4K landscape screenshots
-(`store-screenshots/3840x2160`) are frames of the raw video: `4-gameover.png` is frame 6720 (the
-held debrief) and `5-leaderboard.png` frame 7030 (extract with
-`-vf "select=eq(n\,6720)" -frames:v 1 -pix_fmt rgb24`: 24-bit, no alpha).
+(`store-screenshots/3840x2160`) are frames of the raw video: `4-gameover.png` is frame 6620 (the
+held debrief) and `5-leaderboard.png` frame 6900 (extract with
+`-vf "select=eq(n\,6620)" -frames:v 1 -pix_fmt rgb24`: 24-bit, no alpha). The frames move with
+the post-run timeline: pick them from the `[record] debrief / initials / leaderboard from frame …`
+lines of step 1.
 
 ## Testing against production
 

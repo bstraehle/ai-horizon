@@ -209,14 +209,14 @@ export class RunHistory {
    * commander who debriefs it (see Commanders.js), then remember both unless `record` is false
    * (e.g. autopilot runs).
    * @param {RunEntry} entry
-   * @param {{ record?: boolean, locale?: string|null, online?: boolean }} [opts] `online`: the
-   *   AI debrief is available (Altair's debut waits for it).
+   * @param {{ record?: boolean, online?: boolean }} [opts] `online`: the AI debrief is available
+   *   (Altair's debut waits for it).
    * @returns {DebriefHistory}
    */
-  debrief(entry, { record = true, locale = null, online = true } = {}) {
+  debrief(entry, { record = true, online = true } = {}) {
     const { count, runs, best, cast, day } = this.read();
     const mission = count + 1;
-    const pick = pickCommander(entry, runs, cast, locale, best, online);
+    const pick = pickCommander(entry, runs, cast, best, online);
     const { lead, tail } = commanderHooks(pick, entry, cast);
     // First mission of a new day: the commander recaps where the pilot left off.
     const recap = sessionRecap(entry, runs, day || null, this.timeZone);

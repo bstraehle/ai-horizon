@@ -1136,11 +1136,9 @@ class AIHorizon {
     // device; autopilot runs (recordings, profiling) are not remembered.
     try {
       const entry = runEntry(this._lastRunSummary);
-      const device = this._lastRunSummary && this._lastRunSummary.device;
       this._lastHistory = entry
         ? this.runHistory.debrief(entry, {
             record: !(this.devTools && this.devTools.autopilot),
-            locale: (device && device.locale) || null,
             online: AIAnalysisManager.IS_REMOTE,
           })
         : null;

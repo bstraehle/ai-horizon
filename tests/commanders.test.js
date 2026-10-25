@@ -1,11 +1,6 @@
 // @ts-check
 import { describe, it, expect } from "vitest";
-import {
-  altairCanSpeak,
-  commanderHooks,
-  isStarCrossedDay,
-  pickCommander,
-} from "../js/managers/Commanders.js";
+import { commanderHooks, isStarCrossedDay, pickCommander } from "../js/managers/Commanders.js";
 
 const DAY = 86_400_000;
 /** A Wednesday in October, no star-crossed day in either calendar. */
@@ -26,21 +21,21 @@ const full = (o = {}) => run({ survived: 90, verdict: "satisfactory", ...o });
 
 describe("pickCommander", () => {
   it("gives every mission under 90 seconds to Vega, records included", () => {
-    expect(pickCommander(run(), [], {}, "en-US")).toEqual({ commander: "vega", debut: false });
+    expect(pickCommander(run(), [], {})).toEqual({ commander: "vega", debut: false });
     const crashRecord = run({ score: 9000, top: 8000, survived: 85 });
-    expect(pickCommander(crashRecord, [run()], met, "en").commander).toBe("vega");
-    expect(pickCommander(crashRecord, [run()], {}, "en")).toEqual({
+    expect(pickCommander(crashRecord, [run()], met).commander).toBe("vega");
+    expect(pickCommander(crashRecord, [run()], {})).toEqual({
       commander: "vega",
       debut: false,
     });
   });
 
   it("gives the first full mission to Altair as his debut, once the AI debrief is online", () => {
-    expect(pickCommander(full(), [run(), run()], {}, "en-US")).toEqual({
+    expect(pickCommander(full(), [run(), run()], {})).toEqual({
       commander: "altair",
       debut: true,
     });
-    expect(pickCommander(full(), [run()], {}, "en-US", undefined, false)).toEqual({
+    expect(pickCommander(full(), [run()], {}, undefined, false)).toEqual({
       commander: "vega",
       debut: false,
     });
@@ -48,7 +43,7 @@ describe("pickCommander", () => {
 
   it("alternates full missions, picking up after the last full one", () => {
     const pick = (/** @type {any} */ lastFull) =>
-      pickCommander(full({ score: 10 }), [run()], { ...met, lastFull }, "en").commander;
+      pickCommander(full({ score: 10 }), [run()], { ...met, lastFull }).commander;
     expect(pick("altair")).toBe("vega");
     expect(pick("vega")).toBe("altair");
     // Not remembered (history from before): the last full mission was Altair's debut.
@@ -58,28 +53,15 @@ describe("pickCommander", () => {
   it("gives full missions with a personal best or overall record to Altair", () => {
     const cast = { ...met, lastFull: /** @type {const} */ ("altair") };
     const best = full({ score: 5000 });
-    expect(pickCommander(best, [run({ score: 4000 })], cast, "en")).toEqual({
+    expect(pickCommander(best, [run({ score: 4000 })], cast)).toEqual({
       commander: "altair",
       debut: false,
     });
     // The all-time best counts, not just the recent runs passed in.
-    expect(pickCommander(best, [run({ score: 4000 })], cast, "en", 6000).commander).toBe("vega");
+    expect(pickCommander(best, [run({ score: 4000 })], cast, 6000).commander).toBe("vega");
     // Beating the leaderboard's top score is a record even below the personal best.
     const overall = full({ score: 5000, top: 4500 });
-    expect(pickCommander(overall, [run({ score: 4000 })], cast, "en", 6000).commander).toBe(
-      "altair"
-    );
-  });
-
-  it("never picks Altair where he has no voice", () => {
-    expect(altairCanSpeak("nl-BE")).toBe(false);
-    expect(altairCanSpeak("pl_PL")).toBe(false);
-    expect(altairCanSpeak("ko-KR")).toBe(true);
-    expect(altairCanSpeak(null)).toBe(true);
-    const best = full({ score: 5000 });
-    expect(pickCommander(best, [run()], { ...met, lastFull: "vega" }, "nl-NL").commander).toBe(
-      "vega"
-    );
+    expect(pickCommander(overall, [run({ score: 4000 })], cast, 6000).commander).toBe("altair");
   });
 });
 
@@ -98,7 +80,10 @@ describe("commanderHooks", () => {
     const july7 = run({ t: Date.UTC(2026, 6, 7, 12), survived: 90 });
     const cast = { line: "x".repeat(200), lineBy: /** @type {const} */ ("vega") };
     const { lead, tail } = commanderHooks({ commander: "altair", debut: true }, july7, cast);
-    expect(lead[0]).toMatch(/first full 90-second mission\. Briefly introduce yourself\.$/);
+    expect(lead[0]).toMatch(/^Captain “Altair” Straehle's first debrief with this pilot/);
+    expect(lead[0]).toMatch(
+      /first full 90-second mission\. Briefly introduce yourself with your rank, name and call sign\.$/
+    );
     expect(lead[1]).toMatch(/Vega and Altair meet across the Milky Way.*Mention Commander Vega/);
     expect(tail).toHaveLength(1);
     expect(tail[0]).toMatch(/^Last mission, Commander Vega told the pilot: "x+…"$/);

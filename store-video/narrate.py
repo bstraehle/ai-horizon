@@ -11,11 +11,17 @@ then `python store-video/narrate.py --raw store-video/_raw-3840x2160.mp4 --size 
 --out store-video/ai-horizon-3840x2160.mp4` (seed 2024 completes the full 90s at that aspect; 39996
 dies after 15s). Each narration cue has a target start time `at` (seconds of video) and a voice;
 cues never overlap: a cue starts at max(at, previous cue end + gap). The last frame is held until
-the final cue has finished plus `tail` seconds. Speech is synthesised with the Polly neural engine
-as 24 kHz MP3 (cached in store-video/.polly-cache/), mixed onto a 48 kHz track and normalised to
--16 LUFS integrated (linear gain + peak limiter, so the voice/effects balance is preserved); a
-matching .srt is written next to the MP4. Conventions follow the svg-to-mp4 agent skill: female host
-for the intro/outro, male narrator for the gameplay, us-east-1 fallback when the engine is unavailable.
+the final cue has finished plus `tail` seconds. Speech is synthesised as MP3, mixed onto a 48 kHz
+track and normalised to -16 LUFS integrated (linear gain + peak limiter, so the voice/effects
+balance is preserved); a matching .srt is written next to the MP4. Conventions follow the
+svg-to-mp4 agent skill: female host for the intro/outro, male narrator for the gameplay.
+
+Voices in the script's `voices` map are either a Polly voice name (the `engine`, neural by default,
+at 24 kHz, cached in store-video/.polly-cache/, us-east-1 fallback when the engine is unavailable)
+or an ElevenLabs voice `{"elevenlabs": "<voice id>", "model": "eleven_v4", "settings": {...}}`
+(`model` and the optional `settings`, sent as `voice_settings`; 44.1 kHz, cached in
+store-video/.elevenlabs-cache/). ElevenLabs reads its API key from ELEVENLABS_API_KEY or, failing
+that, .secrets/api_key.txt (gitignored). Delete a cached clip to re-generate it.
 
 Game sound (optional): record with `--sfx=store-video/_sfx-3840x2160.json`, render it with
 `node --experimental-websocket scripts/render-sfx.cjs --events=store-video/_sfx-3840x2160.json`,
@@ -34,9 +40,12 @@ import argparse
 import array
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 import wave
 from pathlib import Path
 
@@ -44,6 +53,8 @@ HERE = Path(__file__).resolve().parent
 FFMPEG_DIR = HERE.parent / ".tools" / "ffmpeg" / "ffmpeg-8.1.2-essentials_build" / "bin"
 RATE = 48000
 FALLBACK_REGION = "us-east-1"
+ELEVENLABS_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}?output_format=mp3_44100_128"
+ELEVENLABS_KEY_FILE = HERE.parent / ".secrets" / "api_key.txt"
 TARGET_LUFS = -16.0
 PEAK_LIMIT = 0.84  # ~-1.5 dBFS
 DUCK = "sidechaincompress=threshold=0.03:ratio=4:attack=15:release=350:knee=4"
@@ -54,13 +65,46 @@ def tool(name: str) -> str:
     return str(local) if local.exists() else name
 
 
-def synthesize(text: str, voice: str, engine: str, cache: Path) -> Path:
+def cache_path(cache: Path, key: str, text: str) -> Path:
+    cache.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha1(key.encode()).hexdigest()[:12]
+    return cache / (re.sub(r"[^a-z0-9]+", "-", text.lower())[:50].strip("-") + f"_{digest}.mp3")
+
+
+def synthesize(text: str, voice: str | dict, engine: str) -> Path:
+    if isinstance(voice, dict):
+        return synthesize_elevenlabs(text, voice, HERE / ".elevenlabs-cache")
+    return synthesize_polly(text, voice, engine, HERE / ".polly-cache")
+
+
+def synthesize_elevenlabs(text: str, voice: dict, cache: Path) -> Path:
+    body = {"text": text, "model_id": voice.get("model", "eleven_v4")}
+    if "settings" in voice:
+        body["voice_settings"] = voice["settings"]
+    voice_id = voice["elevenlabs"]
+    path = cache_path(cache, f"elevenlabs|{voice_id}|{json.dumps(body, sort_keys=True)}", text)
+    if path.exists():
+        return path
+    key = os.environ.get("ELEVENLABS_API_KEY") or (
+        ELEVENLABS_KEY_FILE.read_text(encoding="utf-8").strip() if ELEVENLABS_KEY_FILE.exists() else "")
+    if not key:
+        sys.exit(f"ElevenLabs voice needs ELEVENLABS_API_KEY or {ELEVENLABS_KEY_FILE}")
+    req = urllib.request.Request(
+        ELEVENLABS_URL.format(voice=voice_id), data=json.dumps(body).encode(), method="POST",
+        headers={"xi-api-key": key, "Content-Type": "application/json", "Accept": "audio/mpeg"})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            path.write_bytes(resp.read())
+    except urllib.error.HTTPError as exc:
+        sys.exit(f"ElevenLabs error {exc.code}: {exc.read().decode(errors='replace')}")
+    return path
+
+
+def synthesize_polly(text: str, voice: str, engine: str, cache: Path) -> Path:
     import boto3
     from botocore.exceptions import ClientError
 
-    cache.mkdir(parents=True, exist_ok=True)
-    digest = hashlib.sha1(f"{voice}|{engine}|24k|{text}".encode()).hexdigest()[:12]
-    path = cache / (re.sub(r"[^a-z0-9]+", "-", text.lower())[:50].strip("-") + f"_{digest}.mp3")
+    path = cache_path(cache, f"{voice}|{engine}|24k|{text}", text)
     if path.exists():
         return path
     req = dict(Text=text, OutputFormat="mp3", SampleRate="24000", VoiceId=voice, Engine=engine)
@@ -166,7 +210,7 @@ def main() -> None:
 
     cues, cursor = [], 0.0
     for cue in spec["cues"]:
-        pcm = decode(synthesize(cue["text"], voices[cue["voice"]], engine, HERE / ".polly-cache"))
+        pcm = decode(synthesize(cue["text"], voices[cue["voice"]], engine))
         start = max(cue["at"], cursor)
         length = len(pcm) / 2 / RATE
         if busy and start < busy[1] and start + length > busy[0]:
