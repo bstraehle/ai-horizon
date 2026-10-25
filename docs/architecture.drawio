@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net" type="device">
   <diagram id="ai-horizon-architecture" name="AI HORIZON">
-    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1510" pageHeight="902" background="#FFFFFF" math="0" shadow="0">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1510" pageHeight="1002" background="#FFFFFF" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -34,7 +34,7 @@
         <mxCell id="ui" value="&lt;b&gt;UI &amp; Overlays&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot; color=&quot;#5F6B7A&quot;&gt;HUD · game over · leaderboard&lt;/font&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#AAB7B8;fontColor=#232F3E;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="engine">
           <mxGeometry x="240" y="126" width="200" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="audio" value="&lt;b&gt;Audio · AudioManager&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot; color=&quot;#5F6B7A&quot;&gt;Web Audio synthesized SFX · Polly narration playback · mute (M)&lt;/font&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#AAB7B8;fontColor=#232F3E;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="engine">
+        <mxCell id="audio" value="&lt;b&gt;Audio · AudioManager&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot; color=&quot;#5F6B7A&quot;&gt;Web Audio synthesized SFX · debrief voice playback · mute (M)&lt;/font&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#AAB7B8;fontColor=#232F3E;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="engine">
           <mxGeometry x="20" y="216" width="420" height="60" as="geometry" />
         </mxCell>
         <mxCell id="repo" value="&lt;b&gt;Leaderboard Repository&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot; color=&quot;#5F6B7A&quot;&gt;localStorage fallback&lt;/font&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#AAB7B8;fontColor=#232F3E;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="browser">
@@ -70,11 +70,17 @@
         <mxCell id="bedrock" value="Amazon Bedrock&lt;br&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#5F6B7A&quot;&gt;LLM run feedback&lt;/font&gt;" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;" vertex="1" parent="aws">
           <mxGeometry x="612" y="362" width="56" height="56" as="geometry" />
         </mxCell>
-        <mxCell id="polly" value="Amazon Polly&lt;br&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#5F6B7A&quot;&gt;generative voices&lt;/font&gt;" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.polly;" vertex="1" parent="aws">
+        <mxCell id="polly" value="Amazon Polly&lt;br&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#5F6B7A&quot;&gt;Vega's voice · fallback&lt;/font&gt;" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.polly;" vertex="1" parent="aws">
           <mxGeometry x="612" y="482" width="56" height="56" as="geometry" />
         </mxCell>
+        <mxCell id="secrets" value="AWS Secrets Manager&lt;br&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#5F6B7A&quot;&gt;ElevenLabs API key&lt;/font&gt;" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#DD344C;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.secrets_manager;" vertex="1" parent="aws">
+          <mxGeometry x="252" y="482" width="56" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="elevenlabs" value="&lt;b&gt;ElevenLabs&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot; color=&quot;#5F6B7A&quot;&gt;Altair's custom voice · eleven_v4&lt;/font&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#232F3E;fontColor=#232F3E;fontSize=13;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="720" width="220" height="56" as="geometry" />
+        </mxCell>
         <mxCell id="build" value="&lt;b&gt;Build &amp; Verification&lt;/b&gt;&amp;nbsp;&amp;nbsp;&lt;font style=&quot;font-size:11px&quot; color=&quot;#5F6B7A&quot;&gt;Husky hooks · GitHub Actions CI&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;fillColor=#F8F9FA;strokeColor=#AAB7B8;fontColor=#232F3E;fontSize=13;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="150" y="730" width="520" height="132" as="geometry" />
+          <mxGeometry x="150" y="830" width="520" height="132" as="geometry" />
         </mxCell>
         <mxCell id="lint" value="&lt;b&gt;Lint &amp; Format&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#5F6B7A&quot;&gt;ESLint · Prettier&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#AAB7B8;fontColor=#232F3E;fontSize=12;align=center;verticalAlign=middle;" vertex="1" parent="build">
           <mxGeometry x="20" y="60" width="104" height="52" as="geometry" />
@@ -89,7 +95,7 @@
           <mxGeometry x="398" y="60" width="104" height="52" as="geometry" />
         </mxCell>
         <mxCell id="legend" value="&lt;b&gt;Request Flow&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;fillColor=#F8F9FA;strokeColor=#AAB7B8;fontColor=#232F3E;fontSize=13;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="730" y="730" width="740" height="132" as="geometry" />
+          <mxGeometry x="730" y="830" width="740" height="132" as="geometry" />
         </mxCell>
         <mxCell id="legendBadge1" value="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FF9900;strokeColor=#FFFFFF;strokeWidth=2;fontColor=#232F3E;fontSize=11;fontStyle=1;" vertex="1" parent="legend">
           <mxGeometry x="22" y="42" width="20" height="20" as="geometry" />
@@ -124,11 +130,11 @@
         <mxCell id="legendBadge6" value="6" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FF9900;strokeColor=#FFFFFF;strokeWidth=2;fontColor=#232F3E;fontSize=11;fontStyle=1;" vertex="1" parent="legend">
           <mxGeometry x="382" y="94" width="20" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="legendText6" value="Speak the debrief headline with Amazon Polly (sound on)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#232F3E;" vertex="1" parent="legend">
+        <mxCell id="legendText6" value="Speak the headline: Polly (Vega), ElevenLabs (Altair)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#232F3E;" vertex="1" parent="legend">
           <mxGeometry x="410" y="94" width="330" height="20" as="geometry" />
         </mxCell>
         <mxCell id="credit" value="AWS Architecture Icons: Q3 2026 (July 31, 2026)" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=11;fontColor=#5F6B7A;" vertex="1" parent="1">
-          <mxGeometry x="970" y="872" width="500" height="20" as="geometry" />
+          <mxGeometry x="970" y="972" width="500" height="20" as="geometry" />
         </mxCell>
         <mxCell id="e-player" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=5;strokeColor=#545B64;strokeWidth=1.5;fontSize=11;fontColor=#5F6B7A;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="player" target="browser">
           <mxGeometry relative="1" as="geometry"></mxGeometry>
@@ -192,6 +198,20 @@
             <Array as="points">
               <mxPoint x="1290" y="510" />
               <mxPoint x="1290" y="610" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-voice" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=5;strokeColor=#545B64;strokeWidth=1.5;fontSize=11;fontColor=#5F6B7A;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.85;exitDx=0;exitDy=0;entryX=0.1818;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="lambdaAi" target="elevenlabs">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1290" y="510" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-secret" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=5;strokeColor=#545B64;strokeWidth=1.5;fontSize=11;fontColor=#5F6B7A;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.85;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="lambdaAi" target="secrets">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1010" y="510" />
             </Array>
           </mxGeometry>
         </mxCell>

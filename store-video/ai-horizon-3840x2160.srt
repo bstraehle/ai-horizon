@@ -3,43 +3,43 @@
 Welcome to AI Horizon, a fast arcade space shooter.
 
 2
-00:00:04,600 --> 00:00:08,800
+00:00:04,600 --> 00:00:09,240
 Launch the mission. You have ninety seconds to score as many points as you can.
 
 3
-00:00:10,500 --> 00:00:16,044
+00:00:10,500 --> 00:00:16,820
 Collect stars along the way. White stars are worth twenty-five points, red bonus stars fifty.
 
 4
-00:00:18,000 --> 00:00:23,064
+00:00:18,000 --> 00:00:23,920
 Blast the asteroids. Hardened gray planets take many hits, but pay out a hundred points.
 
 5
-00:00:27,000 --> 00:00:31,152
+00:00:27,000 --> 00:00:32,360
 The red planets are the eight bonus asteroids, worth two hundred and fifty points each.
 
 6
-00:00:36,500 --> 00:00:40,052
+00:00:36,500 --> 00:00:40,900
 Aim carefully. Your shot accuracy earns an end-of-run bonus.
 
 7
-00:00:46,000 --> 00:00:48,664
+00:00:46,000 --> 00:00:49,520
 Every thousand points adds another two hundred and fifty.
 
 8
-00:00:56,000 --> 00:01:00,368
+00:00:56,000 --> 00:01:01,200
 Don't get hit. One asteroid collision forces you to eject and ends the run.
 
 9
-00:01:07,000 --> 00:01:10,144
+00:01:07,000 --> 00:01:10,440
 Stay sharp. The asteroid waves keep on coming.
 
 10
-00:01:19,200 --> 00:01:23,568
+00:01:19,200 --> 00:01:24,160
 Fifteen seconds left. It's the finale, and every point now counts double!
 
 11
-00:01:26,500 --> 00:01:28,468
+00:01:26,500 --> 00:01:28,980
 Survive to the end for the full score.
 
 12
@@ -47,9 +47,9 @@ Survive to the end for the full score.
 Mission complete.
 
 13
-00:01:50,502 --> 00:01:58,350
-Your AI commanders, Vega and Altair, powered by Amazon Bedrock and Amazon Polly, remember your missions and tell you how to improve.
+00:01:47,655 --> 00:01:56,559
+Your AI commanders, Vega and Altair, powered by Amazon Bedrock, Amazon Polly and ElevenLabs, remember your missions and tell you how to improve.
 
 14
-00:01:58,750 --> 00:02:04,870
+00:01:56,959 --> 00:02:03,079
 Post your score to the leaderboard. Download AI Horizon on Google Play, and beat the high score!
