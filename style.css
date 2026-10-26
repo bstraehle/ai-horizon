@@ -806,8 +806,14 @@ body.about-body,
   .game-header {
     position: fixed;
   }
+  /* Keep the HUD on one line on narrow phones, even with a 5-digit score and 100% accuracy. */
+  .score-display {
+    font-size: clamp(0.75rem, 3.9vw, 1rem);
+    gap: 6px;
+  }
   .score {
-    padding: 6px 10px;
+    padding: 6px 8px;
+    white-space: nowrap;
   }
   #leaderboardList {
     max-height: calc(
