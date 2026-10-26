@@ -200,6 +200,8 @@ body {
 /* 5. Overlays -------------------------------------------- */
 .game-over-screen {
   align-items: center;
+  /* A dialog taller than the screen starts at the top and scrolls instead of being cut off. */
+  align-items: safe center;
   display: flex;
   inset: 0;
   justify-content: center;
@@ -820,6 +822,30 @@ body.about-body,
       var(--leaderboard-rows-mobile) * var(--leaderboard-row-block) +
         (var(--leaderboard-rows-mobile) - 1) * var(--leaderboard-row-gap)
     );
+  }
+}
+/* Short screens (landscape phones, 540px-tall windows): tighter dialogs so a full debrief fits. */
+@media (max-height: 600px) {
+  .game-over-screen {
+    padding-top: max(var(--space-3), env(safe-area-inset-top));
+    padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
+  }
+  .game-over-content {
+    padding: var(--space-4);
+    padding-top: var(--space-4) !important;
+  }
+  .game-over-content h2 {
+    font-size: 2rem;
+    margin-bottom: var(--space-3);
+  }
+  .game-over-content p {
+    font-size: 1.25rem;
+  }
+  .post-game-message p {
+    margin-bottom: var(--space-3);
+  }
+  .post-game-message .debrief-section + .debrief-section {
+    margin-top: var(--space-3);
   }
 }
 @media (hover: hover) and (pointer: fine) {

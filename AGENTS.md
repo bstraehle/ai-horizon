@@ -85,11 +85,14 @@ the frames from game over on), skip step 2 (the sound timeline is unchanged), ru
 `--raw` pointing at the new file, then move it over the old raw for next time. This only works
 when the game-over dialog's first frame and the sounds are unchanged (the splice checks that frame
 against the old video); otherwise do the full render. The 4K landscape screenshots
-(`store-screenshots/3840x2160`) are frames of the raw video: `4-gameover.png` is frame 6620 (the
-held debrief) and `5-leaderboard.png` frame 6900 (extract with
-`-vf "select=eq(n\,6620)" -frames:v 1 -pix_fmt rgb24`: 24-bit, no alpha). The frames move with
-the post-run timeline: pick them from the `[record] debrief / initials / leaderboard from frame …`
-lines of step 1.
+(`store-screenshots/3840x2160`) are frames of the raw video, except `4-gameover.png`:
+`5-leaderboard.png` is frame 6900 (extract with
+`-vf "select=eq(n\,6900)" -frames:v 1 -pix_fmt rgb24`: 24-bit, no alpha); the frames move with
+the post-run timeline, so pick them from the `[record] debrief / initials / leaderboard from frame …`
+lines of step 1. `4-gameover.png` shows the same debrief as the portrait sets
+(`store-screenshots/debrief.json`): render it with
+`node --experimental-websocket scripts/store-screenshots.cjs --only=none --size=3840x2160@4 --seed=2024 --out=.shots/store-4k`
+plus `--debrief=store-screenshots/debrief.json`, and save its `3-gameover.png` as RGB (no alpha).
 
 ## Testing against production
 
