@@ -2,10 +2,18 @@
   "engine": "neural",
   "voices": {
     "host": "Joanna",
-    "narrator": { "elevenlabs": "AYZwqKNJgPfbTjp3GbCG", "model": "eleven_v4" }
+    "narrator": "Matthew"
   },
   "gap": 0.4,
   "tail": 1.5,
+  "slowmo": {
+    "start": 46.4,
+    "end": 47.15,
+    "speed": 0.25,
+    "zoom": 2,
+    "center": [0.607, 0.42],
+    "ramp": 0.8
+  },
   "cues": [
     { "at": 0.4, "voice": "host", "text": "Welcome to AI Horizon, a fast arcade space shooter." },
     {
@@ -34,7 +42,12 @@
       "text": "Aim carefully. Your shot accuracy earns an end-of-run bonus."
     },
     {
-      "at": 46.0,
+      "at": 45.4,
+      "voice": "narrator",
+      "text": "There goes a red bonus planet: two hundred and fifty points."
+    },
+    {
+      "at": 47.9,
       "voice": "narrator",
       "text": "Every thousand points adds another two hundred and fifty."
     },
@@ -47,7 +60,12 @@
     {
       "at": 79.2,
       "voice": "narrator",
-      "text": "Fifteen seconds left. It's the finale, and every point now counts double!"
+      "text": "Fifteen seconds left. Every point now counts double!"
+    },
+    {
+      "at": 82.3,
+      "voice": "narrator",
+      "text": "Past twenty-five hundred points, your bullets upgrade: hardened and bonus asteroids take fifty percent fewer hits."
     },
     { "at": 86.5, "voice": "narrator", "text": "Survive to the end for the full score." },
     { "at": 94.6, "voice": "host", "text": "Mission complete." },

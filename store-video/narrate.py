@@ -33,6 +33,14 @@ audible between and under the cues.
 Commander's voice (optional): render-sfx also writes `_sfx-....-comms.wav` when the recording
 captured the AI debrief's spoken clip; pass it as `--comms`. It is mixed at the voice-over's
 loudness, ducks the game like the narration, and any cue that would overlap it starts after it.
+
+Slow-motion close-up (optional, the script's `slowmo`: `start`/`end` raw seconds, `speed`, `zoom`,
+`center` as frame fractions, `ramp` seconds): the camera eases in to `zoom` over the `ramp` before
+`start`, plays `start`-`end` at `speed` (motion-interpolated, so it stays smooth), and eases back
+out over the `ramp` after `end`. The ramps are cropped on the Y/U/V planes with sub-pixel boxes (no
+zoompan jitter, no colour conversion). Game sound is slowed (and pitched down) over the same span,
+and everything after it, including cue `at` times and the commander's voice, moves later by the
+added time. Cue `at` values stay in raw-video time.
 """
 from __future__ import annotations
 
@@ -52,6 +60,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 FFMPEG_DIR = HERE.parent / ".tools" / "ffmpeg" / "ffmpeg-8.1.2-essentials_build" / "bin"
 RATE = 48000
+FPS = 60  # raw recordings and output
 FALLBACK_REGION = "us-east-1"
 ELEVENLABS_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}?output_format=mp3_44100_128"
 ELEVENLABS_KEY_FILE = HERE.parent / ".secrets" / "api_key.txt"
@@ -180,6 +189,128 @@ def mix(narration: Path, sfx: Path | None, sfx_lu: float, out: Path, comms: Path
     subprocess.run(cmd, check=True)
 
 
+class Retime:
+    """Raw-video time to output time around the slow-motion span [start, end] (identity without one)."""
+
+    def __init__(self, sm: dict | None, fps: int):
+        self.sm, self.fps = sm, fps
+        if sm:
+            self.s_f, self.e_f = round(sm["start"] * fps), round(sm["end"] * fps)
+            self.r_f = round(sm.get("ramp", 0.8) * fps)
+            self.start, self.end, self.speed = self.s_f / fps, self.e_f / fps, sm["speed"]
+            self.slow_frames = round((self.e_f - self.s_f) / self.speed)
+            self.extra = self.slow_frames / fps - (self.end - self.start)
+        else:
+            self.extra = 0.0
+
+    def map(self, t: float) -> float:
+        if not self.sm or t <= self.start:
+            return t
+        if t < self.end:
+            return self.start + (t - self.start) / self.speed
+        return t + self.extra
+
+
+def retime_audio(src: Path, dst: Path, rt: Retime) -> Path:
+    """Slow (and pitch down) the slow-motion span of a WAV; later audio moves by `rt.extra`."""
+    s, e, sp = rt.start, rt.end, rt.speed
+    graph = (
+        "[0:a]asplit=3[a][b][c];"
+        f"[a]atrim=end={s:.6f},asetpts=PTS-STARTPTS[a1];"
+        f"[b]atrim=start={s:.6f}:end={e:.6f},asetpts=PTS-STARTPTS,asetrate={RATE * sp:.0f},"
+        f"aresample={RATE}[b1];"
+        f"[c]atrim=start={e:.6f},asetpts=PTS-STARTPTS[c1];"
+        "[a1][b1][c1]concat=n=3:v=0:a=1[out]"
+    )
+    subprocess.run([tool("ffmpeg"), "-y", "-v", "error", "-i", str(src), "-filter_complex", graph,
+                    "-map", "[out]", "-c:a", "pcm_s16le", str(dst)], check=True)
+    return dst
+
+
+def video_size(video: Path) -> tuple[int, int]:
+    cmd = [tool("ffprobe"), "-v", "error", "-select_streams", "v:0", "-show_entries",
+           "stream=width,height", "-of", "csv=p=0", str(video)]
+    w, h = subprocess.run(cmd, check=True, capture_output=True, text=True).stdout.strip().split(",")
+    return int(w), int(h)
+
+
+def zoom_box(z: float, center: tuple[float, float], W: int, H: int) -> tuple[float, float, float, float]:
+    """Crop box (x0, y0, x1, y1) showing 1/z of the frame around `center` (pixels), kept inside."""
+    w, h = W / z, H / z
+    x = min(max(center[0] - w / 2, 0.0), W - w)
+    y = min(max(center[1] - h / 2, 0.0), H - h)
+    return x, y, x + w, y + h
+
+
+LOSSLESS = ["-c:v", "libx264", "-qp", "0", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+            "-colorspace", "bt709", "-color_range", "tv"]
+
+
+def render_ramp(raw: Path, first: int, count: int, boxes, W: int, H: int, fps: int, dst: Path) -> Path:
+    """Frames [first, first+count) of `raw`, each cropped to its box and scaled back to W x H. Works
+    on the yuv420p planes with float boxes (Lanczos), so the motion is smooth and colours exact."""
+    from PIL import Image
+
+    ysz, csz = W * H, (W // 2) * (H // 2)
+    dec = subprocess.Popen([tool("ffmpeg"), "-v", "error", "-ss", f"{(first - 0.5) / fps:.6f}", "-i", str(raw),
+                            "-frames:v", str(count), "-f", "rawvideo", "-pix_fmt", "yuv420p", "-"],
+                           stdout=subprocess.PIPE)
+    enc = subprocess.Popen([tool("ffmpeg"), "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "yuv420p",
+                            "-s", f"{W}x{H}", "-r", str(fps), "-i", "-", *LOSSLESS, str(dst)],
+                           stdin=subprocess.PIPE)
+    for box in boxes:
+        buf = dec.stdout.read(ysz + 2 * csz)
+        if len(buf) < ysz + 2 * csz:
+            raise SystemExit("slowmo: raw video ended inside the zoom ramp")
+        y = Image.frombuffer("L", (W, H), buf[:ysz], "raw", "L", 0, 1).resize((W, H), Image.LANCZOS, box=box)
+        half = tuple(v / 2 for v in box)
+        u, v = (Image.frombuffer("L", (W // 2, H // 2), buf[ysz + i * csz: ysz + (i + 1) * csz], "raw", "L", 0, 1)
+                .resize((W // 2, H // 2), Image.LANCZOS, box=half) for i in (0, 1))
+        enc.stdin.write(y.tobytes() + u.tobytes() + v.tobytes())
+    dec.stdout.close(); dec.wait()
+    enc.stdin.close()
+    if enc.wait() != 0:
+        raise SystemExit("slowmo: encoding the zoom ramp failed")
+    return dst
+
+
+def render_closeup(raw: Path, rt: Retime, work: Path) -> list[Path]:
+    """Zoom-in ramp, interpolated slow motion at full zoom, zoom-out ramp (lossless clips)."""
+    sm, fps = rt.sm, rt.fps
+    W, H = video_size(raw)
+    full, center = (0.0, 0.0, float(W), float(H)), (sm["center"][0] * W, sm["center"][1] * H)
+    x0, y0, x1, y1 = zoom_box(sm["zoom"], center, W, H)
+    cw, ch = int(round((x1 - x0) / 2)) * 2, int(round((y1 - y0) / 2)) * 2
+    cx, cy = int(round(x0 / 2)) * 2, int(round(y0 / 2)) * 2
+    close = (float(cx), float(cy), float(cx + cw), float(cy + ch))
+    ease = lambda u: u * u * (3 - 2 * u)
+    lerp = lambda a, b, k: tuple(p + (q - p) * k for p, q in zip(a, b))
+    n = rt.r_f
+    # Interpolate the zoom in scale space (1/width) so the push-in feels uniform.
+    def boxes(a, b):
+        out = []
+        for i in range(n):
+            k = ease((i + 1) / n)
+            wa, wb = a[2] - a[0], b[2] - b[0]
+            w = 1 / (1 / wa + (1 / wb - 1 / wa) * k)
+            kk = (wa - w) / (wa - wb) if wa != wb else k
+            out.append(lerp(a, b, kk))
+        return out
+    zin = render_ramp(raw, rt.s_f - n, n, boxes(full, close), W, H, fps, work / "_closeup-in.mp4")
+    zout = render_ramp(raw, rt.e_f, n, boxes(close, full), W, H, fps, work / "_closeup-out.mp4")
+    slow = work / "_closeup-slow.mp4"
+    vf = (f"crop={cw}:{ch}:{cx}:{cy},"
+          f"minterpolate=fps={fps / rt.speed:g}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,"
+          f"setpts=PTS/{rt.speed:g},fps={fps},scale={W}:{H}:flags=lanczos,"
+          f"tpad=stop_mode=clone:stop=16,trim=end_frame={rt.slow_frames}")
+    print(f"slow motion: {rt.end - rt.start:.2f}s at {rt.speed:g}x ({rt.slow_frames} frames, "
+          f"+{rt.extra:.2f}s), {sm['zoom']:g}x close-up at {center[0]:.0f},{center[1]:.0f}", file=sys.stderr)
+    subprocess.run([tool("ffmpeg"), "-y", "-v", "error", "-ss", f"{(rt.s_f - 0.5) / fps:.6f}",
+                    "-t", f"{(rt.e_f - rt.s_f) / fps:.6f}", "-i", str(raw), "-an", "-vf", vf, "-r", str(fps),
+                    *LOSSLESS, str(slow)], check=True)
+    return [zin, slow, zout]
+
+
 def srt_time(s: float) -> str:
     ms = int(round(s * 1000))
     return f"{ms // 3600000:02d}:{ms // 60000 % 60:02d}:{ms // 1000 % 60:02d},{ms % 1000:03d}"
@@ -203,7 +334,15 @@ def main() -> None:
     spec = json.loads(Path(args.script).read_text(encoding="utf-8"))
     engine, gap, tail = spec.get("engine", "neural"), spec.get("gap", 0.35), spec.get("tail", 1.0)
     voices = spec["voices"]
+    rt = Retime(spec.get("slowmo"), FPS)
+    temps: list[Path] = []
+    sfx = Path(args.sfx) if args.sfx else None
     comms = Path(args.comms) if args.comms else None
+    if rt.sm:
+        if sfx:
+            sfx = retime_audio(sfx, out.with_suffix(".sfx.wav"), rt); temps.append(sfx)
+        if comms:
+            comms = retime_audio(comms, out.with_suffix(".comms.wav"), rt); temps.append(comms)
     busy = busy_span(comms) if comms else None
     if busy:
         print(f"commander speaks {busy[0]:.1f}s-{busy[1]:.1f}s", file=sys.stderr)
@@ -211,18 +350,19 @@ def main() -> None:
     cues, cursor = [], 0.0
     for cue in spec["cues"]:
         pcm = decode(synthesize(cue["text"], voices[cue["voice"]], engine))
-        start = max(cue["at"], cursor)
+        at = rt.map(cue["at"])
+        start = max(at, cursor)
         length = len(pcm) / 2 / RATE
         if busy and start < busy[1] and start + length > busy[0]:
             start = busy[1] + gap
         end = start + length
-        if start > cue["at"] + 0.05:
-            print(f"note: cue at {cue['at']:.1f}s pushed to {start:.1f}s by the previous cue or "
-                  "the commander", file=sys.stderr)
+        if start > at + 0.05:
+            print(f"note: cue at {cue['at']:.1f}s ({at:.1f}s in the output) pushed to {start:.1f}s by "
+                  "the previous cue or the commander", file=sys.stderr)
         cues.append((start, end, cue["text"], pcm))
         cursor = end + gap
 
-    raw_len = duration(raw)
+    raw_len = rt.map(duration(raw))
     total = max(raw_len, cues[-1][1] + tail)
     buf = bytearray(int(round(total * RATE)) * 2)
     for start, _end, _text, pcm in cues:
@@ -239,24 +379,38 @@ def main() -> None:
     )
 
     mixed = out.with_suffix(".mix.wav")
-    mix(wav, Path(args.sfx) if args.sfx else None, args.sfx_lu, mixed, comms)
+    mix(wav, sfx, args.sfx_lu, mixed, comms)
     gain = TARGET_LUFS - loudness(mixed)
 
     w, h = args.size.split("x")
     hold = max(0.0, total - raw_len)
     vf = (f"scale={w}:{h}:flags=lanczos:out_color_matrix=bt709,"
           f"tpad=stop_mode=clone:stop_duration={hold:.3f},format=yuv420p")
+    if rt.sm:
+        clips = render_closeup(raw, rt, out.parent); temps += clips
+        inputs = ["-i", str(raw), *(a for c in clips for a in ("-i", str(c))), "-i", str(mixed)]
+        graph = (
+            "[0:v]split=2[r0][r1];"
+            f"[r0]trim=end_frame={rt.s_f - rt.r_f},setpts=PTS-STARTPTS,setsar=1[p0];"
+            + "".join(f"[{i}:v]setpts=PTS-STARTPTS,setsar=1[p{i}];" for i in (1, 2, 3))
+            + f"[r1]trim=start_frame={rt.e_f + rt.r_f},setpts=PTS-STARTPTS,setsar=1[p4];"
+            f"[p0][p1][p2][p3][p4]concat=n=5:v=1:a=0,{vf}[v]"
+        )
+        video = ["-filter_complex", graph, "-map", "[v]", "-map", f"{len(clips) + 1}:a"]
+    else:
+        inputs = ["-i", str(raw), "-i", str(mixed)]
+        video = ["-vf", vf]
     subprocess.run(
-        [tool("ffmpeg"), "-y", "-v", "error", "-i", str(raw), "-i", str(mixed), "-vf", vf,
-         "-c:v", "libx264", "-preset", "slow", "-crf", args.crf, "-profile:v", "high", "-r", "60",
+        [tool("ffmpeg"), "-y", "-v", "error", *inputs, *video,
+         "-c:v", "libx264", "-preset", "slow", "-crf", args.crf, "-profile:v", "high", "-r", str(FPS),
          "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709",
          "-af", f"volume={gain:.2f}dB,alimiter=limit={PEAK_LIMIT}:level=false",
          "-c:a", "aac", "-b:a", "192k", "-ac", "2", "-ar", str(RATE),
          "-t", f"{total:.3f}", "-movflags", "+faststart", str(out)],
         check=True,
     )
-    wav.unlink()
-    mixed.unlink()
+    for p in [wav, mixed, *temps]:
+        p.unlink()
     print(f"wrote {out} ({out.stat().st_size / 1e6:.1f} MB, {total:.1f}s, {len(cues)} cues)")
 
 

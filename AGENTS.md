@@ -62,12 +62,17 @@ Only the 4K cut is kept (no 1080p version). With `npm run serve` running:
    (writes the game sounds and, with a voice clip, `_sfx-3840x2160-comms.wav`: the commander's
    voice through the game's radio chain).
 3. `python store-video/narrate.py --raw store-video/_raw-3840x2160.mp4 --size 3840x2160 --out store-video/ai-horizon-3840x2160.mp4 --sfx store-video/_sfx-3840x2160.wav --comms store-video/_sfx-3840x2160-comms.wav`
-   (needs AWS credentials for Polly, which voices the host, and an ElevenLabs API key for the
-   narrator, the owner's custom voice on `eleven_v4`: `ELEVENLABS_API_KEY` or
-   `.secrets/api_key.txt`, gitignored; clips are cached in `store-video/.elevenlabs-cache/`, so
-   delete one to re-generate it; `--sfx-lu` sets how far the game sits under the voice-over).
+   (needs AWS credentials for Polly, which voices both the host, Joanna, and the narrator,
+   Matthew; the owner's ElevenLabs voice is kept for Captain Altair's debrief, which comes from
+   the recording; clips are cached in `store-video/.polly-cache/`, so delete one to re-generate
+   it; `--sfx-lu` sets how far the game sits under the voice-over).
    The commander's voice is mixed at narrator loudness and narration cues that would overlap it
    start after it, so the video's length follows the clip.
+   `slowmo` in `narration.json` zooms in on the red bonus planet's explosion (frame 2789 of the
+   raw video, 46.48 s) and plays it at quarter speed, motion-interpolated (about 3 minutes of the
+   encode); the game sound is slowed with it and everything after moves later by the added time.
+   Cue `at` values and `slowmo` times are raw-video seconds (pick them from raw frames, e.g. with
+   `select=eq(n\,N)`).
 
 Frames are piped to ffmpeg (no temp PNGs). The MP4 exceeds GitHub's 100 MB file limit, so it is
 gitignored (its `.srt` is committed); upload it to YouTube instead. Narration cue times in
