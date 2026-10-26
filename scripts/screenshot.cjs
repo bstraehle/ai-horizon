@@ -12,6 +12,7 @@
  *   shotif <name> <js> like shot, but only when the expression is truthy (overwrites earlier takes)
  *   click <selector>   dispatch a click on the first matching element
  *   eval <js>          evaluate an expression in the page
+ *   save <file> <js>   evaluate an expression and write its value to <file> as JSON
  *   waitfor <js>       poll (every 250ms) until the expression is truthy or --timeout elapses
  * Options: --width=1600 --height=900 --scale=1 (device scale factor) --timeout=120000 --chrome=<path>
  *
@@ -243,6 +244,14 @@ async function capture(options) {
         console.error(`[click] ${arg}: ${value}`);
       } else if (verb === "eval") {
         console.error(`[eval] ${JSON.stringify(await evaluate(arg))}`);
+      } else if (verb === "save") {
+        const split = arg.indexOf(" ");
+        const file = arg.slice(0, split);
+        const value = await evaluate(arg.slice(split + 1).trim());
+        if (value === undefined || value === null) throw new Error(`save ${file}: no value`);
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
+        console.error(`[save] ${file}`);
       } else if (verb === "waitfor") {
         const deadline = Date.now() + timeoutMs;
         let ok = false;

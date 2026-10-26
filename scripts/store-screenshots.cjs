@@ -7,6 +7,14 @@
  *       [--seed=314] [--only=1440x2880] [--size=WxH[@scale]]... [--chrome=<path>]
  *   npm run shots:store
  *
+ * One debrief on every screen: the game-over shot of each size shows the same debrief (headline,
+ * Well done / Next mission, commander) and HUD (score, accuracy, high score), saved in
+ * `--debrief=<file>` (default store-screenshots/debrief.json, committed). Each size still flies
+ * its own run behind the dialog; once its own debrief has rendered, the dialog and HUD are
+ * replaced with the saved ones. When the file is missing, or with `--new-debrief`, the first
+ * size's real debrief is saved instead (check its headline before re-shooting the rest, e.g. for
+ * time-of-day phrases such as "Monday morning" that age badly in a store listing).
+ *
  * `--size` renders an extra ad-hoc output size (repeatable) in addition to TARGETS. Without an
  * explicit `@scale` the largest integer factor of both sides that keeps the CSS width >= 360px is
  * used (1440x2960 -> 360x740 @4). Note that 1440x2960 itself breaks the Play Console 2:1 rule.
@@ -28,6 +36,7 @@
  * depends on the viewport width, and adaptive quality makes runs only roughly repeatable), and
  * `--seed=` overrides it for every size if a take looks weak.
  */
+const fs = require("node:fs");
 const path = require("node:path");
 const { capture } = require("./screenshot.cjs");
 
@@ -50,6 +59,8 @@ const seedOverride = opt("seed", "");
 const only = opt("only", "");
 const chrome = opt("chrome", "");
 const extraSizes = args.filter((a) => a.startsWith("--size=")).map((a) => parseSize(a.slice(7)));
+const debriefFile = path.resolve(opt("debrief", path.join(outRoot, "debrief.json")));
+const newDebrief = args.includes("--new-debrief");
 
 /**
  * Parse `WxH[@scale]` into a target; picks the scale when omitted.
@@ -88,12 +99,54 @@ const SKIP_INITIALS = `(() => {
   return 'skipped';
 })()`;
 const LEADERBOARD_VISIBLE = "!document.getElementById('leaderboardScreen').hidden";
+/**
+ * The rendered debrief dialog and HUD, to show the same debrief on every size. The dialog is kept
+ * as an element tree (`[tag, attributes, ...children]`, text as strings) rather than HTML: the
+ * page enforces Trusted Types, so it is rebuilt with createElement / setAttribute, not innerHTML.
+ */
+const DEBRIEF_SNAPSHOT = `(() => {
+  const text = (id) => document.getElementById(id).textContent;
+  const tree = (n) => n.nodeType === Node.TEXT_NODE ? n.data : [n.localName,
+    Object.fromEntries([...n.attributes].map((a) => [a.name, a.value])), ...[...n.childNodes]
+      .filter((c) => c.nodeType === Node.ELEMENT_NODE || c.nodeType === Node.TEXT_NODE).map(tree)];
+  const msg = document.getElementById('postGameMessage');
+  return { title: text('gameOverTitle'), score: text('currentScore'), high: text('highScore'),
+    timer: text('timer'), message: tree(msg) };
+})()`;
+/**
+ * Expression that puts a saved {@link DEBRIEF_SNAPSHOT} into the page.
+ * @param {{ title: string, score: string, high: string, timer: string, message: any[] }} d
+ */
+const applyDebrief = (d) => `(() => {
+  const d = ${JSON.stringify(d)};
+  const set = (id, v) => { document.getElementById(id).textContent = v; };
+  set('gameOverTitle', d.title); set('currentScore', d.score); set('highScore', d.high);
+  set('timer', d.timer);
+  const build = (t) => {
+    if (typeof t === 'string') return document.createTextNode(t);
+    const [tag, attrs, ...kids] = t;
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    el.append(...kids.map(build));
+    return el;
+  };
+  const msg = document.getElementById('postGameMessage');
+  const [, attrs, ...kids] = d.message;
+  msg.className = attrs.class || '';
+  msg.replaceChildren(...kids.map(build));
+  return 'applied';
+})()`;
 
 async function main() {
   const targets = TARGETS.filter((t) => !only || `${t.w}x${t.h}` === only).concat(extraSizes);
   if (!targets.length) throw new Error(`no target matches --only=${only}`);
   const missing = [];
+  let saveDebrief = newDebrief || !fs.existsSync(debriefFile);
   for (const t of targets) {
+    const debriefStep = saveDebrief
+      ? `save ${debriefFile} ${DEBRIEF_SNAPSHOT}`
+      : `waitfor ${applyDebrief(JSON.parse(fs.readFileSync(debriefFile, "utf8")))}`;
+    saveDebrief = false;
     const outDir = path.join(outRoot, `${t.w}x${t.h}`);
     const seed = seedOverride || t.seed || DEFAULT_SEED;
     const common = { outDir, width: t.css[0], height: t.css[1], scale: t.scale, chrome };
@@ -120,6 +173,8 @@ async function main() {
         `shotif 2-midgame ${RUNNING}`,
         `waitfor ${DEBRIEF_READY}`,
         "wait 500",
+        debriefStep,
+        "wait 300",
         "shot 3-gameover",
         "click #okBtn",
         "wait 500",

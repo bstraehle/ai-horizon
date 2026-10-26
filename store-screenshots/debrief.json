@@ -1,0 +1,115 @@
+{
+  "title": "Mission Complete",
+  "score": "11285 | 53%",
+  "high": "14759",
+  "timer": "0:00",
+  "message": [
+    "div",
+    {
+      "id": "postGameMessage",
+      "class": "post-game-message commander-altair"
+    },
+    [
+      "p",
+      {
+        "class": "debrief-from"
+      },
+      [
+        "span",
+        {
+          "class": "voice-meter",
+          "aria-hidden": "true",
+          "hidden": ""
+        },
+        ["i", {}],
+        ["i", {}],
+        ["i", {}]
+      ],
+      "Captain “Altair” Straehle",
+      [
+        "span",
+        {
+          "class": "voice-meter mirrored",
+          "aria-hidden": "true",
+          "hidden": ""
+        },
+        ["i", {}],
+        ["i", {}],
+        ["i", {}]
+      ]
+    ],
+    [
+      "p",
+      {
+        "class": "debrief-headline"
+      },
+      [
+        "span",
+        {
+          "class": "sr-only"
+        },
+        "👨‍🚀 Satisfactory, pilot. 90 seconds in the cockpit. Captain Straehle here—call sign Altair. First time on my debrief, and you nailed the full run. 11285 points shows real control in that final push."
+      ],
+      [
+        "span",
+        {
+          "class": "debrief-typed",
+          "aria-hidden": "true"
+        },
+        [
+          "span",
+          {
+            "class": "debrief-typed-shown"
+          },
+          "👨‍🚀 Satisfactory, pilot. 90 seconds in the cockpit. Captain Straehle here—call sign Altair. First time on my debrief, and you nailed the full run. 11285 points shows real control in that final push."
+        ],
+        [
+          "span",
+          {
+            "class": "debrief-typed-rest"
+          }
+        ]
+      ]
+    ],
+    [
+      "div",
+      {
+        "class": "debrief"
+      },
+      [
+        "section",
+        {
+          "class": "debrief-section debrief-done"
+        },
+        ["h3", {}, "Well done"],
+        ["ul", {}, ["li", {}, "Finale: 2410 points"]]
+      ],
+      [
+        "section",
+        {
+          "class": "debrief-section debrief-next"
+        },
+        ["h3", {}, "Next mission"],
+        [
+          "ul",
+          {},
+          [
+            "li",
+            {},
+            "Hardened asteroids: 12 / 60. Reach 2500 points early to upgrade your bullets for half the hits."
+          ],
+          [
+            "li",
+            {},
+            "Accuracy: 53% (231 / 434). Fire short bursts at targets instead of holding fire for accuracy."
+          ],
+          [
+            "li",
+            {},
+            "Bonus asteroids: 3 / 8. Hit each bonus asteroid as soon as it appears on screen."
+          ]
+        ]
+      ]
+    ]
+  ]
+}
