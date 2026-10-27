@@ -1,6 +1,11 @@
 // @ts-check
 import { describe, it, expect } from "vitest";
-import { commanderHooks, isStarCrossedDay, pickCommander } from "../js/managers/Commanders.js";
+import {
+  commanderHooks,
+  isStarCrossedDay,
+  pickCommander,
+  quotableLine,
+} from "../js/managers/Commanders.js";
 
 const DAY = 86_400_000;
 /** A Wednesday in October, no star-crossed day in either calendar. */
@@ -63,6 +68,24 @@ describe("commanderHooks", () => {
     expect(tail).toHaveLength(1);
     expect(tail[0]).toMatch(/^Last mission, Commander Vega told the pilot: "x+…"$/);
     expect(tail[0].length).toBeLessThanOrEqual(200);
+  });
+
+  it("quotes the last line without the sentences that carry its numbers", () => {
+    const line =
+      "👨‍🚀 Commendation, pilot. Destroyed 6 of 8 bonus asteroids. New personal best: 13963 points, 381 more than your last 13582. That finale pushed you past your slump! 796 to the board.";
+    expect(quotableLine(line)).toBe(
+      "👨‍🚀 Commendation, pilot. That finale pushed you past your slump!"
+    );
+    expect(quotableLine("하나。둘 3개。셋。")).toBe("하나。 셋。");
+    const crash = run({ survived: 17 });
+    const quoteOf = (/** @type {string} */ text) =>
+      commanderHooks({ commander: "vega", debut: false }, crash, { line: text, lineBy: "altair" })
+        .tail;
+    expect(quoteOf(line)).toEqual([
+      'Last mission, Captain “Altair” Straehle told the pilot: "👨‍🚀 Commendation, pilot. That finale pushed you past your slump!"',
+    ]);
+    // Nothing left to quote: no hook at all.
+    expect(quoteOf("Survived 17 seconds. 684 points.")).toEqual([]);
   });
 
   it("adds nothing on an ordinary day without a remembered line", () => {

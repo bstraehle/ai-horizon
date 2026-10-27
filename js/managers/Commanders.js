@@ -22,6 +22,22 @@ const NAMES = { vega: "Commander Vega", altair: "Captain “Altair” Straehle" 
 const MAX_QUOTE_CHARS = 140;
 
 /**
+ * The last debrief's headline without its sentences that contain a number: those numbers were
+ * about that mission, and the model would otherwise reuse them as if they described this one
+ * (e.g. "381 more than your best" turned into "down 381 from your best").
+ * @param {string} line
+ * @returns {string} Empty when every sentence has a number.
+ */
+export function quotableLine(line) {
+  return line
+    .split(/(?<=[.!?。！？])\s*/u)
+    .filter((s) => s.trim() && !/\p{Nd}/u.test(s))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
  * @typedef {{ t: number, score: number, survived: number, total: number,
  *   verdict: string|null, top?: number }} MissionLike The fields of a RunEntry used here.
  * @typedef {{ altairMet?: boolean, line?: string, lineBy?: CommanderId }} CastMemory
@@ -76,7 +92,8 @@ export function pickCommander(entry, cast, online = true) {
 
 /**
  * Story hooks about the commanders themselves: Altair's debut and the star-crossed day go first
- * (the debrief reacts to the first hook), the last debrief's line goes last.
+ * (the debrief reacts to the first hook), the last debrief's line goes last, without its
+ * numbers (see {@link quotableLine}).
  * @param {{ commander: CommanderId, debut: boolean }} pick
  * @param {MissionLike} entry
  * @param {CastMemory} cast
@@ -96,11 +113,10 @@ export function commanderHooks(pick, entry, cast) {
     );
   }
   const tail = [];
-  if (cast.line && isCommander(cast.lineBy)) {
+  const quoted = cast.line ? quotableLine(cast.line) : "";
+  if (quoted && isCommander(cast.lineBy)) {
     const line =
-      cast.line.length > MAX_QUOTE_CHARS
-        ? `${cast.line.slice(0, MAX_QUOTE_CHARS - 1)}…`
-        : cast.line;
+      quoted.length > MAX_QUOTE_CHARS ? `${quoted.slice(0, MAX_QUOTE_CHARS - 1)}…` : quoted;
     tail.push(`Last mission, ${NAMES[cast.lineBy]} told the pilot: "${line}"`);
   }
   return { lead, tail };

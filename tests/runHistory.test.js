@@ -205,7 +205,8 @@ describe("RunHistory", () => {
     history.rememberDebrief(first.commander, "  Reprimand, pilot. Survived 40 seconds.  ");
     const second = history.debrief(e({ score: 50 }));
     expect(second.hooks[second.hooks.length - 1]).toBe(
-      'Last mission, Commander Vega told the pilot: "Reprimand, pilot. Survived 40 seconds."'
+      // The sentence with a number is left out: it was about that mission.
+      'Last mission, Commander Vega told the pilot: "Reprimand, pilot."'
     );
     // No debrief arrived for the second mission (offline), so the third quotes nothing.
     expect(history.debrief(e({ score: 60 })).hooks.join(" ")).not.toMatch(/Last mission/);
