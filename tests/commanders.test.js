@@ -41,27 +41,37 @@ describe("pickCommander", () => {
     });
   });
 
-  it("alternates full missions, picking up after the last full one", () => {
+  it("alternates back-to-back full missions, picking up after the last full one", () => {
     const pick = (/** @type {any} */ lastFull) =>
-      pickCommander(full({ score: 10 }), [run()], { ...met, lastFull }).commander;
+      pickCommander(full({ score: 10 }), [full({ score: 20 })], { ...met, lastFull }).commander;
     expect(pick("altair")).toBe("vega");
     expect(pick("vega")).toBe("altair");
     // Not remembered (history from before): the last full mission was Altair's debut.
     expect(pick(undefined)).toBe("vega");
   });
 
+  it("gives the first full mission after one that ended early to Altair", () => {
+    const cast = { ...met, lastFull: /** @type {const} */ ("altair") };
+    expect(pickCommander(full({ score: 10 }), [full({ score: 20 }), run()], cast).commander).toBe(
+      "altair"
+    );
+    // Only the mission right before counts.
+    expect(pickCommander(full({ score: 10 }), [run(), full({ score: 20 })], cast).commander).toBe(
+      "vega"
+    );
+  });
+
   it("gives full missions with a personal best or overall record to Altair", () => {
     const cast = { ...met, lastFull: /** @type {const} */ ("altair") };
     const best = full({ score: 5000 });
-    expect(pickCommander(best, [run({ score: 4000 })], cast)).toEqual({
-      commander: "altair",
-      debut: false,
-    });
+    // A full mission before, so only the record decides (after a crash it would be Altair's anyway).
+    const before = [full({ score: 4000 })];
+    expect(pickCommander(best, before, cast)).toEqual({ commander: "altair", debut: false });
     // The all-time best counts, not just the recent runs passed in.
-    expect(pickCommander(best, [run({ score: 4000 })], cast, 6000).commander).toBe("vega");
+    expect(pickCommander(best, before, cast, 6000).commander).toBe("vega");
     // Beating the leaderboard's top score is a record even below the personal best.
     const overall = full({ score: 5000, top: 4500 });
-    expect(pickCommander(overall, [run({ score: 4000 })], cast, 6000).commander).toBe("altair");
+    expect(pickCommander(overall, before, cast, 6000).commander).toBe("altair");
   });
 });
 

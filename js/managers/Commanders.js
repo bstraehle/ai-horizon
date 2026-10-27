@@ -6,9 +6,10 @@
  * Vega's an Amazon Polly voice, Altair's a custom ElevenLabs voice that speaks every language;
  * their radio tones in CONFIG.AUDIO.COMMANDERS). Vega debriefs every mission that ends before the
  * full 90 seconds, record or not. Altair debriefs the pilot's first full mission with the AI
- * debrief online (his debut; offline full missions before it stay Vega's) and every full mission
- * that sets a record, personal or overall (the leaderboard's top score); other full missions
- * alternate between the two.
+ * debrief online (his debut; offline full missions before it stay Vega's), every full mission
+ * that sets a record, personal or overall (the leaderboard's top score), and every full mission
+ * that follows one that ended early (Vega had that one); back-to-back full missions alternate
+ * between the two.
  */
 
 /** @typedef {"vega"|"altair"} CommanderId */
@@ -80,7 +81,10 @@ export function pickCommander(entry, previous, cast, allTimeBest, online = true)
   if (!cast.altairMet) return online ? { ...altair, debut: true } : vega;
   const best = allTimeBest ?? previous.reduce((b, e) => Math.max(b, e.score), 0);
   if ((best > 0 && entry.score > best) || isOverallRecord(entry)) return altair;
-  // Full missions take turns; without a remembered one, the last was Altair's debut.
+  // Vega had the mission before if it ended early, so this full one is Altair's.
+  const last = previous[previous.length - 1];
+  if (last && last.survived < last.total) return altair;
+  // Back-to-back full missions take turns; without a remembered one, the last was Altair's debut.
   return (cast.lastFull ?? "altair") === "altair" ? vega : altair;
 }
 
