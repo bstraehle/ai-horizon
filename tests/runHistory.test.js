@@ -159,7 +159,7 @@ describe("RunHistory", () => {
     expect(stored.runs.map((r) => r.score)).toEqual([200, 150]);
   });
 
-  it("introduces Altair on the first full mission, then Altair takes full missions after a crash and back-to-back ones take turns", () => {
+  it("introduces Altair on the first full mission, then gives him every full one and Vega every crash", () => {
     const history = new RunHistory({
       storage: new LocalStorageAdapter({ storage: memoryStorage() }),
     });
@@ -168,16 +168,13 @@ describe("RunHistory", () => {
     const debut = history.debrief(full({ score: 300 }));
     expect(debut.commander).toBe("altair");
     expect(debut.hooks[0]).toMatch(/^Captain “Altair” Straehle's first debrief with this pilot/);
-    expect(history.read().cast).toEqual({ lastFull: "altair", altairMet: true });
-    // Crashes are always Vega's and leave the full-mission turn alone.
+    expect(history.read().cast).toEqual({ altairMet: true });
     const crash = history.debrief(e({ score: 200 }));
     expect(crash.commander).toBe("vega");
     expect(crash.hooks.join(" ")).not.toMatch(/first debrief/);
-    expect(history.read().cast.lastFull).toBe("altair");
-    // The full mission after a crash is Altair's, even though he also had the last full one.
-    expect(history.debrief(full({ score: 100 })).commander).toBe("altair");
-    expect(history.debrief(full({ score: 100 })).commander).toBe("vega");
-    expect(history.debrief(full({ score: 100 })).commander).toBe("altair");
+    for (const mission of [full({ score: 100 }), full({ score: 100 }), full({ score: 100 })]) {
+      expect(history.debrief(mission)).toMatchObject({ commander: "altair", debut: false });
+    }
     expect(history.debrief(e({ score: 100 })).commander).toBe("vega");
     expect(history.debrief(full({ score: 100 })).commander).toBe("altair");
   });
@@ -188,7 +185,6 @@ describe("RunHistory", () => {
     });
     history.debrief(full({ score: 9000 }));
     history.debrief(full({ score: 100 }));
-    expect(history.read().cast.lastFull).toBe("vega");
     // Below the personal best of 9000, but above the leaderboard's top score.
     const crash = history.debrief(e({ score: 5000, top: 4000 }));
     expect(crash.commander).toBe("vega");
@@ -281,9 +277,9 @@ describe("RunHistory", () => {
     const history = new RunHistory({
       storage: new LocalStorageAdapter({ storage: memoryStorage() }),
     });
-    // Offline full missions before his debut stay Vega's and don't use it up.
+    // Offline full missions before his debut are Altair's but don't use it up.
     const offline = history.debrief(full({ score: 100 }), { online: false });
-    expect(offline).toMatchObject({ commander: "vega", debut: false });
+    expect(offline).toMatchObject({ commander: "altair", debut: false });
     expect(history.read().cast.altairMet).toBeUndefined();
     // Online, but the request failed: the debut is undone, so the next full mission is it again.
     expect(history.debrief(full({ score: 50 }))).toMatchObject({
@@ -296,9 +292,9 @@ describe("RunHistory", () => {
       commander: "altair",
       debut: true,
     });
-    expect(history.read().cast).toEqual({ lastFull: "altair", altairMet: true });
-    // After the debut, offline full missions take turns as usual.
-    expect(history.debrief(full({ score: 10 }), { online: false }).commander).toBe("vega");
+    expect(history.read().cast).toEqual({ altairMet: true });
+    // After the debut, offline full missions are still Altair's.
+    expect(history.debrief(full({ score: 10 }), { online: false }).commander).toBe("altair");
   });
 
   it("treats missing or corrupt storage as an empty history", () => {
@@ -333,14 +329,12 @@ describe("RunHistory", () => {
     const history = new RunHistory({ storage: new LocalStorageAdapter({ storage }), max: 2 });
     history.debrief(full({ score: 9000 }));
     history.debrief(e({ score: 100 }));
-    history.debrief(full({ score: 200 }));
+    history.debrief(e({ score: 200 }));
     expect(history.read().runs.map((r) => r.score)).toEqual([100, 200]);
     expect(history.read().best).toBe(9000);
-    // 5000 beats every remembered run but not the all-time best: no false personal best (and
-    // after Altair's full 200, it is Vega's turn).
+    // 5000 beats every remembered run but not the all-time best: no false personal best.
     const below = history.debrief(full({ score: 5000 }));
     expect(below.hooks.join(" ")).not.toMatch(/New personal best/);
-    expect(below.commander).toBe("vega");
     const above = history.debrief(full({ score: 9500 }));
     expect(above.hooks[0]).toBe(
       "New personal best: 9500 points, 500 more than the previous best of 9000."

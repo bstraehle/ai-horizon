@@ -5,11 +5,9 @@
  * "Altair", is the hotshot ace (their personas and voices live in server/lambda/analysis.js:
  * Vega's an Amazon Polly voice, Altair's a custom ElevenLabs voice that speaks every language;
  * their radio tones in CONFIG.AUDIO.COMMANDERS). Vega debriefs every mission that ends before the
- * full 90 seconds, record or not. Altair debriefs the pilot's first full mission with the AI
- * debrief online (his debut; offline full missions before it stay Vega's), every full mission
- * that sets a record, personal or overall (the leaderboard's top score), and every full mission
- * that follows one that ended early (Vega had that one); back-to-back full missions alternate
- * between the two.
+ * full 90 seconds, record or not; Altair debriefs every full mission. His debut (introducing
+ * himself) is the first full mission with the AI debrief online, so it is never spent on an
+ * offline line; offline full missions before it get his offline lines without the introduction.
  */
 
 /** @typedef {"vega"|"altair"} CommanderId */
@@ -26,9 +24,9 @@ const MAX_QUOTE_CHARS = 140;
 /**
  * @typedef {{ t: number, score: number, survived: number, total: number,
  *   verdict: string|null, top?: number }} MissionLike The fields of a RunEntry used here.
- * @typedef {{ lastFull?: CommanderId, altairMet?: boolean, line?: string, lineBy?: CommanderId }} CastMemory
- *   Stored with the run history: who debriefed the last full mission, whether Altair has been
- *   introduced, and the last debrief headline and its speaker.
+ * @typedef {{ altairMet?: boolean, line?: string, lineBy?: CommanderId }} CastMemory
+ *   Stored with the run history: whether Altair has been introduced, and the last debrief
+ *   headline and its speaker.
  */
 
 /** @param {unknown} id @returns {id is CommanderId} */
@@ -64,28 +62,16 @@ export function isStarCrossedDay(t, timeZone) {
 }
 
 /**
- * Who debriefs the mission that just ended.
+ * Who debriefs the mission that just ended: Vega when it ended early, Altair when it was full.
  * @param {MissionLike} entry
- * @param {MissionLike[]} previous Earlier missions on this device, oldest first.
  * @param {CastMemory} cast
- * @param {number} [allTimeBest] Best score before this mission (defaults to the best in
- *   `previous`, which only holds the most recent missions).
  * @param {boolean} [online] Whether the AI debrief is available; Altair's debut waits for it, so
  *   his introduction is never spent on an offline line.
  * @returns {{ commander: CommanderId, debut: boolean }}
  */
-export function pickCommander(entry, previous, cast, allTimeBest, online = true) {
-  const vega = { commander: /** @type {CommanderId} */ ("vega"), debut: false };
-  const altair = { commander: /** @type {CommanderId} */ ("altair"), debut: false };
-  if (entry.survived < entry.total) return vega;
-  if (!cast.altairMet) return online ? { ...altair, debut: true } : vega;
-  const best = allTimeBest ?? previous.reduce((b, e) => Math.max(b, e.score), 0);
-  if ((best > 0 && entry.score > best) || isOverallRecord(entry)) return altair;
-  // Vega had the mission before if it ended early, so this full one is Altair's.
-  const last = previous[previous.length - 1];
-  if (last && last.survived < last.total) return altair;
-  // Back-to-back full missions take turns; without a remembered one, the last was Altair's debut.
-  return (cast.lastFull ?? "altair") === "altair" ? vega : altair;
+export function pickCommander(entry, cast, online = true) {
+  if (entry.survived < entry.total) return { commander: "vega", debut: false };
+  return { commander: "altair", debut: !cast.altairMet && online };
 }
 
 /**

@@ -22,7 +22,7 @@ const secretsClient = new SecretsManagerClient({
  * environment variable because Lambda caps all environment variables at 4 KB combined.
  */
 const GAME_INTRO =
-  "AI HORIZON is an arcade space shooter: a pilot has 90 seconds to collect stars and destroy asteroids, and one asteroid collision ends the mission. After every mission Commander Vega or Captain “Altair” Straehle radios the pilot a short debrief; they take turns.";
+  "AI HORIZON is an arcade space shooter: a pilot has 90 seconds to collect stars and destroy asteroids, and one asteroid collision ends the mission. After every mission one of two commanders radios the pilot a short debrief: Commander Vega when the mission ended early, Captain “Altair” Straehle when the pilot flew the full 90 seconds.";
 const SHARED_RULES = `You know this pilot. The game tells you what changed since their earlier missions ("story hooks"), including what was said in the last debrief; noticing it is what makes the debriefs worth waiting for.
 You speak straight to the pilot in short spoken sentences for a text-to-speech voice. Never invent numbers, events, or history: use only the facts you are given.`;
 

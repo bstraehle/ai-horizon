@@ -156,7 +156,6 @@ const isEntry = (e) =>
 function readCast(cast) {
   if (!cast || typeof cast !== "object") return {};
   return {
-    ...(isCommander(cast.lastFull) ? { lastFull: cast.lastFull } : {}),
     ...(cast.altairMet === true ? { altairMet: true } : {}),
     ...(typeof cast.line === "string" && isCommander(cast.lineBy)
       ? { line: cast.line, lineBy: cast.lineBy }
@@ -216,7 +215,7 @@ export class RunHistory {
   debrief(entry, { record = true, online = true } = {}) {
     const { count, runs, best, cast, day } = this.read();
     const mission = count + 1;
-    const pick = pickCommander(entry, runs, cast, best, online);
+    const pick = pickCommander(entry, cast, online);
     const { lead, tail } = commanderHooks(pick, entry, cast);
     // First mission of a new day: the commander recaps where the pilot left off.
     const recap = sessionRecap(entry, runs, day || null, this.timeZone);
@@ -231,12 +230,11 @@ export class RunHistory {
     if (record) {
       // The quoted line belongs to the mission before; rememberDebrief() stores this one's.
       const altairMet = cast.altairMet || pick.debut;
-      const lastFull = entry.survived >= entry.total ? pick.commander : cast.lastFull;
       this.storage.setJSON(this.key, {
         count: mission,
         runs: [...runs, entry].slice(-this.max),
         best: Math.max(best, entry.score),
-        cast: { ...(lastFull ? { lastFull } : {}), ...(altairMet ? { altairMet: true } : {}) },
+        cast: altairMet ? { altairMet: true } : {},
         day: today,
       });
     }
@@ -250,7 +248,7 @@ export class RunHistory {
   cancelDebut() {
     const data = /** @type {any} */ (this.storage.getJSON(this.key, null));
     if (!data || typeof data !== "object") return;
-    const { altairMet: _met, lastFull: _last, ...cast } = readCast(data.cast);
+    const { altairMet: _met, ...cast } = readCast(data.cast);
     this.storage.setJSON(this.key, { ...data, cast });
   }
 

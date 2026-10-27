@@ -21,57 +21,22 @@ const full = (o = {}) => run({ survived: 90, verdict: "satisfactory", ...o });
 
 describe("pickCommander", () => {
   it("gives every mission under 90 seconds to Vega, records included", () => {
-    expect(pickCommander(run(), [], {})).toEqual({ commander: "vega", debut: false });
+    expect(pickCommander(run(), {})).toEqual({ commander: "vega", debut: false });
     const crashRecord = run({ score: 9000, top: 8000, survived: 85 });
-    expect(pickCommander(crashRecord, [run()], met).commander).toBe("vega");
-    expect(pickCommander(crashRecord, [run()], {})).toEqual({
-      commander: "vega",
-      debut: false,
-    });
+    expect(pickCommander(crashRecord, met)).toEqual({ commander: "vega", debut: false });
+    expect(pickCommander(crashRecord, {})).toEqual({ commander: "vega", debut: false });
   });
 
-  it("gives the first full mission to Altair as his debut, once the AI debrief is online", () => {
-    expect(pickCommander(full(), [run(), run()], {})).toEqual({
-      commander: "altair",
-      debut: true,
-    });
-    expect(pickCommander(full(), [run()], {}, undefined, false)).toEqual({
-      commander: "vega",
-      debut: false,
-    });
+  it("gives every full mission to Altair, records or not", () => {
+    for (const mission of [full({ score: 10 }), full({ score: 9000, top: 8000 })]) {
+      expect(pickCommander(mission, met)).toEqual({ commander: "altair", debut: false });
+      expect(pickCommander(mission, met, false)).toEqual({ commander: "altair", debut: false });
+    }
   });
 
-  it("alternates back-to-back full missions, picking up after the last full one", () => {
-    const pick = (/** @type {any} */ lastFull) =>
-      pickCommander(full({ score: 10 }), [full({ score: 20 })], { ...met, lastFull }).commander;
-    expect(pick("altair")).toBe("vega");
-    expect(pick("vega")).toBe("altair");
-    // Not remembered (history from before): the last full mission was Altair's debut.
-    expect(pick(undefined)).toBe("vega");
-  });
-
-  it("gives the first full mission after one that ended early to Altair", () => {
-    const cast = { ...met, lastFull: /** @type {const} */ ("altair") };
-    expect(pickCommander(full({ score: 10 }), [full({ score: 20 }), run()], cast).commander).toBe(
-      "altair"
-    );
-    // Only the mission right before counts.
-    expect(pickCommander(full({ score: 10 }), [run(), full({ score: 20 })], cast).commander).toBe(
-      "vega"
-    );
-  });
-
-  it("gives full missions with a personal best or overall record to Altair", () => {
-    const cast = { ...met, lastFull: /** @type {const} */ ("altair") };
-    const best = full({ score: 5000 });
-    // A full mission before, so only the record decides (after a crash it would be Altair's anyway).
-    const before = [full({ score: 4000 })];
-    expect(pickCommander(best, before, cast)).toEqual({ commander: "altair", debut: false });
-    // The all-time best counts, not just the recent runs passed in.
-    expect(pickCommander(best, before, cast, 6000).commander).toBe("vega");
-    // Beating the leaderboard's top score is a record even below the personal best.
-    const overall = full({ score: 5000, top: 4500 });
-    expect(pickCommander(overall, before, cast, 6000).commander).toBe("altair");
+  it("makes the first full mission online Altair's debut; offline ones keep it waiting", () => {
+    expect(pickCommander(full(), {})).toEqual({ commander: "altair", debut: true });
+    expect(pickCommander(full(), {}, false)).toEqual({ commander: "altair", debut: false });
   });
 });
 
