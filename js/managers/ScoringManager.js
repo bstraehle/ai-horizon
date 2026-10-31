@@ -118,6 +118,22 @@ export const ScoringManager = {
     };
   },
   /**
+   * Shot accuracy so far, 0..1: hits per shot as in {@link ScoringManager.applyAccuracyBonus}
+   * (regular kills plus bullet hits on hardened/bonus planets), 0 before the first shot.
+   * @param {{ shotsFired?:number, regularAsteroidsKilled?:number, hardenedAsteroidHitBullets?:number, bonusAsteroidHitBullets?:number }} game
+   * @returns {number}
+   */
+  accuracy(game) {
+    const shots = (game && game.shotsFired) || 0;
+    if (shots <= 0) return 0;
+    const regular = game.regularAsteroidsKilled || 0;
+    const hardenedUnion = Math.max(
+      game.hardenedAsteroidHitBullets || 0,
+      game.bonusAsteroidHitBullets || 0
+    );
+    return Math.min(1, (regular + hardenedUnion) / shots);
+  },
+  /**
    * Compute and apply an end-of-run accuracy bonus based on hits per shot.
    * Formula: bonus = round(baseScore * accuracy)
    * where accuracy = (regularKills + union(hardenedBulletHits, bonusBulletHits)) / shotsFired.
@@ -135,29 +151,16 @@ export const ScoringManager = {
     if (!game || typeof game.score !== "number")
       return { applied: false, baseScore: 0, accuracy: 0, bonus: 0, newScore: 0 };
     if (game._accuracyBonusApplied) {
-      const regular = game.regularAsteroidsKilled || 0;
-      const hardenedHits = game.hardenedAsteroidHitBullets || 0;
-      const bonusHits = game.bonusAsteroidHitBullets || 0;
-      const hardenedUnion = Math.max(hardenedHits, bonusHits);
-      const totalHits = regular + hardenedUnion;
-      const shots = game.shotsFired || 0;
-      const acc = shots > 0 ? totalHits / shots : 0;
       return {
         applied: false,
         baseScore: game.score,
-        accuracy: acc,
+        accuracy: ScoringManager.accuracy(game),
         bonus: game.accuracyBonus || 0,
         newScore: game.score,
       };
     }
     const baseScore = game.score;
-    const regular = game.regularAsteroidsKilled || 0;
-    const hardenedHits = game.hardenedAsteroidHitBullets || 0;
-    const bonusHits = game.bonusAsteroidHitBullets || 0;
-    const hardenedUnion = Math.max(hardenedHits, bonusHits);
-    const totalHits = regular + hardenedUnion;
-    const shots = game.shotsFired || 0;
-    const accuracy = shots > 0 ? Math.min(1, totalHits / shots) : 0;
+    const accuracy = ScoringManager.accuracy(game);
     const bonus = Math.round(baseScore * accuracy);
     if (bonus > 0) {
       game.score += bonus;

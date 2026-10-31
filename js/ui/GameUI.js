@@ -1,4 +1,5 @@
 import { UIManager } from "../managers/UIManager.js";
+import { ScoringManager } from "../managers/ScoringManager.js";
 import { AIAnalysisManager } from "../managers/AIAnalysisManager.js";
 import { gameOverHeadline } from "./GameOverHeadline.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
@@ -179,16 +180,13 @@ export const GameUI = {
     UIManager.hidePostGame(game.gameOverScreen || null);
   },
   /**
-   * Update the visible score.
+   * Update the visible score with the shot accuracy so far ("4443 | 76%"), as the game-over
+   * screen shows it; called on every score change, shot and hit.
    * @param {AIHorizon} game
    */
   setScore(game) {
-    try {
-      const total = game.score || 0;
-      UIManager.setScore(game.currentScoreEl || null, total);
-    } catch {
-      UIManager.setScore(game.currentScoreEl || null, game.score || 0);
-    }
+    const pct = Math.round(100 * ScoringManager.accuracy(game));
+    UIManager.setScore(game.currentScoreEl || null, `${game.score || 0} | ${pct}%`);
   },
   /**
    * Update the visible countdown timer.

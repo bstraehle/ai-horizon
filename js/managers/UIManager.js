@@ -544,9 +544,13 @@ export class UIManager {
     return typeof Element !== "undefined" && obj instanceof Element;
   }
 
-  /** @param {HTMLElement|null} currentScoreEl @param {number|string} score */
+  /**
+   * Show the score text; skips the DOM write when it is unchanged (called on every shot).
+   * @param {HTMLElement|null} currentScoreEl @param {number|string} score
+   */
   static setScore(currentScoreEl, score) {
-    if (currentScoreEl) currentScoreEl.textContent = String(score);
+    const text = String(score);
+    if (currentScoreEl && currentScoreEl.textContent !== text) currentScoreEl.textContent = text;
   }
 
   /**

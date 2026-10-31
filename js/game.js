@@ -951,6 +951,7 @@ class AIHorizon {
     this.fireLimiter.try(() => {
       this.bullets.push(GameFactories.createBullet(this));
       this.shotsFired = (this.shotsFired || 0) + 1;
+      GameUI.setScore(this);
     });
   }
 

@@ -175,6 +175,8 @@ export const EventHandlers = {
        */
       events.on("bulletDamagedAsteroid", function (/** @type {{ asteroid:any }} */ payload) {
         game.audio?.playAsteroidHit(soundOptions(game, payload && payload.asteroid));
+        // The hit counts toward the accuracy shown next to the score.
+        if (typeof game.updateScore === "function") game.updateScore();
       })
     );
 
