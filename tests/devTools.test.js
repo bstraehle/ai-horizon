@@ -127,22 +127,25 @@ describe("attachDevTools", () => {
     }
   });
 
-  it("soundlog records sound-effect calls (not narration) and still plays them", () => {
+  it("soundlog records sound-effect and music calls (not narration) and still plays them", () => {
     const calls = /** @type {any[]} */ ([]);
     const audio = {
       playAsteroidHit: (/** @type {any} */ o) => calls.push(["hit", o]),
       playStarCollect: (/** @type {any} */ o) => calls.push(["star", o]),
+      setMusic: (/** @type {any} */ mood) => calls.push(["music", mood]),
       playSpeech: () => calls.push(["speech"]),
     };
     const log = /** @type {any[]} */ ([]);
     expect(attachSoundLog({ audio }, log)).toBe(log);
     audio.playAsteroidHit({ heavy: true, pan: 0.5 });
     audio.playStarCollect({ bonus: false, pan: -1 });
+    audio.setMusic("calm", { delay: 2.5 });
     audio.playSpeech();
-    expect(calls.map((c) => c[0])).toEqual(["hit", "star", "speech"]);
+    expect(calls.map((c) => c[0])).toEqual(["hit", "star", "music", "speech"]);
     expect(log.map((e) => [e.method, e.args])).toEqual([
       ["playAsteroidHit", [{ heavy: true, pan: 0.5 }]],
       ["playStarCollect", [{ bonus: false, pan: -1 }]],
+      ["setMusic", ["calm", { delay: 2.5 }]],
     ]);
     expect(log.every((e) => typeof e.t === "number")).toBe(true);
     expect(attachSoundLog({}, [])).toBeNull();

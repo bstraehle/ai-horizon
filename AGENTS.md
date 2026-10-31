@@ -59,8 +59,9 @@ Only the 4K cut is kept (no 1080p version). With `npm run serve` running:
    The recorder also captures the debrief's spoken clip from the AI response: the headline types
    in sync with it, the voice meters follow it, and it is logged as the timeline's `comms` track.
 2. `node --experimental-websocket scripts/render-sfx.cjs --events=store-video/_sfx-3840x2160.json`
-   (writes the game sounds and, with a voice clip, `_sfx-3840x2160-comms.wav`: the commander's
-   voice through the game's radio chain).
+   (writes the game sounds, including the in-game music that follows the logged `setMusic` mood
+   changes, and, with a voice clip, `_sfx-3840x2160-comms.wav`: the commander's voice through the
+   game's radio chain).
 3. `python store-video/narrate.py --raw store-video/_raw-3840x2160.mp4 --size 3840x2160 --out store-video/ai-horizon-3840x2160.mp4 --sfx store-video/_sfx-3840x2160.wav --comms store-video/_sfx-3840x2160-comms.wav`
    (needs AWS credentials for Polly, which voices both the host, Joanna, and the narrator,
    Matthew; the owner's ElevenLabs voice is kept for Captain Altair's debrief, which comes from
@@ -86,8 +87,8 @@ the frames from game over on), skip step 2 (the sound timeline is unchanged), ru
 when the game-over dialog's first frame and the sounds are unchanged (the splice checks that frame
 against the old video); otherwise do the full render. The 4K landscape screenshots
 (`store-screenshots/3840x2160`) are frames of the raw video, except `4-gameover.png`:
-`5-leaderboard.png` is frame 6900 (extract with
-`-vf "select=eq(n\,6900)" -frames:v 1 -pix_fmt rgb24`: 24-bit, no alpha); the frames move with
+`5-leaderboard.png` is frame 7070 (extract with
+`-vf "select=eq(n\,7070)" -frames:v 1 -pix_fmt rgb24`: 24-bit, no alpha); the frames move with
 the post-run timeline, so pick them from the `[record] debrief / initials / leaderboard from frame …`
 lines of step 1. `4-gameover.png` shows the same debrief as the portrait sets
 (`store-screenshots/debrief.json`): render it with

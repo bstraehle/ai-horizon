@@ -36,8 +36,8 @@ function soundOptions(game, asteroid) {
  *   once the bullet caliber upgrade is active.
  * - bulletDamagedAsteroid: Non-lethal hit on a hardened planet; plays the regular asteroid-hit
  *   sound (same pan / heavy rules).
- * - playerHitAsteroid: Plays the fatal crash sound and triggers the game over sequence exactly
- *   once per emission chain.
+ * - playerHitAsteroid: Plays the fatal crash sound, cuts the music, and triggers the game over
+ *   sequence exactly once per emission chain.
  * - Planet kills and the player's death also request a short screen shake (render-only, skipped
  *   under prefers-reduced-motion; see systems/ScreenShake.js).
  * - collectedStar (score path): Awards score (bonus for red stars), plays the star or bonus-star
@@ -186,6 +186,7 @@ export const EventHandlers = {
         }
         /** @type {any} */ (game)._dramaticEndPlayed = true;
         game.audio?.playFatal();
+        game.audio?.setMusic("off");
         try {
           const p = /** @type {any} */ (game.player);
           if (p && typeof game.createExplosion === "function") {

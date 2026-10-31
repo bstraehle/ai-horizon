@@ -9,8 +9,9 @@
  *  - Handles lifecycle: start, game over, full & soft resets (no pause: Esc only releases the
  *    captured mouse)
  *  - Wires cross-cutting event handlers (see `systems/EventHandlers.js`)
- *  - Owns synthesized sound effects (`managers/AudioManager.js`), unlocked on launch and
- *    suspended while the tab is hidden; mute via the Sound toggles or the M key
+ *  - Owns synthesized sound effects and music (`managers/AudioManager.js`), unlocked on launch
+ *    and suspended while the tab is hidden; mute via the Sound toggles or the M key. The music
+ *    drives during a mission, lifts for the finale, cuts on a crash and calms on game over
  *  - Remembers recent missions on this device (`managers/RunHistory.js`) for the debrief's
  *    story hooks, and picks who debriefs: Commander Vega or Captain Altair
  *    (`managers/Commanders.js`)
@@ -1074,6 +1075,7 @@ class AIHorizon {
     // Launch / restart is a user gesture, so this is where browsers allow audio to start.
     this.audio.unlock();
     this.audio.stopSpeech();
+    this.audio.setMusic("drive");
     // Forget the previous run's pointer position so the ship starts level at its spawn point
     // instead of dashing (and banking) toward a stale target; steering resumes on the next
     // pointer move / touch / key press.
@@ -1125,6 +1127,11 @@ class AIHorizon {
     }
     this.state.end();
     this.mouseCapture.release();
+    // Calm music for the game-over screens: right away after a full mission, once the crash has
+    // faded after an ejection.
+    this.audio.setMusic("calm", {
+      delay: this._dramaticEndPlayed ? CONFIG.AUDIO.MUSIC.AFTER_CRASH_S : 0,
+    });
     const oldHighScore = this.highScore;
     this.updateHighScore();
     try {

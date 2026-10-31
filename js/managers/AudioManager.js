@@ -1,5 +1,6 @@
 import { CONFIG } from "../constants.js";
 import { LocalStorageAdapter } from "../adapters/LocalStorageAdapter.js";
+import { MusicSequencer } from "./MusicSequencer.js";
 
 /**
  * Quindar tone pitches of a debrief commander; Commander Vega's for unknown names.
@@ -48,6 +49,12 @@ const STAR_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
  *    the loud part of a fatal crash, and reports when the voice starts and how long it lasts
  *    (the headline types along with it); stopSpeech() cancels it (new run); speechLevel()
  *    reads the voice's loudness for the level meter.
+ *
+ * Music (managers/MusicSequencer.js: procedural A-minor synth music, no audio files)
+ *  - setMusic(mood, { delay }): "drive" during a mission, "finale" for its last seconds, "off"
+ *    on a crash, "calm" on the game-over screens. Notes are scheduled a short lookahead ahead by
+ *    a timer (offline renders call scheduleMusic(until) instead); the music is ducked while the
+ *    commander speaks and follows mute through the master bus. A no-op until unlocked.
  *
  * Lifecycle & policy
  *  - The AudioContext is created lazily by `unlock()`, which callers invoke from a user gesture
@@ -103,6 +110,10 @@ export class AudioManager {
     this._speech = null;
     /** Incremented to invalidate in-flight narration decodes. */
     this._speechToken = 0;
+    /** @type {MusicSequencer|null} Created by the first setMusic() after unlock. */
+    this._music = null;
+    /** @type {ReturnType<typeof setInterval>|null} Live lookahead scheduler for the music. */
+    this._musicTimer = null;
     /** @type {Set<(muted: boolean) => void>} */
     this._listeners = new Set();
   }
@@ -163,6 +174,41 @@ export class AudioManager {
   /** Resume audio processing after `suspend()`. */
   resume() {
     if (this._ctx && this._ctx.state === "suspended") this._settle(() => this._ctx?.resume());
+  }
+
+  /**
+   * Switch the background music to `mood` after `delay` seconds (see MusicSequencer). Starts the
+   * live lookahead scheduler on first use; offline contexts (store-video renders) get no timer and
+   * call {@link scheduleMusic} instead. Silent no-op until unlocked.
+   * @param {import("./MusicSequencer.js").MusicMood} mood
+   * @param {{ delay?: number }} [opts]
+   */
+  setMusic(mood, opts = {}) {
+    const ctx = this._ctx;
+    if (!ctx) return;
+    if (!this._music) {
+      this._music = new MusicSequencer(ctx, /** @type {GainNode} */ (this._master), this._verb);
+    }
+    this._music.setMood(mood, ctx.currentTime + Math.max(0, opts.delay || 0));
+    const g = /** @type {any} */ (globalThis);
+    const offline =
+      typeof g.OfflineAudioContext === "function" && ctx instanceof g.OfflineAudioContext;
+    if (!offline && !this._musicTimer && typeof setInterval === "function") {
+      this._musicTimer = setInterval(
+        () => this.scheduleMusic(ctx.currentTime + CONFIG.AUDIO.MUSIC.LOOKAHEAD_S),
+        CONFIG.AUDIO.MUSIC.TICK_MS
+      );
+    }
+    this.scheduleMusic(ctx.currentTime + CONFIG.AUDIO.MUSIC.LOOKAHEAD_S);
+  }
+
+  /**
+   * Create the music's notes up to context time `until` (the live timer's tick, or once for a
+   * whole offline render).
+   * @param {number} until
+   */
+  scheduleMusic(until) {
+    if (this._music) this._music.schedule(until);
   }
 
   /**
@@ -430,6 +476,7 @@ export class AudioManager {
       src.connect(analyser);
       src.start(voiceAt);
       this._speech = { src, out, analyser, samples: new Float32Array(analyser.fftSize) };
+      if (this._music) this._music.duck(voiceAt, voiceEnd);
       return { delay: Math.max(0, voiceAt - ctx.currentTime), duration: voiceEnd - voiceAt };
     } catch {
       return null;
@@ -456,6 +503,7 @@ export class AudioManager {
     const speech = this._speech;
     this._speech = null;
     if (!speech) return;
+    if (this._music && this._ctx) this._music.unduck(this._ctx.currentTime);
     try {
       speech.src.stop();
     } catch {

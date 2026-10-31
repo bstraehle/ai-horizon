@@ -12,6 +12,7 @@ function makeAudio() {
     playHardenedExplosion: vi.fn(),
     playStarCollect: vi.fn(),
     playFatal: vi.fn(),
+    setMusic: vi.fn(),
   };
 }
 
@@ -43,12 +44,13 @@ describe("star and crash sound routing", () => {
     unsub();
   });
 
-  it("plays the fatal crash once when the player is hit", () => {
+  it("plays the fatal crash and cuts the music once when the player is hit", () => {
     const game = makeGame();
     const unsub = EventHandlers.register(game);
     game.events.emit("playerHitAsteroid", { asteroid: {} });
     game.events.emit("playerHitAsteroid", { asteroid: {} });
     expect(game.audio.playFatal).toHaveBeenCalledTimes(1);
+    expect(game.audio.setMusic.mock.calls).toEqual([["off"]]);
     expect(game.gameOver).toHaveBeenCalledTimes(2);
     unsub();
   });

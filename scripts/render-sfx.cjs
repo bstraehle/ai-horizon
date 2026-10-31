@@ -14,7 +14,8 @@
  * while that call schedules its nodes, so every sound starts exactly on its video frame and uses
  * the same synthesis, panning, reverb and compression as the live game. The voice cap is disabled
  * (offline rendering reports `onended` only after scheduling finishes); per-sound throttling still
- * applies. Output is 16-bit stereo PCM covering `duration + tail` seconds, unmuted and
+ * applies. The music follows the logged `setMusic` mood changes and is scheduled in full before
+ * rendering. Output is 16-bit stereo PCM covering `duration + tail` seconds, unmuted and
  * unnormalised – level setting and ducking under the voice-over happen in store-video/narrate.py.
  */
 const fs = require("node:fs");
@@ -58,6 +59,8 @@ const RENDER = (events, duration, sampleRate, tailSec) => `(async () => {
     await audio[e.method](...(e.args || []));
     played++;
   }
+  // The music (setMusic mood changes) has no live timer offline: schedule all of it now.
+  audio.scheduleMusic(${duration} + ${tailSec});
   const rendered = await audio._ctx.startRendering();
   const l = rendered.getChannelData(0), r = rendered.getChannelData(1);
   const pcm = new Int16Array(l.length * 2);

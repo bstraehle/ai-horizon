@@ -25,7 +25,7 @@ import { FocusManager } from "../managers/FocusManager.js";
  *    (store listings); applied immediately via `game.resizeCanvas()`.
  *  - `debug=focus` → console trace of focus changes, pointer/key input, window focus and overlay
  *    transitions (with the active focus lock), for diagnosing lost overlay focus. Observes only.
- *  - `soundlog=1` → appends every sound-effect call to `window.__soundLog` as
+ *  - `soundlog=1` → appends every sound-effect and music-mood call to `window.__soundLog` as
  *    `{ t: performance.now(), method, args }` (narration excluded) so a recorder can rebuild the
  *    soundtrack offline (see scripts/render-sfx.cjs). Sounds still play as usual.
  *
@@ -89,7 +89,10 @@ export function attachDevTools(game, search) {
   };
 }
 
-/** AudioManager sound-effect methods captured by `soundlog=1` (narration is deliberately absent). */
+/**
+ * AudioManager methods captured by `soundlog=1`: the sound effects and the music's mood changes
+ * (narration is deliberately absent).
+ */
 export const SOUND_LOG_METHODS = [
   "playAsteroidHit",
   "playHardenedExplosion",
@@ -97,6 +100,7 @@ export const SOUND_LOG_METHODS = [
   "playStarCollect",
   "playFatal",
   "playTransmission",
+  "setMusic",
 ];
 
 /**

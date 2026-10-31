@@ -15,6 +15,19 @@ import { UIManager } from "../managers/UIManager.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
 /**
+ * Lift the music to its finale mood once per mission, when the timer enters the finale window
+ * (points double in the last CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS).
+ * @param {{ timerRemaining: number, _finaleMusicStarted?: boolean,
+ *   audio?: { setMusic: (mood: string) => void } }} game
+ */
+export function updateFinaleMusic(game) {
+  if (game._finaleMusicStarted) return;
+  if (game.timerRemaining > (CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS || 0)) return;
+  game._finaleMusicStarted = true;
+  game.audio?.setMusic("finale");
+}
+
+/**
  * Core per-frame update routine extracted from AIHorizon.update.
  *
  * Orchestrates all per-tick game logic in deterministic order:
@@ -24,7 +37,8 @@ import { UIManager } from "../managers/UIManager.js";
  *  4. Entity spawning via SpawnManager.
  *  5. Collision detection via CollisionManager.
  *  6. Player movement update.
- *  7. Timer countdown and game over trigger.
+ *  7. Timer countdown and game over trigger; the music switches to its finale mood once when the
+ *     finale window (CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS) begins.
  *
  * Determinism:
  *  - All updates use dtSec for frame-rate independence.
@@ -75,6 +89,7 @@ export function updateGame(game, dtSec = CONFIG.TIME.DEFAULT_DT) {
         game.gameOver();
       } else {
         UIManager.setTimer(game.timerEl, game.timerRemaining);
+        updateFinaleMusic(game);
       }
     }
   } catch (_e) {
