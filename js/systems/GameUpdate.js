@@ -15,16 +15,17 @@ import { UIManager } from "../managers/UIManager.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
 /**
- * Lift the music to its finale mood once per mission, when the timer enters the finale window
- * (points double in the last CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS).
+ * Start the music's finale once per mission, when the timer enters the finale window (points
+ * double in the last CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS); it builds over the seconds left so
+ * it peaks as the mission ends.
  * @param {{ timerRemaining: number, _finaleMusicStarted?: boolean,
- *   audio?: { setMusic: (mood: string) => void } }} game
+ *   audio?: { setMusic: (mood: string, opts?: { length?: number }) => void } }} game
  */
 export function updateFinaleMusic(game) {
   if (game._finaleMusicStarted) return;
   if (game.timerRemaining > (CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS || 0)) return;
   game._finaleMusicStarted = true;
-  game.audio?.setMusic("finale");
+  game.audio?.setMusic("finale", { length: game.timerRemaining });
 }
 
 /**

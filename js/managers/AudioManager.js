@@ -50,11 +50,13 @@ const STAR_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
  *    (the headline types along with it); stopSpeech() cancels it (new run); speechLevel()
  *    reads the voice's loudness for the level meter.
  *
- * Music (managers/MusicSequencer.js: procedural A-minor synth music, no audio files)
- *  - setMusic(mood, { delay }): "drive" during a mission, "finale" for its last seconds, "off"
- *    on a crash, "calm" on the game-over screens. Notes are scheduled a short lookahead ahead by
- *    a timer (offline renders call scheduleMusic(until) instead); the music is ducked while the
- *    commander speaks and follows mute through the master bus. A no-op until unlocked.
+ * Music (managers/MusicSequencer.js: procedural deep-space scores, no audio files)
+ *  - setMusic(mood, { delay, style, length }): "mission" while flying (the red or blue nebula
+ *    palette picks the score: "Abyss" or "Event Horizon"), "finale" building over its last
+ *    seconds into "end" (the closing impact) when the mission is survived, "off" on a crash; it
+ *    stays silent through the game-over screens and the radio debrief. Notes are scheduled a
+ *    short lookahead ahead by a timer (offline renders call scheduleMusic(until) instead); the
+ *    music follows mute through the master bus. A no-op until unlocked.
  *
  * Lifecycle & policy
  *  - The AudioContext is created lazily by `unlock()`, which callers invoke from a user gesture
@@ -177,11 +179,12 @@ export class AudioManager {
   }
 
   /**
-   * Switch the background music to `mood` after `delay` seconds (see MusicSequencer). Starts the
+   * Switch the background music to `mood` after `delay` seconds (see MusicSequencer): `style` is
+   * the mission's nebula palette (which picks the score), `length` the finale's seconds. Starts the
    * live lookahead scheduler on first use; offline contexts (store-video renders) get no timer and
    * call {@link scheduleMusic} instead. Silent no-op until unlocked.
    * @param {import("./MusicSequencer.js").MusicMood} mood
-   * @param {{ delay?: number }} [opts]
+   * @param {{ delay?: number, style?: import("./MusicSequencer.js").MusicStyle, length?: number }} [opts]
    */
   setMusic(mood, opts = {}) {
     const ctx = this._ctx;
@@ -189,7 +192,11 @@ export class AudioManager {
     if (!this._music) {
       this._music = new MusicSequencer(ctx, /** @type {GainNode} */ (this._master), this._verb);
     }
-    this._music.setMood(mood, ctx.currentTime + Math.max(0, opts.delay || 0));
+    const { delay = 0, style, length } = opts;
+    this._music.setMood(mood, ctx.currentTime + Math.max(0, delay), {
+      ...(style ? { style } : {}),
+      ...(length ? { length } : {}),
+    });
     const g = /** @type {any} */ (globalThis);
     const offline =
       typeof g.OfflineAudioContext === "function" && ctx instanceof g.OfflineAudioContext;
@@ -476,7 +483,6 @@ export class AudioManager {
       src.connect(analyser);
       src.start(voiceAt);
       this._speech = { src, out, analyser, samples: new Float32Array(analyser.fftSize) };
-      if (this._music) this._music.duck(voiceAt, voiceEnd);
       return { delay: Math.max(0, voiceAt - ctx.currentTime), duration: voiceEnd - voiceAt };
     } catch {
       return null;
@@ -503,7 +509,6 @@ export class AudioManager {
     const speech = this._speech;
     this._speech = null;
     if (!speech) return;
-    if (this._music && this._ctx) this._music.unduck(this._ctx.currentTime);
     try {
       speech.src.stop();
     } catch {

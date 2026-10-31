@@ -4,7 +4,7 @@
  *
  * Usage:
  *   node --experimental-websocket scripts/render-sfx.cjs --events=store-video/_sfx.json
- *       [--out=store-video/_sfx.wav] [--rate=48000] [--tail=3]
+ *       [--out=store-video/_sfx.wav] [--rate=48000] [--tail=30]
  *
  * Input is the JSON written by `record-autoplay.cjs --sfx=...` ({ duration, events: [{ at, method,
  * args }], comms?: [...] }). `comms` holds the debrief commander's voice (playSpeech with the
@@ -33,7 +33,8 @@ const out = path.resolve(opt("out", eventsPath.replace(/\.json$/i, ".wav")));
 /** The commander's voice track (the timeline's `comms` events), next to the effects WAV. */
 const commsOut = out.replace(/\.wav$/i, "-comms.wav");
 const rate = Number(opt("rate", "48000")) || 48000;
-const tail = Number(opt("tail", "3")) || 3;
+/** Seconds rendered past the recording: the music keeps playing under narration that runs on. */
+const tail = Number(opt("tail", "30")) || 30;
 
 /**
  * Page-side renderer: schedules every event (awaiting async ones such as playSpeech, whose MP3

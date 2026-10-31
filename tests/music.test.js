@@ -1,12 +1,12 @@
 // @ts-check
 import { describe, it, expect, vi } from "vitest";
-import { MusicSequencer, MUSIC_MOODS } from "../js/managers/MusicSequencer.js";
+import { MusicSequencer, MUSIC_STYLES } from "../js/managers/MusicSequencer.js";
 import { AudioManager } from "../js/managers/AudioManager.js";
 import { updateFinaleMusic } from "../js/systems/GameUpdate.js";
 import { CONFIG } from "../js/constants.js";
 
-const BEAT = 60 / CONFIG.AUDIO.MUSIC.BPM;
-const BAR = 4 * BEAT;
+/** Bar length of a score, in seconds. @param {"red"|"blue"} style */
+const bar = (style) => (4 * 60) / MUSIC_STYLES[style].bpm;
 
 /** AudioParam stand-in recording every automation call as [method, value, time]. */
 function makeParam(value = 0) {
@@ -34,7 +34,6 @@ class FakeContext {
     this.destination = {};
     /** @type {any[]} */ this.oscillators = [];
     /** @type {any[]} */ this.sources = [];
-    /** @type {any[]} */ this.gains = [];
   }
   resume() {
     this.state = "running";
@@ -48,9 +47,7 @@ class FakeContext {
     return { connect: vi.fn(), disconnect: vi.fn(), ...extra };
   }
   createGain() {
-    const g = this.node({ gain: makeParam(1) });
-    this.gains.push(g);
-    return g;
+    return this.node({ gain: makeParam(1) });
   }
   createDelay() {
     return this.node({ delayTime: makeParam() });
@@ -123,111 +120,145 @@ const started = (ctx, from, to, pred = (/** @type {any} */ _o) => true) =>
   ctx.oscillators.filter(
     (/** @type {any} */ o) => o.at !== null && o.at >= from - 1e-9 && o.at < to - 1e-9 && pred(o)
   );
+/** A thump (heartbeat, tom, pulse, boom) that starts at `f0` Hz. @param {number} f0 */
+const thump = (f0) => (/** @type {any} */ o) =>
+  o.frequency.calls.some((/** @type {any[]} */ c) => c[0] === "set" && c[1] === f0);
 /** @param {any} o */
-const isKick = (o) =>
-  o.frequency.calls.some((/** @type {any[]} */ c) => c[0] === "set" && c[1] === 110);
-/** @param {any} o */
-const isPluck = (o) => o.type === "square";
-/** Hats started in [from, to). @param {any} ctx */
-const hats = (ctx, from, to) =>
-  ctx.sources.filter((/** @type {any} */ s) => s.at >= from - 1e-9 && s.at < to - 1e-9).length;
+const isTick = (o) => o.type === "square" && o.frequency.value === 2000;
+/** @param {number} note */
+const hzOf = (note) => 440 * 2 ** ((note - 69) / 12);
+/** Notes (MIDI) of the saws started in [from, to). @param {any} ctx */
+const sawNotes = (ctx, from, to) =>
+  [
+    ...new Set(
+      started(ctx, from, to, (o) => o.type === "sawtooth").map((o) =>
+        Math.round(69 + 12 * Math.log2(o.frequency.value / 440))
+      )
+    ),
+  ].sort((a, b) => a - b);
 
 describe("MusicSequencer", () => {
-  it("is silent while off, then drives with a kick on every beat and off-beat hats", () => {
+  it("is silent while off, then plays Abyss for red: dark pad, drone and a heartbeat each bar", () => {
     const { ctx, seq } = sequencer();
     seq.schedule(10);
-    expect(started(ctx, 0, 10, (o) => o.type !== "sine")).toHaveLength(0);
-    seq.setMood("drive", 1);
-    seq.schedule(1 + 2 * BAR);
-    const kicks = started(ctx, 1, 1 + 2 * BAR, isKick);
-    expect(kicks.map((o) => +(o.at - 1).toFixed(6))).toEqual(
-      Array.from({ length: 8 }, (_, i) => +(i * BEAT).toFixed(6))
+    expect(ctx.oscillators).toHaveLength(0);
+    seq.setMood("mission", 1, { style: "red" });
+    const B = bar("red");
+    seq.schedule(1 + 4 * B);
+    expect(seq.style).toBe("red");
+    expect(sawNotes(ctx, 1, 1.01)).toEqual([38, 39, 50, 53, 57]);
+    const beats = started(ctx, 1, 1 + 4 * B, thump(62)).map((o) => +(o.at - 1).toFixed(6));
+    expect(beats).toEqual([1, 2, 3].map((i) => +(i * B).toFixed(6)));
+    expect(started(ctx, 1, 1 + 4 * B, thump(55))).toHaveLength(3);
+  });
+
+  it("plays Event Horizon for blue: choir pad, a ticking clock and a braam every two bars", () => {
+    const { ctx, seq } = sequencer();
+    seq.setMood("mission", 0, { style: "blue" });
+    const B = bar("blue");
+    seq.schedule(4 * B);
+    expect(sawNotes(ctx, 0, 0.01)).toEqual([50, 57, 62, 65]);
+    expect(started(ctx, B, 2 * B, isTick)).toHaveLength(8);
+    expect(started(ctx, 0, B, isTick)).toHaveLength(0);
+    const braams = started(
+      ctx,
+      0,
+      4 * B,
+      (o) => o.type === "sawtooth" && o.frequency.value === hzOf(26)
     );
-    expect(hats(ctx, 1, 1 + 2 * BAR)).toBe(8);
-    expect(seq.mood).toBe("drive");
+    expect(braams.map((o) => o.at)).toEqual([2 * B]);
   });
 
-  it("plays calm without drums, and lifts the finale (more hats, arpeggio an octave up)", () => {
-    const calm = sequencer();
-    calm.seq.setMood("calm", 0);
-    calm.seq.schedule(2 * BAR);
-    expect(started(calm.ctx, 0, 2 * BAR, isKick)).toHaveLength(0);
-    expect(hats(calm.ctx, 0, 2 * BAR)).toBe(0);
-
-    const finale = sequencer();
-    finale.seq.setMood("finale", 0);
-    finale.seq.schedule(BAR);
-    expect(hats(finale.ctx, 0, BAR)).toBe(12);
-    const top = (/** @type {any} */ ctx) =>
-      Math.max(...started(ctx, 0, BAR, isPluck).map((o) => o.frequency.value));
-    const drive = sequencer();
-    drive.seq.setMood("drive", 0);
-    drive.seq.schedule(BAR);
-    expect(top(finale.ctx)).toBeGreaterThan(top(drive.ctx) * 1.9);
-    expect(MUSIC_MOODS.finale.cutoff).toBeGreaterThan(MUSIC_MOODS.drive.cutoff);
-  });
-
-  it("applies mood changes on the grid at their time and stops while off", () => {
+  it("builds the finale over its length: the heartbeat races, toms and a riser join", () => {
     const { ctx, seq } = sequencer();
-    seq.setMood("drive", 0);
-    seq.setMood("off", 2);
-    seq.schedule(20);
-    expect(started(ctx, 2, 20, (o) => o.type !== "sine" || isKick(o))).toHaveLength(0);
-    expect(started(ctx, 0, 2, isKick).length).toBeGreaterThan(0);
+    seq.setMood("mission", 0, { style: "red" });
+    seq.setMood("finale", 10, { length: 15 });
+    seq.schedule(25);
+    const early = started(ctx, 10, 15, thump(62)).length;
+    const late = started(ctx, 20, 25, thump(62)).length;
+    expect(early).toBeGreaterThanOrEqual(5);
+    expect(late).toBeGreaterThanOrEqual(2 * early - 1);
+    expect(started(ctx, 10, 25, thump(130)).length).toBeGreaterThan(15);
+    expect(ctx.sources.some((/** @type {any} */ s) => s.loop && s.at === 10)).toBe(true);
+    expect(seq.mood).toBe("finale");
+  });
+
+  it("marks the finale: an entry hit, a bass ostinato that speeds up and a swell in level", () => {
+    const { ctx, seq } = sequencer();
+    seq.setMood("mission", 0, { style: "blue" });
+    seq.schedule(10);
+    // Ostinato notes are low saws without detune (the braam's low saws are detuned).
+    const isPulse = (/** @type {any} */ o) =>
+      o.type === "sawtooth" && o.frequency.value < 80 && o.detune.value === 0;
+    expect(started(ctx, 0, 10, isPulse)).toHaveLength(0);
+    seq.setMood("finale", 10, { length: 8 });
+    seq.schedule(18);
+    expect(started(ctx, 10, 10.01, thump(80))).toHaveLength(1);
+    const step = bar("blue") / 16;
+    expect(started(ctx, 10, 14, isPulse).length).toBeCloseTo(4 / step / 2, -1);
+    expect(started(ctx, 14, 18, isPulse).length).toBeCloseTo(4 / step, -1);
+    const target = CONFIG.AUDIO.MUSIC.VOLUME * MUSIC_STYLES.blue.level;
+    expect(/** @type {any} */ (seq)._level.gain.calls).toContainEqual([
+      "linear",
+      target * CONFIG.AUDIO.MUSIC.FINALE_GAIN,
+      18,
+    ]);
+  });
+
+  it("ends a survived mission on the impact and then stays silent", () => {
+    const { ctx, seq } = sequencer();
+    seq.setMood("mission", 0, { style: "blue" });
+    seq.setMood("finale", 2, { length: 4 });
+    seq.setMood("end", 6);
+    seq.schedule(30);
+    expect(started(ctx, 6, 6.01, thump(70))).toHaveLength(1);
+    expect(started(ctx, 6.01, 30)).toHaveLength(0);
+    expect(seq.mood).toBe("off");
+  });
+
+  it("cuts on a crash and stays silent while off", () => {
+    const { ctx, seq } = sequencer();
+    seq.setMood("mission", 0, { style: "red" });
+    seq.setMood("finale", 5, { length: 15 });
+    seq.setMood("off", 8);
+    seq.schedule(30);
+    expect(started(ctx, 8, 30)).toHaveLength(0);
     const level = /** @type {any} */ (seq)._level.gain.calls;
-    expect(level).toContainEqual(["target", 0, 2]);
+    expect(level).toContainEqual(["target", 0, 8]);
   });
 
-  it("restarts the progression on its first chord when it starts again", () => {
+  it("restarts on the first chord when the style changes", () => {
     const { ctx, seq } = sequencer();
-    seq.setMood("calm", 0);
-    seq.setMood("off", 3 * BAR);
-    seq.setMood("calm", 20);
-    seq.schedule(20.5);
-    const saws = started(ctx, 20, 20.5, (o) => o.type === "sawtooth");
-    const notes = [
-      ...new Set(saws.map((o) => Math.round(69 + 12 * Math.log2(o.frequency.value / 440)))),
-    ];
-    expect(notes.sort()).toEqual([57, 60, 64]);
+    seq.setMood("mission", 0, { style: "red" });
+    seq.setMood("mission", 10, { style: "blue" });
+    seq.schedule(10.5);
+    expect(sawNotes(ctx, 10, 10.5)).toEqual([50, 57, 62, 65]);
+    expect(seq.style).toBe("blue");
   });
 
   it("never rewrites notes already scheduled when a later change arrives", () => {
     const { ctx, seq } = sequencer();
-    seq.setMood("drive", 0);
-    seq.schedule(BAR);
+    seq.setMood("mission", 0, { style: "blue" });
+    seq.schedule(8);
     const before = ctx.oscillators.length;
-    seq.setMood("calm", BAR / 2);
+    seq.setMood("off", 4);
     expect(ctx.oscillators.length).toBe(before);
-    seq.schedule(3 * BAR);
-    expect(started(ctx, BAR, 3 * BAR, isKick)).toHaveLength(0);
   });
 
   it("is identical for the same seed", () => {
     const run = () => {
       const { ctx, seq } = sequencer(42);
-      seq.setMood("drive", 0);
-      seq.schedule(4 * BAR);
+      seq.setMood("mission", 0, { style: "red" });
+      seq.setMood("finale", 10, { length: 5 });
+      seq.schedule(20);
       return ctx.oscillators.map((/** @type {any} */ o) => [o.type, o.at, o.frequency.value]);
     };
     expect(run()).toEqual(run());
   });
-
-  it("ducks under the commander's voice and comes back after it", () => {
-    const { seq } = sequencer();
-    const gain = /** @type {any} */ (seq)._duckGain.gain;
-    seq.duck(3, 6);
-    const duck = gain.calls.filter((/** @type {any[]} */ c) => c[0] === "target");
-    expect(duck[0][1]).toBe(CONFIG.AUDIO.MUSIC.DUCK);
-    expect(duck[0][2]).toBeCloseTo(2.7);
-    expect(duck[1].slice(1)).toEqual([1, 6.2]);
-    seq.unduck(4);
-    expect(gain.calls.at(-1)).toEqual(["target", 1, 4]);
-  });
 });
 
 describe("AudioManager music", () => {
-  /** @param {{ muted?: boolean }} [opts] */
-  function setup(opts = {}) {
+  function setup() {
     /** @type {FakeContext[]} */
     const instances = [];
     class Ctx extends FakeContext {
@@ -236,11 +267,7 @@ describe("AudioManager music", () => {
         instances.push(this);
       }
     }
-    const store = { muted: !!opts.muted };
-    const storage = /** @type {any} */ ({
-      getJSON: () => store.muted,
-      setJSON: () => true,
-    });
+    const storage = /** @type {any} */ ({ getJSON: () => false, setJSON: () => true });
     const audio = new AudioManager({
       AudioContextCtor: /** @type {any} */ (Ctx),
       storage,
@@ -253,19 +280,21 @@ describe("AudioManager music", () => {
     vi.useFakeTimers();
     try {
       const { audio, instances } = setup();
-      audio.setMusic("drive");
+      audio.setMusic("mission", { style: "blue" });
       expect(instances).toHaveLength(0);
       audio.unlock();
       const ctx = instances[0];
-      audio.setMusic("drive");
+      audio.setMusic("mission", { style: "blue" });
       const first = ctx.oscillators.length;
-      expect(started(ctx, 0, CONFIG.AUDIO.MUSIC.LOOKAHEAD_S, isKick)).toHaveLength(1);
-      ctx.currentTime = 2;
+      expect(first).toBeGreaterThan(0);
+      ctx.currentTime = bar("blue") + 1;
       vi.advanceTimersByTime(CONFIG.AUDIO.MUSIC.TICK_MS);
-      expect(ctx.oscillators.length).toBeGreaterThan(first);
-      expect(started(ctx, 0, 2 + CONFIG.AUDIO.MUSIC.LOOKAHEAD_S, isKick).length).toBeGreaterThan(2);
-      audio.setMusic("calm", { delay: 2.5 });
-      expect(/** @type {any} */ (audio)._music._changes).toEqual([{ mood: "calm", at: 4.5 }]);
+      expect(started(ctx, bar("blue"), ctx.currentTime, isTick).length).toBeGreaterThan(0);
+      audio.setMusic("finale", { length: 15 });
+      const music = /** @type {any} */ (audio)._music;
+      expect(music.mood).toBe("finale");
+      audio.setMusic("end", { delay: 2.5 });
+      expect(music._changes).toEqual([{ mood: "end", at: ctx.currentTime + 2.5 }]);
     } finally {
       vi.useRealTimers();
     }
@@ -279,54 +308,29 @@ describe("AudioManager music", () => {
     const timers = vi.spyOn(globalThis, "setInterval");
     try {
       audio.unlock();
-      audio.setMusic("drive");
-      audio.scheduleMusic(4 * BAR);
+      audio.setMusic("mission", { style: "red" });
+      audio.scheduleMusic(4 * bar("red"));
       expect(timers).not.toHaveBeenCalled();
-      expect(started(instances[0], 0, 4 * BAR, isKick)).toHaveLength(16);
+      expect(started(instances[0], 0, 4 * bar("red"), thump(62))).toHaveLength(3);
     } finally {
       g.OfflineAudioContext = saved;
       timers.mockRestore();
     }
   });
-
-  it("ducks the music while the commander speaks and restores it when speech stops", async () => {
-    vi.useFakeTimers();
-    try {
-      const { audio, instances } = setup();
-      audio.unlock();
-      await Promise.resolve();
-      instances[0].state = "running";
-      audio.setMusic("calm");
-      const music = /** @type {any} */ (audio)._music;
-      const duck = vi.spyOn(music, "duck");
-      const unduck = vi.spyOn(music, "unduck");
-      const timing = await audio.playSpeech(btoa("mp3"), "altair");
-      expect(timing).not.toBeNull();
-      expect(duck).toHaveBeenCalledTimes(1);
-      const [from, to] = duck.mock.calls[0];
-      expect(to - from).toBeCloseTo(2);
-      audio.stopSpeech();
-      expect(unduck).toHaveBeenCalledTimes(1);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
 });
 
 describe("finale music", () => {
-  it("lifts the music once when the finale window begins", () => {
+  it("starts the finale once, building over the seconds left", () => {
     const setMusic = vi.fn();
-    const game = {
-      timerRemaining: CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS + 1,
-      audio: { setMusic },
-    };
+    const window = CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS;
+    const game = { timerRemaining: window + 1, audio: { setMusic } };
     updateFinaleMusic(game);
     expect(setMusic).not.toHaveBeenCalled();
-    game.timerRemaining = CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS;
+    game.timerRemaining = window - 0.01;
     updateFinaleMusic(game);
     game.timerRemaining -= 1;
     updateFinaleMusic(game);
-    expect(setMusic.mock.calls).toEqual([["finale"]]);
+    expect(setMusic.mock.calls).toEqual([["finale", { length: window - 0.01 }]]);
     expect(() => updateFinaleMusic({ timerRemaining: 1 })).not.toThrow();
   });
 });

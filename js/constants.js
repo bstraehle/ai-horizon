@@ -451,19 +451,18 @@ export const CONFIG = deepFreeze({
     REVERB_SECONDS: 2,
     MAX_PAN: 0.7,
     /**
-     * Background music (managers/MusicSequencer.js): level relative to the master bus, level while
-     * the commander speaks, crossfade, tempo and arrangement seed; notes are scheduled
-     * LOOKAHEAD_S ahead every TICK_MS; after a crash the music returns AFTER_CRASH_S later.
+     * Background music (managers/MusicSequencer.js; the scores and their tempos are its
+     * MUSIC_STYLES): level relative to the master bus, how much louder the finale ends (gain
+     * factor, about +8 dB), fade-in and arrangement seed; notes are scheduled LOOKAHEAD_S ahead
+     * every TICK_MS.
      */
     MUSIC: {
       VOLUME: 0.25,
-      DUCK: 0.35,
+      FINALE_GAIN: 2.5,
       FADE_S: 1.5,
-      BPM: 92,
       SEED: 7,
       LOOKAHEAD_S: 0.4,
       TICK_MS: 100,
-      AFTER_CRASH_S: 2.5,
     },
   },
   /** Recent missions remembered on this device for the debrief's story hooks (RunHistory). */

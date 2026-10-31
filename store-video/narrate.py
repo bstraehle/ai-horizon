@@ -67,6 +67,7 @@ ELEVENLABS_KEY_FILE = HERE.parent / ".secrets" / "api_key.txt"
 TARGET_LUFS = -16.0
 PEAK_LIMIT = 0.84  # ~-1.5 dBFS
 DUCK = "sidechaincompress=threshold=0.03:ratio=4:attack=15:release=350:knee=4"
+BED_FADE_S = 2.5  # the game sound and music fade out at the end of the video
 
 
 def tool(name: str) -> str:
@@ -154,9 +155,11 @@ def busy_span(audio: Path, threshold: float = 0.02) -> tuple[float, float] | Non
     return (loud[0] / RATE, loud[-1] / RATE) if loud else None
 
 
-def mix(narration: Path, sfx: Path | None, sfx_lu: float, out: Path, comms: Path | None = None) -> None:
+def mix(narration: Path, sfx: Path | None, sfx_lu: float, out: Path, comms: Path | None = None,
+        total: float | None = None) -> None:
     """Narration alone, or narration (plus the commander's comms track, at the same loudness)
-    over the effects bed, which both duck (float WAV)."""
+    over the effects bed, which both duck (float WAV). The bed (game sound and music, rendered
+    past the recording) fades out over the last BED_FADE_S of `total`."""
     if sfx is None:
         cmd = [tool("ffmpeg"), "-y", "-v", "error", "-i", str(narration),
                "-af", "aformat=channel_layouts=stereo", "-c:a", "pcm_f32le", str(out)]
@@ -177,7 +180,9 @@ def mix(narration: Path, sfx: Path | None, sfx_lu: float, out: Path, comms: Path
                   file=sys.stderr)
         graph = (
             voices
-            + f"[1:a]{stereo},volume={gain:.2f}dB,apad[bed];"
+            + f"[1:a]{stereo},volume={gain:.2f}dB,apad"
+            + (f",afade=t=out:st={max(0.0, total - BED_FADE_S):.3f}:d={BED_FADE_S}" if total else "")
+            + "[bed];"
             + f"[bed][key]{DUCK}[ducked];"
             + "[voice][ducked]amix=inputs=2:duration=first:normalize=0[out]"
         )
@@ -379,7 +384,7 @@ def main() -> None:
     )
 
     mixed = out.with_suffix(".mix.wav")
-    mix(wav, sfx, args.sfx_lu, mixed, comms)
+    mix(wav, sfx, args.sfx_lu, mixed, comms, total)
     gain = TARGET_LUFS - loudness(mixed)
 
     w, h = args.size.split("x")
