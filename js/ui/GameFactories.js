@@ -1,6 +1,7 @@
 import { CONFIG } from "../constants.js";
 import { Particle } from "../entities/Particle.js";
 import { SpawnManager } from "../managers/SpawnManager.js";
+import { ScoringManager } from "../managers/ScoringManager.js";
 /** @typedef {import('../game.js').AIHorizon} AIHorizon */
 
 /**
@@ -16,10 +17,7 @@ export const GameFactories = {
   createBullet(game) {
     const player = /** @type {any} */ (game.player);
     const pool = /** @type {any} */ (game.bulletPool);
-    const upgraded =
-      (CONFIG.GAME && CONFIG.GAME.BULLET_UPGRADE_SCORE | 0) > 0 &&
-      typeof game.score === "number" &&
-      game.score >= (CONFIG.GAME.BULLET_UPGRADE_SCORE | 0);
+    const upgraded = ScoringManager.bulletUpgradeActive(game);
     const bw =
       upgraded && (CONFIG.BULLET.WIDTH_UPGRADED || 0) > 0
         ? CONFIG.BULLET.WIDTH_UPGRADED

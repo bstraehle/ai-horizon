@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { LeaderboardManager } from "../managers/LeaderboardManager.js";
+import { getPurchases } from "../managers/PurchaseManager.js";
 import { UIManager } from "../managers/UIManager.js";
 import { FocusManager } from "../managers/FocusManager.js";
 import { GameUI } from "./GameUI.js";
@@ -84,6 +85,7 @@ export function handleGameOver(game) {
             accuracy: game.accuracy,
             gameSummary: game._lastRunSummary,
             aiAnalysis: game._lastAIAnalysis,
+            upgradeToken: game.bulletUpgradePurchased ? getPurchases().token : null,
           });
           submittedScore = true;
           initialsInput.value = "";

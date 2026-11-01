@@ -66,6 +66,8 @@ import { warmUpPools } from "./ui/PoolWarmup.js";
 import { attachDevTools } from "./ui/DevTools.js";
 import { initShareLink } from "./ui/Share.js";
 import { initSoundToggles } from "./ui/SoundToggle.js";
+import { initUpgradeLinks } from "./ui/UpgradeLink.js";
+import { getPurchases } from "./managers/PurchaseManager.js";
 import { MouseCapture, isMouseEvent } from "./ui/MouseCapture.js";
 import { detectMobilePlatform } from "./utils/mobilePlatform.js";
 import { updateGame } from "./systems/GameUpdate.js";
@@ -342,6 +344,8 @@ class AIHorizon {
     InputBindings.setup(this);
     initShareLink(document.getElementById("shareLink"), () => this.score);
     initSoundToggles(this.audio);
+    initUpgradeLinks(getPurchases());
+    getPurchases().init();
     this._unsubscribeEvents = EventHandlers.register(this);
 
     // Global capture listener to intercept the first post-game synthetic click.
@@ -1074,6 +1078,10 @@ class AIHorizon {
       wasGameOver = false;
     }
     this.resetGameState(wasGameOver);
+    // The Bullet Upgrade applies for the whole mission once launched (a background ownership
+    // re-check cannot change it mid-run); with it there is no 2500-point upgrade cue to play.
+    this.bulletUpgradePurchased = getPurchases().owned;
+    this._caliberUpgraded = this.bulletUpgradePurchased;
     // Launch / restart is a user gesture, so this is where browsers allow audio to start.
     this.audio.unlock();
     this.audio.stopSpeech();
@@ -1290,6 +1298,7 @@ class AIHorizon {
         missedSecondsFinale: missedSecondsFinale,
       },
       score: scoreSummary,
+      upgrade: { purchased: !!this.bulletUpgradePurchased },
       stats: {
         regularStarsEncountered:
           typeof this.regularStarsSpawned === "number" ? this.regularStarsSpawned : null,
@@ -1415,7 +1424,7 @@ class AIHorizon {
    */
   updateScore() {
     GameUI.setScore(this);
-    const upgraded = ScoringManager.isBulletUpgraded(this.score);
+    const upgraded = ScoringManager.bulletUpgradeActive(this);
     if (
       upgraded &&
       !this._caliberUpgraded &&

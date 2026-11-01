@@ -475,6 +475,19 @@ export const CONFIG = deepFreeze({
     TITLE: "AI HORIZON",
     FEEDBACK_MS: 2000,
   },
+  /**
+   * Bullet Upgrade purchase (PurchaseManager / UpgradeLink; server/lambda/purchases.js). `LIVE`
+   * offers it on the production site; otherwise only on `DEV_HOSTS` (Stripe test mode).
+   */
+  PURCHASES: {
+    LIVE: false,
+    DEV_HOSTS: ["localhost", "127.0.0.1"],
+    GOOGLE_CLIENT_ID: "543292441425-m7omsj7v8507s76j14iticcd380v6i3c.apps.googleusercontent.com",
+    PRICE_LABEL: "$0.99",
+    STORAGE_KEY: "aiHorizonPurchase",
+    /** How long the "Buy · $0.99" confirmation waits for the second click. */
+    CONFIRM_MS: 5000,
+  },
   NEBULA: {
     COUNT_DESKTOP: 6,
     COUNT_MOBILE: 2,

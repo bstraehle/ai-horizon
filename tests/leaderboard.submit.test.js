@@ -31,6 +31,28 @@ describe("LeaderboardManager submit + render", () => {
     expect(li.textContent).toContain("150");
   });
 
+  it("sends upgrade-token with a Bullet Upgrade run and shows ⚡ optimistically", async () => {
+    /** @type {any[]} */
+    const sent = [];
+    const original = LeaderboardManager._createRepository;
+    LeaderboardManager._createRepository = async () =>
+      /** @type {any} */ ({
+        loadRemote: async () => [],
+        submitRemote: async (/** @type {any} */ entry) => {
+          sent.push(entry);
+          return { ok: false, accepted: false, entries: null };
+        },
+      });
+    try {
+      await LeaderboardManager.submit(300, "UPG", { remote: true, upgradeToken: "acct" });
+    } finally {
+      LeaderboardManager._createRepository = original;
+    }
+    expect(sent[0]["upgrade-token"]).toBe("acct");
+    expect(sent[0].bulletUpgrade).toBe(true);
+    expect(document.getElementById("leaderboardList")?.textContent).toContain("UPG ⚡");
+  });
+
   it("rejects blocked or malformed initials without storing anything", async () => {
     expect(await LeaderboardManager.submit(150, "ASS")).toBe(false);
     expect(await LeaderboardManager.submit(150, "ab")).toBe(false);

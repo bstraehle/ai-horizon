@@ -16,7 +16,7 @@ function soundOptions(game, asteroid) {
   const cx =
     asteroid && typeof asteroid.x === "number" ? asteroid.x + (asteroid.width || 0) / 2 : 0;
   const pan = width > 0 ? Math.max(-1, Math.min(1, (cx / width) * 2 - 1)) : 0;
-  return { heavy: ScoringManager.isBulletUpgraded(game && game.score), pan };
+  return { heavy: ScoringManager.bulletUpgradeActive(game), pan };
 }
 
 /**

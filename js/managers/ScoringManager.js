@@ -25,14 +25,31 @@ import { CONFIG } from "../constants.js";
  */
 export const ScoringManager = {
   /**
-   * Whether `score` has reached the bullet (caliber) upgrade threshold
-   * (`CONFIG.GAME.BULLET_UPGRADE_SCORE`; disabled when <= 0).
+   * Whether bullets are upgraded: the Bullet Upgrade was bought (`purchased`, from the first shot)
+   * or `score` has reached `CONFIG.GAME.BULLET_UPGRADE_SCORE` (that threshold is disabled when <= 0).
    * @param {number} score
+   * @param {boolean} [purchased]
    * @returns {boolean}
    */
-  isBulletUpgraded(score) {
+  isBulletUpgraded(score, purchased = false) {
+    if (purchased) return true;
     const threshold = CONFIG.GAME.BULLET_UPGRADE_SCORE | 0;
     return threshold > 0 && typeof score === "number" && score >= threshold;
+  },
+  /**
+   * {@link ScoringManager.isBulletUpgraded} for a game: its score and whether the mission was
+   * launched with the Bullet Upgrade (`bulletUpgradePurchased`, set in `startGame`).
+   * @param {{ score?: number, bulletUpgradePurchased?: boolean } | null | undefined} game
+   * @returns {boolean}
+   */
+  bulletUpgradeActive(game) {
+    return (
+      !!game &&
+      ScoringManager.isBulletUpgraded(
+        /** @type {number} */ (game.score),
+        !!game.bulletUpgradePurchased
+      )
+    );
   },
   /**
    * Add base points and apply milestone bonuses.

@@ -6,6 +6,7 @@ import { LeaderboardManager } from "../LeaderboardManager";
  * @property {number} score Non‑negative integer score.
  * @property {number} [accuracy] Accuracy as decimal (0.0-1.0).
  * @property {string} [date] ISO date string (YYYY-MM-DD) when score was achieved.
+ * @property {boolean} [bulletUpgrade] Flown with the Bullet Upgrade (set by the server; shows ⚡).
  * @property {string} [game-summary] JSON string containing game summary data.
  * @property {string} [ai-analysis] JSON string containing AI analysis data.
  *
@@ -56,6 +57,7 @@ export function normalize(arr) {
         if (e?.date && typeof e.date === "string") {
           entry.date = e.date;
         }
+        if (e?.bulletUpgrade === true) entry.bulletUpgrade = true;
         if (e?.["game-summary"] && typeof e["game-summary"] === "string") {
           entry["game-summary"] = e["game-summary"];
         }
@@ -102,7 +104,8 @@ export function qualifiesForInitials(score, entries, max = LeaderboardManager.MA
  * - Badge is the validated initials (1–3 A–Z) or "???" fallback.
  * - Accuracy is formatted as XX% (rounded to whole number) or empty string if missing.
  * - Date is formatted as YYYY-MM-DD or empty string if missing.
- * - Text layout: `[medal ][icon ]<BADGE> • <score>[ • XX%][ • YYYY-MM-DD]` (spaces only when parts present).
+ * - A run flown with the Bullet Upgrade gets ⚡ after the initials.
+ * - Text layout: `[medal ][icon ]<BADGE>[ ⚡] • <score>[ • XX%][ • YYYY-MM-DD]` (spaces only when parts present).
  *
  * @param {LeaderboardEntry} entry Normalized entry.
  * @param {number} index Zero‑based index within already ordered list.
@@ -127,7 +130,8 @@ export function formatRow(entry, index) {
   const iconPrefix = icon ? icon + " " : "";
   const accuracySuffix = accuracyFormatted ? " • " + accuracyFormatted : "";
   const dateSuffix = dateFormatted ? " • " + dateFormatted : "";
-  const text = `${medalPrefix}${iconPrefix}${badge} • ${entry.score}${accuracySuffix}${dateSuffix}`;
+  const upgrade = entry.bulletUpgrade === true ? " ⚡" : "";
+  const text = `${medalPrefix}${iconPrefix}${badge}${upgrade} • ${entry.score}${accuracySuffix}${dateSuffix}`;
   return { rank, badge, medal, icon, text, accuracyFormatted, dateFormatted };
 }
 

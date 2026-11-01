@@ -16,6 +16,7 @@ import { isAllowedInitials } from "../utils/initials.js";
  * @property {number} score
  * @property {number} [accuracy]
  * @property {string} [date]
+ * @property {boolean} [bulletUpgrade]
  * @property {any} [game-summary]
  * @property {any} [ai-analysis]
  */
@@ -31,6 +32,7 @@ function toStoredEntry(entry) {
   if (typeof entry.accuracy === "number" && !isNaN(entry.accuracy))
     cleaned.accuracy = entry.accuracy;
   if (entry.date) cleaned.date = entry.date;
+  if (entry.bulletUpgrade === true) cleaned.bulletUpgrade = true;
   for (const key of /** @type {const} */ (["game-summary", "ai-analysis"])) {
     const value = entry[key];
     if (value === undefined || value === null) continue;
@@ -198,13 +200,19 @@ export class LeaderboardManager {
    * The same initials keep only their higher score.
    * - Local: merges into the stored list and saves it.
    * - Remote: renders the merged list optimistically, sends only the new entry, then publishes the
-   *   server's authoritative list (or keeps the optimistic one when the request fails).
+   *   server's authoritative list (or keeps the optimistic one when the request fails). A run
+   *   flown with the Bullet Upgrade sends `upgradeToken` (the purchases account token) as
+   *   `upgrade-token`; the server checks it and sets the entry's `bulletUpgrade` (⚡) itself.
    * @param {number} score
    * @param {string} userId
-   * @param {{remote?:boolean, accuracy?:number, gameSummary?:any, aiAnalysis?:any}=} options
+   * @param {{remote?:boolean, accuracy?:number, gameSummary?:any, aiAnalysis?:any, upgradeToken?:string|null}=} options
    * @returns {Promise<boolean>} True when stored locally / accepted for processing by the server.
    */
-  static async submit(score, userId, { remote = false, accuracy, gameSummary, aiAnalysis } = {}) {
+  static async submit(
+    score,
+    userId,
+    { remote = false, accuracy, gameSummary, aiAnalysis, upgradeToken } = {}
+  ) {
     if (typeof score !== "number" || !Number.isFinite(score) || score <= 0) return false;
     if (!isAllowedInitials(userId)) return false;
     const now = new Date();
@@ -216,6 +224,7 @@ export class LeaderboardManager {
       ...(typeof accuracy === "number" ? { accuracy } : {}),
       "game-summary": gameSummary,
       "ai-analysis": aiAnalysis,
+      ...(upgradeToken ? { bulletUpgrade: true } : {}),
     });
 
     const entries = await LeaderboardManager.load({ remote });
@@ -232,7 +241,9 @@ export class LeaderboardManager {
     LeaderboardManager._cacheEntries = merged.slice();
     LeaderboardManager._renderList(merged);
     const repo = await LeaderboardManager._createRepository();
-    const result = await repo.submitRemote(newEntry);
+    const result = await repo.submitRemote(
+      upgradeToken ? { ...newEntry, "upgrade-token": upgradeToken } : newEntry
+    );
     if (result.ok) {
       LeaderboardManager._lastRemoteSync =
         (typeof performance !== "undefined" && performance.now()) || Date.now();

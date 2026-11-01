@@ -580,7 +580,11 @@ export class AIAnalysisAdapter {
       ? debriefSections(
           insights,
           labels,
-          insights.weaknesses.map((w) => TOPICS[w.topic].technique)
+          insights.weaknesses.map((w) =>
+            w.topic === "hardenedAsteroids" && payload.runSummary?.upgrade?.purchased
+              ? "Keep firing at each one until it breaks."
+              : TOPICS[w.topic].technique
+          )
         )
       : [
           {

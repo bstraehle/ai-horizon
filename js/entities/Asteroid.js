@@ -1,4 +1,5 @@
 import { CONFIG, PI2 } from "../constants.js";
+import { ScoringManager } from "../managers/ScoringManager.js";
 
 /** @typedef {{dx:number,dy:number,r:number,grow?:number,_puffed?:boolean}} Crater */
 /** @typedef {{ canvas: OffscreenCanvas | HTMLCanvasElement, ctx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D, padX: number, padY: number, width: number, height: number }} SurfaceSprite */
@@ -666,13 +667,11 @@ export class Asteroid {
     try {
       const baseMax = CONFIG.ASTEROID.HARDENED_HITS || 10;
       let eff = baseMax;
-      const threshold = (CONFIG.GAME && CONFIG.GAME.BULLET_UPGRADE_SCORE | 0) || 0;
       const factor =
         CONFIG.GAME && typeof CONFIG.GAME.BULLET_UPGRADE_HARDENED_HITS_FACTOR === "number"
           ? CONFIG.GAME.BULLET_UPGRADE_HARDENED_HITS_FACTOR
           : 0.5;
-      const score = game && typeof game.score === "number" ? game.score : 0;
-      if (threshold > 0 && score >= threshold) {
+      if (ScoringManager.bulletUpgradeActive(game)) {
         const reduced = Math.ceil(baseMax * Math.max(0.05, Math.min(1, factor)));
         eff = Math.max(1, reduced);
       }

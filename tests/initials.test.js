@@ -7,6 +7,10 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
   UpdateCommand: class {},
 }));
 vi.mock("@aws-sdk/client-sns", () => ({ SNSClient: class {}, PublishCommand: class {} }));
+vi.mock("@aws-sdk/client-secrets-manager", () => ({
+  SecretsManagerClient: class {},
+  GetSecretValueCommand: class {},
+}));
 
 const client = await import("../js/utils/initials.js");
 const server = await import("../server/lambda/leaderboard.js");

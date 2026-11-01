@@ -25,25 +25,25 @@ Out of scope: subscriptions, other products, ads, refunds UI (handled by Google 
 
 - A new `action-link` **"Bullet Upgrade"** left of About, Privacy, Sound, on the start and
   leaderboard screens (same style as Share).
-- Not owned: opens the upgrade sheet (2.2).
-- Owned: reads **"Bullet Upgrade ✓"**; opens a small sheet "Bullet Upgrade active – upgraded bullets
-  from the first shot", with the signed-in account, "Manage purchase" (receipt link) and
-  "Sign out".
-- Purchases unavailable (offline, no backend, or the Play app before its Play Billing release): the
-  link is hidden.
+- Not owned: the first click asks **"Buy · $0.99"** (2.2); its tooltip explains the effect.
+- Owned: reads **"Bullet Upgrade ✓"**; clicking it briefly shows "Upgrade active".
+- Purchases unavailable (Play app before its Play Billing release, or the production site while
+  Stripe is in test mode): the link is hidden.
 
-### 2.2 Upgrade sheet
+### 2.2 Buying (implemented without a separate sheet)
 
-- Title "Bullet Upgrade", one line on the effect, a note that leaderboard scores flown with it show
-  ⚡, the localized price and a **Buy** button.
+- A second click on "Buy · $0.99" within 5 s starts the purchase; otherwise the label returns.
+  Stripe's checkout page shows the product name, description and price, so no in-game sheet.
 - Buy:
-  1. If not signed in: Google's one-tap sign-in (Google Identity Services). If the account already
-     owns the upgrade (bought on another device or platform), it unlocks right there – no payment.
+  1. If not signed in: Google sign-in (OpenID Connect redirect to Google and back). If the account
+     already owns the upgrade (bought on another device or platform), it unlocks right there – no
+     payment.
   2. Web: redirect to Stripe Checkout, email prefilled from the Google account (cards, Apple Pay,
      Google Pay).
-  3. Play app: Google's payment sheet (Payment Request API with Play Billing).
-- Success: back in the game, a short confirmation "Bullet Upgrade active" and the link shows ✓.
-- Cancel / failure: back to the sheet with a short message; nothing else changes.
+  3. Play app (phase 2): Google's payment sheet (Payment Request API with Play Billing).
+- Success: back in the game, the link shows ✓.
+- Cancel / failure: back in the game, the link briefly shows "Purchase cancelled" / "Purchase
+  failed"; nothing else changes.
 
 ### 2.3 In game
 
@@ -55,12 +55,15 @@ Out of scope: subscriptions, other products, ads, refunds UI (handled by Google 
 
 - The purchase is stored against the Google account (its stable subject id), whichever platform it
   was bought on.
-- Another device or browser: Google's automatic sign-in recognises the returning player on launch
-  (no prompt when they have signed in before; a one-tap prompt otherwise, shown only from the
-  Bullet Upgrade link, never over gameplay) and the upgrade is active.
+- A device that signed in once keeps the account token, so the upgrade is active on every visit
+  with no prompt.
+- Another device or browser: clicking Bullet Upgrade and signing in with the same Google account
+  unlocks it without paying (Google skips its account chooser when only one account is signed in).
+  The game loads no Google script, so there is no automatic sign-in on launch; this keeps the
+  page's strict Content-Security-Policy and keeps Google off every visit.
 - Play app: Play purchases also restore through Google Play itself; signing in links them to the
   account so they count on the web too.
-- Clearing browser data only means one tap to sign in again.
+- Clearing browser data only means signing in again.
 
 ### 2.5 Leaderboard
 
@@ -71,45 +74,47 @@ Out of scope: subscriptions, other products, ads, refunds UI (handled by Google 
 ## 3. Client design
 
 - `js/managers/PurchaseManager.js` (new): owns sign-in, the entitlement state and the purchase flows.
-  - `available` (purchases possible here), `owned` (entitlement verified), `price` (localized),
-    `account` (signed-in email, for the sheet).
-  - Sign-in: Google Identity Services (one tap / automatic sign-in); the Google ID token goes to the
-    backend, which returns the account's entitlement token.
+  - `available` (purchases possible here), `owned` (entitlement verified), `token` (account token).
+  - Sign-in: redirect to `accounts.google.com/o/oauth2/v2/auth` with `response_type=id_token`,
+    `scope=openid email`, a nonce and a state kept in sessionStorage; back on the game the ID token
+    in the URL fragment goes to the backend, which returns the account token.
   - Platform detection: Play app = `window.getDigitalGoodsService` resolves for
     `https://play.google.com/billing`; otherwise web.
   - Web: `buy()` asks the backend for a Checkout Session URL and redirects; on return
     (`?purchase=success&session_id=…`) asks the backend to confirm and stores the entitlement token
-    in localStorage (`aiHorizonEntitlement`).
+    in localStorage (`aiHorizonPurchase`).
   - Play app: `getDetails(["bullet_upgrade"])` for the price; `buy()` runs the Payment Request with
     the Play method; the purchase token goes to the backend, which verifies, acknowledges and
     records it for the account. On launch, `listPurchases()` re-verifies owned Play purchases.
   - Startup: a stored token is re-checked in the background; the game uses the cached result
     immediately so play is never blocked.
-- `ScoringManager.isBulletUpgraded(score)` gains the entitlement: upgraded when
-  `owned || score >= BULLET_UPGRADE_SCORE`. The run summary records `bulletUpgrade: true` so
-  analysis and validation know.
-- `js/ui/UpgradeLink.js` (new, like `Share.js` / `SoundToggle.js`): the link and the sheet.
-- Analysis prompt: `bulletUpgrade` lets the debrief stop advising "reach 2500 points early to
+- `ScoringManager.bulletUpgradeActive(game)`: upgraded when the mission was launched with the
+  purchase (`game.bulletUpgradePurchased`, snapshotted in `startGame`) or the score reached
+  `BULLET_UPGRADE_SCORE`; bullets, planet hit counts and the shot sound all use it. The run summary
+  records `upgrade: { purchased }` so analysis and validation know.
+- `js/ui/UpgradeLink.js` (new, like `Share.js` / `SoundToggle.js`): the links and their labels.
+- Analysis prompt: `upgrade.purchased` lets the debrief stop advising "reach 2500 points early to
   upgrade your bullets" for upgraded runs.
-- Content-Security-Policy: allow Google Identity Services (`accounts.google.com`) and the Stripe
-  redirect.
+- Content-Security-Policy: unchanged (top-level redirects to Google and Stripe are not limited by
+  it, and the API calls go to the existing API Gateway).
 
 ## 4. Backend design
 
-New Lambda `ai-horizon-purchases` behind the existing API Gateway (IAM / SigV4 like the others),
-plus a public Stripe webhook route.
+New Lambda `ai-horizon-purchases` behind the existing API Gateway: `POST /purchases` (IAM / SigV4
+like the others) takes `{ action, … }`; `POST /purchases/stripe` is the public Stripe webhook.
 
-| Route                      | Purpose                                                                                                                                                 |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /purchases/signin`   | Verify a Google ID token; return the account's entitlement token (owned or not)                                                                         |
-| `POST /purchases/checkout` | Create a Stripe Checkout Session (Managed Payments, the `bullet_upgrade` price, the account as `client_reference_id`, email prefilled); returns its URL |
-| `POST /purchases/confirm`  | After the redirect: look up the session, return the entitlement token if paid                                                                           |
-| `POST /purchases/play`     | Verify a Play purchase token with the Play Developer API, acknowledge it, record it for the account, return the entitlement token                       |
-| `POST /purchases/status`   | Validate an entitlement token (owned or revoked)                                                                                                        |
-| `POST /stripe/webhook`     | Stripe events: `checkout.session.completed` (record), refunds / disputes (revoke); signature verified                                                   |
+| Action / route           | Purpose                                                                                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `signin`                 | Verify a Google ID token (signature, audience, issuer, expiry, nonce); return the account token and whether it owns the upgrade                         |
+| `checkout`               | Create a Stripe Checkout Session (Managed Payments, the `bullet_upgrade` price, the account as `client_reference_id`, email prefilled); returns its URL |
+| `confirm`                | After the redirect: look up the session, record it if paid for this account                                                                             |
+| `play` (phase 2)         | Verify a Play purchase token with the Play Developer API, acknowledge it, record it for the account                                                     |
+| `status`                 | Whether the token's account owns the upgrade (owned or revoked)                                                                                         |
+| `POST /purchases/stripe` | Stripe events: `checkout.session.completed` (record), full refunds / disputes (revoke); signature verified                                              |
 
-- **Entitlement token:** server-signed (HMAC, secret in Secrets Manager), naming the account and
-  product, short-lived and refreshed by `/status`; sent with leaderboard submissions.
+- **Account token:** server-signed (HMAC, key in Secrets Manager), naming the account; valid for a
+  year; the ownership itself is always read from the table. Sent with leaderboard submissions of
+  upgraded runs.
 - **DynamoDB table `ai-horizon-purchases`:** keyed by Google account subject id; product, status
   (`active` / `revoked`), platform and purchase id (Stripe session / Play order id), Play purchase
   token (for re-verification), created / updated time. No card data and no email stored (Stripe

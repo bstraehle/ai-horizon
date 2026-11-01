@@ -8,6 +8,8 @@ import { RemoteStorageAdapter } from "../../adapters/RemoteStorageAdapter.js";
  * @property {number} score
  * @property {number} [accuracy]
  * @property {string} [date]
+ * @property {boolean} [bulletUpgrade]
+ * @property {string} [upgrade-token] Sent with upgraded runs only (see LeaderboardManager.submit).
  * @property {any} [game-summary]
  * @property {any} [ai-analysis]
  *

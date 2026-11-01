@@ -364,8 +364,10 @@ body {
 .initials-entry .action-button {
   margin-bottom: 0;
 }
-/* `display: block` above would override the hidden attribute (Ok hides during the transmission). */
-.action-button[hidden] {
+/* `display` above would override the hidden attribute (Ok hides during the transmission; Sound
+   and Bullet Upgrade hide where unsupported). */
+.action-button[hidden],
+.action-link[hidden] {
   display: none;
 }
 .post-game-message {

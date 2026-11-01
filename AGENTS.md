@@ -18,7 +18,8 @@
    each is a single-file zip whose entry is `index.mjs` (handler `index.handler`), e.g. copy
    `server/lambda/leaderboard.js` to `index.mjs`, zip it, and
    `aws lambda update-function-code --function-name ai-horizon-leaderboard --zip-file fileb://leaderboard.zip --region us-west-2`.
-   Functions: `ai-horizon-leaderboard`, `ai-horizon-analysis` (API `0p6x6bw6c2`, stage `dev`).
+   Functions: `ai-horizon-leaderboard`, `ai-horizon-analysis`, `ai-horizon-purchases` (API
+   `0p6x6bw6c2`, stage `dev`).
    The leaderboard Lambda mirrors scoring constants (`RULES`) and the initials blocklist; when
    changing `CONFIG.GAME` scoring/spawn values, update `RULES` and redeploy the Lambda (tests fail
    until they match). Alerts go to SNS topic `ai-horizon-alerts` via env var `ALERT_TOPIC_ARN`.
@@ -42,6 +43,27 @@
    (via Secrets Manager). To try prompt changes before deploying, run the exported
    prompt helpers against `aws bedrock-runtime converse` (Windows CLI: pass `file://` JSON with
    non-ASCII escaped and set `PYTHONUTF8=1`).
+
+## Bullet Upgrade purchases (spec: `docs/bullet-upgrade-spec.md`)
+
+- Lambda `ai-horizon-purchases` (`server/lambda/purchases.js`, role `ai-horizon-purchases`), API
+  routes `POST /purchases` (IAM, Cognito identity; `{ action: signin|status|checkout|confirm }`)
+  and `POST /purchases/stripe` (public Stripe webhook, signature checked). Deploy like the other
+  Lambdas (`index.mjs` zip). Env vars: `GOOGLE_CLIENT_ID`, `STRIPE_PRICE_ID`, `STRIPE_SECRET_ID`
+  (secret `ai-horizon-stripe`, JSON `{ secretKey, webhookSecret }`) and `SIGNING_SECRET_ID`
+  (secret `ai-horizon-purchases-signing`, JSON `{ signingKey }`, HMAC key of the account tokens).
+- Table `ai-horizon-purchases` (key `account` = `google:<subject>`; `status` `active`/`revoked`).
+  The leaderboard Lambda (env `SIGNING_SECRET_ID` too, beside `ALERT_TOPIC_ARN`) verifies the
+  `upgrade-token` of upgraded runs against it and stores `bulletUpgrade: true` (⚡).
+- Stripe runs in **test mode** (test key, test price `price_1UX0JDFrMGh3bUqYNirkICkC`, webhook
+  `we_1UX1cHFrMGh3bUqYiWCDU8hk`); test keys only accept checkout returns to localhost, and the
+  client offers the upgrade only on localhost while `CONFIG.PURCHASES.LIVE` is false. Going live:
+  live key and new live webhook secret into `ai-horizon-stripe`, `STRIPE_PRICE_ID` =
+  `price_1UX0TyFyAA1uvMq5u2MplkN7`, `LIVE: true`, site deploy, and clear test purchases from the
+  table. Keys live in `.secrets/` (gitignored) and Secrets Manager only; never print them.
+- Google sign-in is the OpenID Connect redirect (`response_type=id_token`, redirect URI = site
+  origin + `/`), so the OAuth client needs `https://www.agentmode.dev/`, `https://agentmode.dev/`
+  and `http://localhost:8000/` as authorized redirect URIs.
 
 ## Store video (16:9 4K, with game sound)
 

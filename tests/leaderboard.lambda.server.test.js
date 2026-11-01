@@ -44,7 +44,22 @@ vi.mock("@aws-sdk/client-sns", () => ({
   },
 }));
 
+vi.mock("@aws-sdk/client-secrets-manager", () => ({
+  SecretsManagerClient: class {
+    send() {
+      return Promise.resolve({ SecretString: JSON.stringify({ signingKey: "lb-test-key" }) });
+    }
+  },
+  GetSecretValueCommand: class {
+    /** @param {any} params */
+    constructor(params) {
+      this.params = params;
+    }
+  },
+}));
+
 const { handler, MAX_SCORE, MAX_TEXT_LENGTH } = await import("../server/lambda/leaderboard.js");
+const { signAccountToken } = await import("../server/lambda/purchases.js");
 
 /** @param {any} body */
 const put = (body) =>
@@ -127,6 +142,70 @@ describe("leaderboard Lambda single-entry submissions", () => {
     snsSend.mockReset();
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  describe("Bullet Upgrade runs", () => {
+    /** @param {Record<string, any>} entry */
+    const upgraded = (entry) => {
+      const summary = JSON.parse(entry["game-summary"]);
+      return {
+        ...entry,
+        "game-summary": JSON.stringify({ ...summary, upgrade: { purchased: true } }),
+      };
+    };
+    /** @param {string} status */
+    const mockWithPurchase = (status) => {
+      mockTable([]);
+      const board = sendMock.getMockImplementation();
+      sendMock.mockImplementation(async (command) =>
+        command.params.TableName === "ai-horizon-purchases"
+          ? { Item: command.params.Key.account === "google:5" ? { status } : undefined }
+          : board?.(command)
+      );
+    };
+
+    beforeEach(() => {
+      process.env.SIGNING_SECRET_ID = "signing";
+    });
+    afterEach(() => {
+      delete process.env.SIGNING_SECRET_ID;
+    });
+
+    it("stores bulletUpgrade for a run with a token of an owning account", async () => {
+      mockWithPurchase("active");
+      const token = signAccountToken("google:5", "lb-test-key");
+      const res = await put({
+        entry: { ...upgraded(run("UPG", 20)), "upgrade-token": token, bulletUpgrade: false },
+      });
+      expect(res.statusCode).toBe(200);
+      const stored = JSON.parse(res.body).scores.find((/** @type {any} */ e) => e.id === "UPG");
+      expect(stored.bulletUpgrade).toBe(true);
+      expect(stored["upgrade-token"]).toBeUndefined();
+    });
+
+    it("rejects an upgraded run without a valid token or with a revoked purchase", async () => {
+      mockWithPurchase("active");
+      const noToken = await put({ entry: upgraded(run("UPG", 20)) });
+      expect(noToken.statusCode).toBe(400);
+      expect(JSON.parse(noToken.body).message).toContain("bullet upgrade not verified");
+      const forged = signAccountToken("google:5", "other-key");
+      expect(
+        (await put({ entry: { ...upgraded(run("UPG", 20)), "upgrade-token": forged } })).statusCode
+      ).toBe(400);
+      mockWithPurchase("revoked");
+      const token = signAccountToken("google:5", "lb-test-key");
+      expect(
+        (await put({ entry: { ...upgraded(run("UPG", 20)), "upgrade-token": token } })).statusCode
+      ).toBe(400);
+    });
+
+    it("never takes bulletUpgrade from the client", async () => {
+      mockTable([]);
+      const res = await put({ entry: { ...run("CLI", 20), bulletUpgrade: true } });
+      expect(res.statusCode).toBe(200);
+      const stored = JSON.parse(res.body).scores.find((/** @type {any} */ e) => e.id === "CLI");
+      expect(stored.bulletUpgrade).toBeUndefined();
+    });
   });
 
   it("ranks the entry server-side and writes with a version condition", async () => {

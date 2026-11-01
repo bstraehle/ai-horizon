@@ -91,7 +91,7 @@ export const PROMPT = `Write the debrief for the mission below.
 - Hardened asteroids (10 hits): +100
 - 8 bonus asteroids (10 hits): +250
 - Every 1000 points: +250
-- Bullet upgrade (after 2500 points): hardened and bonus asteroids take 50% fewer hits
+- Bullet upgrade (after 2500 points, or from the first shot when the mission details show upgrade.purchased: the player bought the Bullet Upgrade): hardened and bonus asteroids take 50% fewer hits
 - Finale (last 15 seconds): all points double
 - End-of-run shots fired accuracy bonus (0-100%)
 <scoring rules - end>
@@ -101,7 +101,7 @@ The mission details include insights computed by the game: up to 3 weaknesses, t
 - finale: Every point counts double in the last 15 seconds; push hardest then.
 - bonusAsteroids (250 points, 10 hits): One appears every 10 seconds, 8 per mission; hit each one as soon as it appears.
 - bonusStars (50 points): Every 5th star is a bonus star; steer through them.
-- hardenedAsteroids (100 points, 10 hits): Reach 2500 points early to upgrade your bullets; they then take half the hits.
+- hardenedAsteroids (100 points, 10 hits): Reach 2500 points early to upgrade your bullets; they then take half the hits. With upgrade.purchased the bullets are already upgraded: keep firing at each one until it breaks.
 - accuracy: The end-of-run bonus is the base score times accuracy; fire short bursts at targets instead of holding fire.
 - stars (25 points): Grab stars on the way between attacks.
 - asteroids (10 points): Shoot the asteroids in your path.

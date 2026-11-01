@@ -1,12 +1,19 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { PublishCommand, SNSClient } from "@aws-sdk/client-sns";
+import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 const client = new DynamoDBClient({ region: "us-west-2" });
 const docClient = DynamoDBDocumentClient.from(client);
 const sns = new SNSClient({ region: "us-west-2" });
+const secretsClient = new SecretsManagerClient({ region: "us-west-2", maxAttempts: 2 });
 
 const TABLE_NAME = "ai-horizon-leaderboard";
+/** Bullet Upgrade purchases, written by server/lambda/purchases.js (key `account`). */
+export const PURCHASES_TABLE = "ai-horizon-purchases";
+const TOKEN_MAX_AGE_SECONDS = 365 * 24 * 3600;
+const TOKEN_SKEW_SECONDS = 300;
 export const MAX_LEADERBOARD_ENTRIES = 10;
 /** Upper bound for a plausible 90-second run (best real runs are ~15k). */
 export const MAX_SCORE = 100000;
@@ -252,6 +259,68 @@ export function checkRunSummary(entry) {
 }
 
 /**
+ * Verify a purchases account token (`v1.<payload>.<hmac>`). Copy of `verifyAccountToken` in
+ * server/lambda/purchases.js (single-file deploys); tests/purchases.lambda.server.test.js keeps
+ * them in sync.
+ * @param {unknown} token
+ * @param {string} key
+ * @param {number} [now]
+ * @returns {string|null} The account id, or null when invalid.
+ */
+export function verifyAccountToken(token, key, now = Math.floor(Date.now() / 1000)) {
+  if (typeof token !== "string" || token.length > 512) return null;
+  const [version, payload, mac] = token.split(".");
+  if (version !== "v1" || !payload || !mac) return null;
+  const expected = createHmac("sha256", key).update(`v1.${payload}`).digest();
+  const given = Buffer.from(mac, "base64url");
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  try {
+    const { sub, iat } = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    if (typeof sub !== "string" || !Number.isInteger(iat)) return null;
+    if (iat > now + TOKEN_SKEW_SECONDS || now - iat > TOKEN_MAX_AGE_SECONDS) return null;
+    return sub;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {Record<string, any>} entry Validated entry.
+ * @returns {boolean} Whether the run summary says the run was flown with the Bullet Upgrade.
+ */
+export function summaryPurchasedUpgrade(entry) {
+  const summary = summaryOf(entry);
+  return !!(summary && typeof summary === "object" && summary.upgrade?.purchased === true);
+}
+
+/** @type {Promise<string>|null} */
+let signingKey = null;
+
+/**
+ * Whether `token` belongs to an account that owns the Bullet Upgrade. False when purchases are
+ * not configured (`SIGNING_SECRET_ID` unset).
+ * @param {unknown} token
+ */
+async function ownsUpgrade(token) {
+  const id = process.env.SIGNING_SECRET_ID;
+  if (!id) return false;
+  if (!signingKey) {
+    signingKey = secretsClient
+      .send(new GetSecretValueCommand({ SecretId: id }))
+      .then((res) => JSON.parse(res.SecretString || "{}").signingKey);
+    signingKey.catch(() => {
+      signingKey = null;
+    });
+  }
+  const account = verifyAccountToken(token, await signingKey);
+  if (!account) return false;
+  const { Item } = await docClient.send(
+    new GetCommand({ TableName: PURCHASES_TABLE, Key: { account } })
+  );
+  return Item?.status === "active";
+}
+
+/**
  * Publish an alert to the SNS topic in `ALERT_TOPIC_ARN` (no-op when unset). Never throws:
  * alerting must not affect the submission.
  * @param {string} subject
@@ -332,7 +401,10 @@ export function mergeEntry(scores, entry, max = MAX_LEADERBOARD_ENTRIES) {
  * PUT  ?id=N  `{ entry: {...} }` -> `{ accepted, scores, version }`
  * The PUT body carries a single score; ranking, de-duplication and trimming happen here so a
  * client can never overwrite other players' entries. The entry's `game-summary` must pass
- * {@link checkRunSummary}. With `ALERT_TOPIC_ARN` set, a new #1 and (rate-limited) rejected
+ * {@link checkRunSummary}; a run flown with the Bullet Upgrade (summary `upgrade.purchased`) must
+ * also carry an `upgrade-token` of an account that owns it, and is then stored with
+ * `bulletUpgrade: true` (the leaderboard's ⚡ badge; never taken from the client). With
+ * `ALERT_TOPIC_ARN` set, a new #1 and (rate-limited) rejected
  * submissions are e-mailed via SNS. Returned `scores` never include device details
  * ({@link publicScores}); the stored entries keep them.
  * @param {{httpMethod:string,queryStringParameters?:Record<string,string>,body?:string,requestContext?:any}} event
@@ -361,7 +433,11 @@ export const handler = async (event) => {
     if (!entry) return respond(400, { message: error });
     const sourceIp = event.requestContext?.identity?.sourceIp;
 
-    const reason = checkRunSummary(entry);
+    let reason = checkRunSummary(entry);
+    if (!reason && summaryPurchasedUpgrade(entry)) {
+      if (await ownsUpgrade(parsed.entry["upgrade-token"])) entry.bulletUpgrade = true;
+      else reason = "bullet upgrade not verified";
+    }
     if (reason) {
       console.log(
         "Leaderboard rejected:",
