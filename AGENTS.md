@@ -87,11 +87,13 @@ the frames from game over on), skip step 2 (the sound timeline is unchanged), ru
 when the game-over dialog's first frame and the sounds are unchanged (the splice checks that frame
 against the old video); otherwise do the full render. The 4K landscape screenshots
 (`store-screenshots/3840x2160`) are frames of the raw video, except `4-gameover.png`:
-`5-leaderboard.png` is frame 7070 (extract with
-`-vf "select=eq(n\,7070)" -frames:v 1 -pix_fmt rgb24`: 24-bit, no alpha); the frames move with
-the post-run timeline, so pick them from the `[record] debrief / initials / leaderboard from frame …`
-lines of step 1. `4-gameover.png` shows the same debrief as the portrait sets
-(`store-screenshots/debrief.json`): render it with
+`1-gameplay.png` is frame 5234 (the finale, 0:06 left), `2-explosion.png` 5339, `3-star-field.png`
+1608 and `5-leaderboard.png` 7061 (extract with
+`-vf "select=eq(n\,5234)" -frames:v 1 -pix_fmt rgb24`: 24-bit, no alpha). The seeded run repeats
+frame for frame, so the gameplay frames stay put; the leaderboard frame moves with the post-run
+timeline, so pick it from the `[record] leaderboard from frame …` line of step 1.
+`4-gameover.png` shows the same debrief as the portrait sets (`store-screenshots/debrief.json`):
+render it with
 `node --experimental-websocket scripts/store-screenshots.cjs --only=none --size=3840x2160@4 --seed=2024 --out=.shots/store-4k`
 plus `--debrief=store-screenshots/debrief.json`, and save its `3-gameover.png` as RGB (no alpha).
 
