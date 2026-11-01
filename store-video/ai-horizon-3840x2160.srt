@@ -55,9 +55,9 @@ Survive to the end for the full score.
 Mission complete.
 
 15
-00:01:52,790 --> 00:02:01,694
+00:01:52,623 --> 00:02:01,527
 Your AI commanders, Vega and Altair, powered by Amazon Bedrock, Amazon Polly and ElevenLabs, remember your missions and tell you how to improve.
 
 16
-00:02:02,094 --> 00:02:08,214
+00:02:01,927 --> 00:02:08,047
 Post your score to the leaderboard. Download AI Horizon on Google Play, and beat the high score!
