@@ -65,9 +65,16 @@
   `.secrets/` (gitignored) and Secrets Manager only; never print them.
 - Google Play app (Trusted Web Activity, package `dev.agentmode.aihorizon`): the Bubblewrap project
   is `C:\github\ai-horizon-android-build` (not a git repo; earlier builds kept in `previous-<ver>`).
-  Play Billing needs `features.playBilling.enabled` and `alphaDependencies.enabled` in
-  `twa-manifest.json`; after editing it run `bubblewrap update --skipVersionUpgrade` and
-  `bubblewrap build` (the build asks for the keystore passwords, so the owner runs it). In the app
+  Do **not** run `bubblewrap update` (with `playBilling` on, Bubblewrap 1.21 regenerates from an
+  old template: AGP 4.1.3, Gradle 6.5, targetSdk 33, billing alpha with an outdated Play Billing
+  Library), and `bubblewrap build` fails under Node 22 on Windows (`spawn EINVAL`). Edit the
+  project directly (`app/build.gradle`: versionCode / versionName, `billing:1.2.0` beside
+  `androidbrowserhelper:2.6.2`; AGP 8.9.1, Gradle 8.11.1, targetSdk 36) and build with
+  `gradlew.bat bundleRelease` (`JAVA_HOME` = `~\.bubblewrap\jdk17\…`, `ANDROID_HOME` =
+  `~\.bubblewrap\android_sdk`), then sign `app-release-bundle.aab` with `jarsigner` using the
+  upload key `upload-2026.keystore` (alias `upload`; passwords in `.secrets/android-keystore.json`,
+  never print them). The original `android.keystore` passwords are lost; Play App Signing holds
+  the app signing key, and the upload key was reset to `upload-2026.keystore`. In the app
   the client uses the Digital Goods API (product `bullet_upgrade`) and the `play` action; the
   Lambda calls the Play Developer API with the service account in `PLAY_SECRET_ID` (its JSON key),
   which needs "View financial data" and "Manage orders" for the app in Play Console.
