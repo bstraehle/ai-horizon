@@ -21,7 +21,7 @@ at 24 kHz, cached in store-video/.polly-cache/, us-east-1 fallback when the engi
 or an ElevenLabs voice `{"elevenlabs": "<voice id>", "model": "eleven_v4", "settings": {...}}`
 (`model` and the optional `settings`, sent as `voice_settings`; 44.1 kHz, cached in
 store-video/.elevenlabs-cache/). ElevenLabs reads its API key from ELEVENLABS_API_KEY or, failing
-that, .secrets/api_key.txt (gitignored). Delete a cached clip to re-generate it.
+that, .secrets/elevenlabs_api_key.txt (gitignored). Delete a cached clip to re-generate it.
 
 Game sound (optional): record with `--sfx=store-video/_sfx-3840x2160.json`, render it with
 `node --experimental-websocket scripts/render-sfx.cjs --events=store-video/_sfx-3840x2160.json`,
@@ -63,7 +63,7 @@ RATE = 48000
 FPS = 60  # raw recordings and output
 FALLBACK_REGION = "us-east-1"
 ELEVENLABS_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}?output_format=mp3_44100_128"
-ELEVENLABS_KEY_FILE = HERE.parent / ".secrets" / "api_key.txt"
+ELEVENLABS_KEY_FILE = HERE.parent / ".secrets" / "elevenlabs_api_key.txt"
 TARGET_LUFS = -16.0
 PEAK_LIMIT = 0.84  # ~-1.5 dBFS
 DUCK = "sidechaincompress=threshold=0.03:ratio=4:attack=15:release=350:knee=4"
