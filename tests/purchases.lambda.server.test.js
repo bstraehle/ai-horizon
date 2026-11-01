@@ -80,6 +80,10 @@ let table;
 let stripeCalls;
 /** @type {(url: string, init: any) => any} */
 let stripeReply;
+/** @type {any} */
+let playPurchase;
+/** @type {any[]} */
+let playCalls;
 
 beforeEach(() => {
   process.env.GOOGLE_CLIENT_ID = CLIENT_ID;
@@ -96,11 +100,19 @@ beforeEach(() => {
     table.set(Key.account, { ...table.get(Key.account), status: values[":status"] });
     return {};
   });
+  process.env.PLAY_SECRET_ID = "play";
+  playPurchase = { purchaseState: 0, acknowledgementState: 0, orderId: "GPA.1" };
+  playCalls = [];
   secretsSend.mockImplementation(async (cmd) => ({
     SecretString: JSON.stringify(
       cmd.params.SecretId === "signing"
         ? { signingKey: SIGNING_KEY }
-        : { secretKey: "sk_test_x", webhookSecret: WEBHOOK_SECRET }
+        : cmd.params.SecretId === "play"
+          ? {
+              client_email: "sa@project.iam.gserviceaccount.com",
+              private_key: privateKey.export({ type: "pkcs8", format: "pem" }),
+            }
+          : { secretKey: "sk_test_x", webhookSecret: WEBHOOK_SECRET }
     ),
   }));
   vi.stubGlobal(
@@ -110,6 +122,16 @@ beforeEach(() => {
         return new Response(JSON.stringify({ keys: [JWK] }), {
           headers: { "cache-control": "public, max-age=3600" },
         });
+      }
+      if (url === "https://oauth2.googleapis.com/token") {
+        const assertion = new URLSearchParams(init.body).get("assertion") || "";
+        playCalls.push({ url, assertion });
+        return new Response(JSON.stringify({ access_token: "ya29.test", expires_in: 3600 }));
+      }
+      if (url.startsWith("https://androidpublisher.googleapis.com/")) {
+        playCalls.push({ url, method: init.method, auth: init.headers.Authorization });
+        if (url.endsWith(":acknowledge")) return new Response("{}");
+        return new Response(JSON.stringify(playPurchase));
       }
       stripeCalls.push({ url, init });
       return new Response(JSON.stringify(stripeReply(url, init)));
@@ -327,6 +349,51 @@ describe("handler", () => {
   it("the webhook rejects a bad signature", async () => {
     const res = await webhook({ type: "checkout.session.completed", data: {} }, "whsec_other");
     expect(res.statusCode).toBe(400);
+  });
+
+  it("play verifies and acknowledges the purchase, owning it for the device and the account", async () => {
+    const token = signAccountToken("google:7", SIGNING_KEY);
+    const res = await post({ action: "play", purchaseToken: "ptok", token });
+    const body = json(res);
+    expect(body.owned).toBe(true);
+    expect(verifyAccountToken(body.token, SIGNING_KEY)).toBe("google:7");
+    expect(table.get("google:7").status).toBe("active");
+    expect(table.get(purchases.playTokenAccount("ptok")).status).toBe("active");
+
+    const [oauth, get, ack] = playCalls;
+    const claims = JSON.parse(Buffer.from(oauth.assertion.split(".")[1], "base64url").toString());
+    expect(claims.iss).toBe("sa@project.iam.gserviceaccount.com");
+    expect(claims.scope).toBe("https://www.googleapis.com/auth/androidpublisher");
+    expect(get.url).toBe(
+      "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/" +
+        "dev.agentmode.aihorizon/purchases/products/bullet_upgrade/tokens/ptok"
+    );
+    expect(get.auth).toBe("Bearer ya29.test");
+    expect(ack.url.endsWith("/tokens/ptok:acknowledge")).toBe(true);
+    expect(ack.method).toBe("POST");
+  });
+
+  it("play without sign-in owns it under the purchase token; acknowledged purchases are not re-acknowledged", async () => {
+    playPurchase = { purchaseState: 0, acknowledgementState: 1, orderId: "GPA.2" };
+    const body = json(await post({ action: "play", purchaseToken: "ptok2" }));
+    expect(verifyAccountToken(body.token, SIGNING_KEY)).toBe(purchases.playTokenAccount("ptok2"));
+    expect(playCalls.some((c) => c.url.endsWith(":acknowledge"))).toBe(false);
+  });
+
+  it("play refuses pending or cancelled purchases and bad tokens", async () => {
+    playPurchase = { purchaseState: 2 };
+    expect(json(await post({ action: "play", purchaseToken: "ptok3" }))).toEqual({ owned: false });
+    expect(table.size).toBe(0);
+    expect((await post({ action: "play", purchaseToken: "" })).statusCode).toBe(400);
+  });
+
+  it("status revokes a Play purchase that was refunded", async () => {
+    table.set("google:7", { status: "active", platform: "play", playToken: "ptok" });
+    const token = signAccountToken("google:7", SIGNING_KEY);
+    expect(json(await post({ action: "status", token }))).toEqual({ owned: true });
+    playPurchase = { purchaseState: 1 };
+    expect(json(await post({ action: "status", token }))).toEqual({ owned: false });
+    expect(table.get("google:7").status).toBe("revoked");
   });
 
   it("rejects other methods and malformed bodies", async () => {

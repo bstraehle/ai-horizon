@@ -32,7 +32,7 @@ const fakeLocation = (over = {}) =>
 
 /**
  * @param {{ location?: Location, storage?: Storage, session?: Storage, referrer?: string,
- *   replies?: Record<string, any> }} [opts]
+ *   replies?: Record<string, any>, goods?: any, playPayment?: any }} [opts]
  */
 function setup(opts = {}) {
   const calls = /** @type {Array<[string, any]>} */ ([]);
@@ -46,6 +46,8 @@ function setup(opts = {}) {
     history: /** @type {History} */ (/** @type {unknown} */ ({ replaceState })),
     referrer: opts.referrer || "",
     navigate,
+    digitalGoods: async () => opts.goods || null,
+    playPayment: opts.playPayment,
     call: async (action, body) => {
       calls.push([action, body]);
       const reply = replies[action];
@@ -119,6 +121,89 @@ describe("PurchaseManager", () => {
     await back.pm.init();
     expect(back.pm.owned).toBe(true);
     expect(back.calls.map(([a]) => a)).toEqual(["signin"]);
+  });
+
+  describe("in the Google Play app", () => {
+    const PLAY = "android-app://dev.agentmode.aihorizon/";
+    /** @param {Array<{ itemId: string, purchaseToken: string }>} [owned] */
+    const goods = (owned = []) => ({
+      getDetails: async () => [
+        { itemId: "bullet_upgrade", price: { currency: "EUR", value: "0.99" } },
+      ],
+      listPurchases: async () => owned,
+    });
+
+    it("is offered once Play Billing is detected, with Play's local price", async () => {
+      const without = setup({ referrer: PLAY });
+      await without.pm.init();
+      expect(without.pm.available).toBe(false);
+
+      const { pm } = setup({ referrer: PLAY, goods: goods() });
+      await pm.init();
+      expect(pm.available).toBe(pm.location.hostname === "localhost" || CONFIG.PURCHASES.LIVE);
+      expect(pm.priceLabel).toMatch(/0[.,]99/);
+      expect(pm.priceLabel).toMatch(/€|EUR/);
+    });
+
+    it("restores an owned Play purchase on launch, without signing in", async () => {
+      const { pm, calls } = setup({
+        referrer: PLAY,
+        goods: goods([{ itemId: "bullet_upgrade", purchaseToken: "ptok" }]),
+        replies: { play: { owned: true, token: "play-acct" } },
+      });
+      await pm.init();
+      expect(calls[0]).toEqual(["play", { purchaseToken: "ptok", token: undefined }]);
+      expect(pm.owned).toBe(true);
+      expect(pm.token).toBe("play-acct");
+    });
+
+    it("buys through Google Play's payment sheet when signed in", async () => {
+      const storage = memoryStorage();
+      storage.setItem(
+        CONFIG.PURCHASES.STORAGE_KEY,
+        JSON.stringify({ token: "acct", owned: false })
+      );
+      const complete = vi.fn(async () => {});
+      const playPayment = vi.fn(async () => ({ details: { purchaseToken: "ptok" }, complete }));
+      const { pm, calls, navigate } = setup({
+        referrer: PLAY,
+        storage,
+        goods: goods(),
+        playPayment,
+        replies: { status: { owned: false }, play: { owned: true, token: "acct" } },
+      });
+      await pm.init();
+      await pm.buy();
+      expect(playPayment).toHaveBeenCalledTimes(1);
+      expect(calls.at(-1)).toEqual(["play", { purchaseToken: "ptok", token: "acct" }]);
+      expect(complete).toHaveBeenCalledWith("success");
+      expect(pm.owned).toBe(true);
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it("waits for a fresh tap after signing in, and a dismissed sheet is cancelled", async () => {
+      const session = memoryStorage();
+      const first = setup({ referrer: PLAY, session, goods: goods() });
+      await first.pm.init();
+      await first.pm.buy();
+      const state = new URL(first.navigate.mock.calls[0][0]).searchParams.get("state");
+
+      const playPayment = vi.fn(async () => {
+        throw Object.assign(new Error("dismissed"), { name: "AbortError" });
+      });
+      const back = setup({
+        session,
+        goods: goods(),
+        playPayment,
+        location: fakeLocation({ hash: `#state=${state}&id_token=idt` }),
+        replies: { signin: { token: "acct", owned: false, email: null } },
+      });
+      await back.pm.init();
+      expect(back.pm.status).toBe("ready");
+      expect(playPayment).not.toHaveBeenCalled();
+      await back.pm.buy();
+      expect(back.pm.status).toBe("cancelled");
+    });
   });
 
   it("ignores a fragment whose state does not match", async () => {

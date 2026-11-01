@@ -1,4 +1,11 @@
-import { createHmac, createPublicKey, timingSafeEqual, verify } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  createPublicKey,
+  sign,
+  timingSafeEqual,
+  verify,
+} from "node:crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
@@ -15,18 +22,24 @@ import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-sec
  * player returns with a Checkout Session id (`confirm`); the Stripe webhook records the same
  * purchase independently (closed tab) and revokes it on a refund or dispute.
  *
+ * Payment (Google Play app): Google Play Billing through the Digital Goods API. The app sends the
+ * purchase token (`play`); it is verified and acknowledged with the Play Developer API and
+ * recorded for the device (`play:<token hash>`, so it restores without signing in) and for the
+ * signed-in Google account, if any. `status` re-checks Play purchases, so refunds revoke them.
+ *
  * Routes (API Gateway REST proxy):
  *   POST /purchases          `{ action, ... }`, IAM auth (Cognito identity, like the leaderboard)
  *     signin   { idToken, nonce }            -> { token, owned, email }
  *     status   { token }                     -> { owned }
  *     checkout { token, origin, email? }     -> { url } | { owned: true }
  *     confirm  { token, sessionId }          -> { owned }
+ *     play     { purchaseToken, token? }     -> { owned, token? }
  *   POST /purchases/stripe   Stripe webhook (public, `Stripe-Signature` verified)
  *
  * The leaderboard Lambda verifies the same account tokens (its copy of `verifyAccountToken`) and
  * reads this table to badge upgraded runs. Env vars: `GOOGLE_CLIENT_ID`, `STRIPE_PRICE_ID`,
  * `STRIPE_SECRET_ID` (secret JSON `{ secretKey, webhookSecret }`), `SIGNING_SECRET_ID` (secret
- * JSON `{ signingKey }`).
+ * JSON `{ signingKey }`), `PLAY_SECRET_ID` (the Play service account's JSON key).
  */
 
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({ region: "us-west-2" }));
@@ -221,41 +234,116 @@ async function stripe(secretKey, path, form) {
  * @param {string} account
  */
 async function isOwned(account) {
+  return (await getPurchase(account))?.status === "active";
+}
+
+/** @param {string} account */
+async function getPurchase(account) {
   const { Item } = await dynamo.send(new GetCommand({ TableName: TABLE_NAME, Key: { account } }));
-  return Item?.status === "active";
+  return Item;
 }
 
 /**
- * Record (or revoke) the account's Stripe purchase.
+ * Record (or revoke) the account's purchase; `fields` (platform, purchaseId, paymentIntent,
+ * livemode, playToken) are written when not null / undefined.
  * @param {string} account
  * @param {"active"|"revoked"} status
- * @param {{ sessionId?: string, paymentIntent?: string|null, livemode?: boolean }} details
+ * @param {Record<string, string|boolean|null|undefined>} fields
  */
-async function setPurchase(account, status, details) {
+async function setPurchase(account, status, fields) {
   const now = new Date().toISOString();
+  const extra = Object.entries(fields).filter(([, v]) => v !== undefined && v !== null);
   await dynamo.send(
     new UpdateCommand({
       TableName: TABLE_NAME,
       Key: { account },
       UpdateExpression:
-        "SET #status = :status, product = :product, platform = :platform, updatedAt = :now, " +
+        "SET #status = :status, product = :product, updatedAt = :now, " +
         "createdAt = if_not_exists(createdAt, :now)" +
-        (details.sessionId ? ", purchaseId = :purchaseId" : "") +
-        (details.paymentIntent ? ", paymentIntent = :paymentIntent" : "") +
-        (typeof details.livemode === "boolean" ? ", livemode = :livemode" : ""),
-      ExpressionAttributeNames: { "#status": "status" },
+        extra.map((_, i) => `, #f${i} = :f${i}`).join(""),
+      ExpressionAttributeNames: {
+        "#status": "status",
+        ...Object.fromEntries(extra.map(([k], i) => [`#f${i}`, k])),
+      },
       ExpressionAttributeValues: {
         ":status": status,
         ":product": PRODUCT,
-        ":platform": "stripe",
         ":now": now,
-        ...(details.sessionId ? { ":purchaseId": details.sessionId } : {}),
-        ...(details.paymentIntent ? { ":paymentIntent": details.paymentIntent } : {}),
-        ...(typeof details.livemode === "boolean" ? { ":livemode": details.livemode } : {}),
+        ...Object.fromEntries(extra.map(([, v], i) => [`:f${i}`, v])),
       },
     })
   );
 }
+
+/** Android app (Trusted Web Activity) whose Play purchases we verify. */
+export const PLAY_PACKAGE = "dev.agentmode.aihorizon";
+const PLAY_API = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications";
+/** @type {{ token: string, expires: number } | null} */
+let playAccess = null;
+
+/**
+ * OAuth access token for the Play Developer API, from the service account in `PLAY_SECRET_ID`
+ * (its JSON key: `client_email`, `private_key`), cached until shortly before it expires.
+ */
+async function playAccessToken() {
+  if (playAccess && playAccess.expires > Date.now()) return playAccess.token;
+  const { client_email, private_key } = await getSecret(process.env.PLAY_SECRET_ID);
+  const now = Math.floor(Date.now() / 1000);
+  const enc = (/** @type {any} */ o) => b64url(JSON.stringify(o));
+  const claims = {
+    iss: client_email,
+    scope: "https://www.googleapis.com/auth/androidpublisher",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600,
+  };
+  const unsigned = `${enc({ alg: "RS256", typ: "JWT" })}.${enc(claims)}`;
+  const signature = sign("RSA-SHA256", Buffer.from(unsigned), private_key).toString("base64url");
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: `${unsigned}.${signature}`,
+    }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(`Google token: ${json?.error || res.status}`);
+  playAccess = { token: json.access_token, expires: Date.now() + (json.expires_in - 60) * 1000 };
+  return playAccess.token;
+}
+
+/**
+ * Play Developer API call on a Bullet Upgrade purchase token (`purchases.products`).
+ * @param {string} purchaseToken
+ * @param {"get"|"acknowledge"} op
+ */
+async function playProduct(purchaseToken, op) {
+  const url =
+    `${PLAY_API}/${PLAY_PACKAGE}/purchases/products/${PRODUCT}/tokens/` +
+    `${encodeURIComponent(purchaseToken)}${op === "acknowledge" ? ":acknowledge" : ""}`;
+  const res = await fetch(url, {
+    method: op === "acknowledge" ? "POST" : "GET",
+    headers: { Authorization: `Bearer ${await playAccessToken()}` },
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`Play ${op}: ${json?.error?.message || res.status}`);
+  return json;
+}
+
+/**
+ * @param {any} purchase Play `ProductPurchase`.
+ * @returns {boolean} Whether it is a completed purchase (`purchaseState` 0; 1 cancelled or
+ *   refunded, 2 pending).
+ */
+export const playPurchaseActive = (purchase) => purchase?.purchaseState === 0;
+
+/**
+ * Account id for a Play purchase made before (or without) signing in: the purchase token itself
+ * identifies the buyer's Google Play account, so its hash names the account.
+ * @param {string} purchaseToken
+ */
+export const playTokenAccount = (purchaseToken) =>
+  `play:${createHash("sha256").update(purchaseToken).digest("hex")}`;
 
 /**
  * Account id of a paid Checkout Session for our price, or null.
@@ -267,6 +355,17 @@ export function paidSessionAccount(session) {
   if (session.payment_status !== "paid" || session.metadata?.product !== PRODUCT) return null;
   return account;
 }
+
+/**
+ * Purchase record fields of a paid Checkout Session.
+ * @param {any} session
+ */
+const stripeFields = (session) => ({
+  platform: "stripe",
+  purchaseId: session.id,
+  paymentIntent: session.payment_intent,
+  livemode: session.livemode,
+});
 
 /**
  * @param {any} body
@@ -290,8 +389,35 @@ async function handleAction(body, { clientId, priceId }) {
   }
 
   const account = verifyAccountToken(body.token, signingKey);
+  if (body.action === "play") {
+    const purchaseToken = body.purchaseToken;
+    if (typeof purchaseToken !== "string" || !purchaseToken || purchaseToken.length > 1024) {
+      return respond(400, { message: "Bad purchase" });
+    }
+    const purchase = await playProduct(purchaseToken, "get");
+    if (!playPurchaseActive(purchase)) return respond(200, { owned: false });
+    if (purchase.acknowledgementState === 0) await playProduct(purchaseToken, "acknowledge");
+    const fields = { platform: "play", purchaseId: purchase.orderId, playToken: purchaseToken };
+    // The device's purchase always gets its own record (restores without signing in); a
+    // signed-in Google account also owns it, so it works on the web and other devices too.
+    const tokenAccount = playTokenAccount(purchaseToken);
+    await setPurchase(tokenAccount, "active", fields);
+    const owner = account?.startsWith("google:") ? account : tokenAccount;
+    if (owner !== tokenAccount) await setPurchase(owner, "active", fields);
+    return respond(200, { owned: true, token: signAccountToken(owner, signingKey) });
+  }
   if (!account) return respond(401, { message: "Sign in again" });
-  if (body.action === "status") return respond(200, { owned: await isOwned(account) });
+  if (body.action === "status") {
+    const item = await getPurchase(account);
+    if (item?.status === "active" && item.platform === "play" && item.playToken) {
+      const purchase = await playProduct(item.playToken, "get").catch(() => null);
+      if (purchase && !playPurchaseActive(purchase)) {
+        await setPurchase(account, "revoked", {});
+        return respond(200, { owned: false });
+      }
+    }
+    return respond(200, { owned: item?.status === "active" });
+  }
 
   const { secretKey } = await getSecret(process.env.STRIPE_SECRET_ID);
   if (body.action === "checkout") {
@@ -317,11 +443,7 @@ async function handleAction(body, { clientId, priceId }) {
     if (!/^cs_(test|live)_[A-Za-z0-9]+$/.test(id)) return respond(400, { message: "Bad session" });
     const session = await stripe(secretKey, `/checkout/sessions/${id}`);
     if (paidSessionAccount(session) !== account) return respond(200, { owned: false });
-    await setPurchase(account, "active", {
-      sessionId: session.id,
-      paymentIntent: session.payment_intent,
-      livemode: session.livemode,
-    });
+    await setPurchase(account, "active", stripeFields(session));
     return respond(200, { owned: true });
   }
   return respond(400, { message: "Unknown action" });
@@ -346,13 +468,7 @@ async function handleWebhook(body, headers) {
   ) {
     const session = object;
     const account = paidSessionAccount(session);
-    if (account) {
-      await setPurchase(account, "active", {
-        sessionId: session.id,
-        paymentIntent: session.payment_intent,
-        livemode: session.livemode,
-      });
-    }
+    if (account) await setPurchase(account, "active", stripeFields(session));
   } else if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
     const paymentIntent = object?.payment_intent;
     const fullyRefunded = event.type === "charge.dispute.created" || object?.refunded === true;

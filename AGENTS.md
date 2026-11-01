@@ -63,6 +63,14 @@
   `we_1UX1cHFrMGh3bUqYiWCDU8hk`). The Lambda caches the secret per warm container: update its
   configuration (env vars) after changing the secret so new containers read it. Keys live in
   `.secrets/` (gitignored) and Secrets Manager only; never print them.
+- Google Play app (Trusted Web Activity, package `dev.agentmode.aihorizon`): the Bubblewrap project
+  is `C:\github\ai-horizon-android-build` (not a git repo; earlier builds kept in `previous-<ver>`).
+  Play Billing needs `features.playBilling.enabled` and `alphaDependencies.enabled` in
+  `twa-manifest.json`; after editing it run `bubblewrap update --skipVersionUpgrade` and
+  `bubblewrap build` (the build asks for the keystore passwords, so the owner runs it). In the app
+  the client uses the Digital Goods API (product `bullet_upgrade`) and the `play` action; the
+  Lambda calls the Play Developer API with the service account in `PLAY_SECRET_ID` (its JSON key),
+  which needs "View financial data" and "Manage orders" for the app in Play Console.
 - Google sign-in is the OpenID Connect redirect (`response_type=id_token`, redirect URI = site
   origin + `/`), so the OAuth client needs `https://www.agentmode.dev/`, `https://agentmode.dev/`
   and `http://localhost:8000/` as authorized redirect URIs.

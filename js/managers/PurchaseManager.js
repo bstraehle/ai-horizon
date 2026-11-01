@@ -16,10 +16,19 @@ import { loadSignedFetch } from "../adapters/SignedApi.js";
  *  The account token and the last known ownership persist in localStorage, so the game knows at
  *  once on later visits; `init()` re-checks the ownership in the background (refunds revoke it).
  *
- * Offered only where `CONFIG.PURCHASES.LIVE` allows (or on a dev host, Stripe test mode) and never
- * inside the Google Play app, which must sell through Google Play Billing instead.
+ * Flow (Google Play app, a Trusted Web Activity launched with an `android-app://` referrer): the
+ * same Google sign-in first (so the purchase also counts on the web), then Google Play Billing:
+ * the Digital Goods API gives the local price and owned purchases, a Payment Request with the
+ * Play method opens Google's payment sheet, and the purchase token goes to the backend (`play`),
+ * which verifies and acknowledges it. Sign-in returns by redirect, without the user gesture the
+ * payment sheet needs, so the link then waits for one more tap (`ready`). On launch, owned Play
+ * purchases are re-sent, so a reinstall restores the upgrade even before signing in. Stripe is
+ * never offered inside the Play app.
  *
- * @typedef {"idle"|"working"|"owned"|"cancelled"|"error"} PurchaseStatus
+ * Offered only where `CONFIG.PURCHASES.LIVE` allows (or on a dev host, Stripe test mode); in the
+ * Play app only once its Play Billing support is detected.
+ *
+ * @typedef {"idle"|"working"|"ready"|"owned"|"cancelled"|"error"} PurchaseStatus
  * @typedef {{ owned: boolean, status: PurchaseStatus }} PurchaseState
  * @typedef {(action: string, body: Record<string, any>) => Promise<any>} PurchasesCall
  */
@@ -27,6 +36,38 @@ import { loadSignedFetch } from "../adapters/SignedApi.js";
 const PENDING_KEY = "aiHorizonPurchasePending";
 const PLAY_APP_KEY = "aiHorizonPlayApp";
 const GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth";
+const PLAY_BILLING = "https://play.google.com/billing";
+/** Play product id of the Bullet Upgrade (Play Console in-app product). */
+export const PLAY_PRODUCT = "bullet_upgrade";
+
+/**
+ * @typedef {{ getDetails(ids: string[]): Promise<Array<{ itemId: string,
+ *   price: { currency: string, value: string } }>>,
+ *   listPurchases(): Promise<Array<{ itemId: string, purchaseToken: string }>> }} DigitalGoods
+ */
+
+/** @returns {Promise<DigitalGoods|null>} The Play Billing service inside the Play app, or null. */
+async function loadDigitalGoods() {
+  const get = typeof window !== "undefined" && /** @type {any} */ (window).getDigitalGoodsService;
+  if (typeof get !== "function") return null;
+  try {
+    return await get.call(window, PLAY_BILLING);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Open Google Play's payment sheet for the Bullet Upgrade (needs a user gesture).
+ * @returns {Promise<{ details: { purchaseToken: string }, complete(result: string): Promise<void> }>}
+ */
+function showPlayPayment() {
+  const request = new PaymentRequest(
+    [{ supportedMethods: PLAY_BILLING, data: { sku: PLAY_PRODUCT } }],
+    { total: { label: "Total", amount: { currency: "USD", value: "0" } } }
+  );
+  return /** @type {any} */ (request.show());
+}
 
 /** @returns {string} 128 random bits as hex. */
 function randomId() {
@@ -52,7 +93,9 @@ async function callPurchases(action, body) {
 export class PurchaseManager {
   /**
    * @param {{ storage?: Storage, session?: Storage, location?: Location, history?: History,
-   *   referrer?: string, call?: PurchasesCall, navigate?: (url: string) => void }} [deps]
+   *   referrer?: string, call?: PurchasesCall, navigate?: (url: string) => void,
+   *   digitalGoods?: () => Promise<DigitalGoods|null>,
+   *   playPayment?: typeof showPlayPayment }} [deps]
    */
   constructor(deps = {}) {
     // Without a browser (unit tests of the game) these stay null: `available` is then false, and
@@ -76,8 +119,16 @@ export class PurchaseManager {
     this.history = deps.history ?? win.history ?? null;
     this.call = deps.call ?? callPurchases;
     this.navigate = deps.navigate ?? ((url) => this.location?.assign(url));
+    this.digitalGoods = deps.digitalGoods ?? loadDigitalGoods;
+    this.playPayment = deps.playPayment ?? showPlayPayment;
     const referrer = deps.referrer ?? (typeof document !== "undefined" ? document.referrer : "");
     if (referrer.startsWith("android-app://")) this._sessionSet(PLAY_APP_KEY, "1");
+    /** Inside the Google Play app (remembered for the tab: only its first page has the referrer). */
+    this.playApp = this._sessionGet(PLAY_APP_KEY) === "1";
+    /** Whether Google Play Billing was detected (Play app with billing support). */
+    this.playBilling = false;
+    /** Price shown on the link: Play's localized price in the Play app. */
+    this.priceLabel = CONFIG.PURCHASES.PRICE_LABEL;
     /** @type {{ token?: string, owned?: boolean, email?: string|null }} */
     this.saved = this._read();
     /** @type {PurchaseStatus} */
@@ -86,12 +137,16 @@ export class PurchaseManager {
     this.listeners = new Set();
   }
 
-  /** Whether the Bullet Upgrade can be bought here (site allowed, not the Play app). */
-  get available() {
+  /** Whether this site may sell the upgrade (`CONFIG.PURCHASES.LIVE`, or a dev host). */
+  get _siteAllowed() {
     const P = CONFIG.PURCHASES;
     if (!this.location || !this.storage) return false;
-    const allowed = P.LIVE || P.DEV_HOSTS.includes(this.location.hostname);
-    return allowed && this._sessionGet(PLAY_APP_KEY) !== "1";
+    return P.LIVE || P.DEV_HOSTS.includes(this.location.hostname);
+  }
+
+  /** Whether the Bullet Upgrade can be bought here (in the Play app: with Play Billing only). */
+  get available() {
+    return this._siteAllowed && (!this.playApp || this.playBilling);
   }
 
   /** Whether the signed-in account owns the Bullet Upgrade (last known state). */
@@ -118,7 +173,8 @@ export class PurchaseManager {
    * Never rejects.
    */
   async init() {
-    if (!this.available) return;
+    if (!this._siteAllowed) return;
+    if (this.playApp && !(await this._initPlay())) return;
     try {
       if (await this._finishGoogle()) return;
       if (await this._finishStripe()) return;
@@ -142,7 +198,8 @@ export class PurchaseManager {
       return;
     }
     try {
-      await this._checkout();
+      if (this.playApp) await this._playPurchase();
+      else await this._checkout();
     } catch (err) {
       if (/** @type {any} */ (err)?.status !== 401) {
         this._set("error");
@@ -207,8 +264,65 @@ export class PurchaseManager {
     const res = await this.call("signin", { idToken, nonce: pending.nonce });
     this._save({ token: res.token, owned: res.owned === true, email: res.email ?? null });
     if (res.owned) this._set("owned");
+    else if (pending.intent === "buy" && this.playApp) this._set("ready");
     else if (pending.intent === "buy") await this._checkout();
     else this._set("idle");
+    return true;
+  }
+
+  /**
+   * Detect Play Billing in the Play app: the localized price, and owned purchases re-sent to the
+   * backend (restores a reinstall or a new phone, links them to the signed-in account).
+   * @returns {Promise<boolean>} Whether Play Billing is available.
+   */
+  async _initPlay() {
+    const goods = await this.digitalGoods();
+    if (!goods) return false;
+    this.playBilling = true;
+    try {
+      const [item] = await goods.getDetails([PLAY_PRODUCT]);
+      if (item?.price) {
+        this.priceLabel = new Intl.NumberFormat(undefined, {
+          style: "currency",
+          currency: item.price.currency,
+        }).format(Number(item.price.value));
+      }
+      const owned = (await goods.listPurchases()).find((p) => p.itemId === PLAY_PRODUCT);
+      if (owned && !this.saved.owned) await this._sendPlayPurchase(owned.purchaseToken);
+    } catch {
+      /* the price and restore are best effort; buying still works */
+    }
+    this._set(this.saved.owned ? "owned" : this.status);
+    return true;
+  }
+
+  /** Google Play's payment sheet, then the backend verifies and records the purchase. */
+  async _playPurchase() {
+    let response;
+    try {
+      response = await this.playPayment();
+    } catch {
+      this._set("cancelled"); // dismissed, or the sheet could not open
+      return;
+    }
+    let owned = false;
+    try {
+      owned = await this._sendPlayPurchase(response.details.purchaseToken);
+    } finally {
+      await response.complete(owned ? "success" : "fail").catch(() => {});
+    }
+    if (!owned) this._set("error");
+  }
+
+  /**
+   * @param {string} purchaseToken
+   * @returns {Promise<boolean>} Whether the backend accepted it as owned.
+   */
+  async _sendPlayPurchase(purchaseToken) {
+    const res = await this.call("play", { purchaseToken, token: this.saved.token });
+    if (!res.owned) return false;
+    this._save({ token: res.token || this.saved.token, owned: true });
+    this._set("owned");
     return true;
   }
 
