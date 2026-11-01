@@ -48,7 +48,7 @@
     "lint-staged": "^17.0.8",
     "prettier": "^3.3.3",
     "typescript": "^5.5.4",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "lint-staged": {
     "**/*.{js,mjs,cjs}": [
@@ -70,6 +70,6 @@
   "overrides": {
     "@smithy/config-resolver": "^4.4.0",
     "js-yaml": "^4.3.2",
-    "vite": "^7.1.11"
+    "vite": "^7.3.7"
   }
 }

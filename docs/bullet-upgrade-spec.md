@@ -23,8 +23,8 @@ Out of scope: subscriptions, other products, ads, refunds UI (handled by Google 
 
 ### 2.1 Home screen link
 
-- A new `action-link` **"Bullet Upgrade"** left of About, Privacy, Sound, on the start and
-  leaderboard screens (same style as Share).
+- A new `action-link` **"Bullet Upgrade"**, the last link after About, Privacy and Sound, on the
+  start and leaderboard screens (same style as Share).
 - Not owned: the first click asks **"Buy · $0.99"** (2.2); its tooltip explains the effect.
 - Owned: reads **"Bullet Upgrade ✓"**; clicking it briefly shows "Upgrade active".
 - Purchases unavailable (Play app before its Play Billing release, or the production site while
