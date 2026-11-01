@@ -151,6 +151,12 @@ export function verifyStripeSignature(body, header, secret, now = Math.floor(Dat
 }
 
 /**
+ * Whether a Stripe key is a live key (secret `sk_live_…` or restricted `rk_live_…`).
+ * @param {unknown} key
+ */
+export const isLiveKey = (key) => typeof key === "string" && /^(sk|rk)_live_/.test(key);
+
+/**
  * Allowed checkout return origin for the key's mode, or null.
  * @param {unknown} origin
  * @param {boolean} live Whether the Stripe key is a live key.
@@ -290,7 +296,7 @@ async function handleAction(body, { clientId, priceId }) {
   const { secretKey } = await getSecret(process.env.STRIPE_SECRET_ID);
   if (body.action === "checkout") {
     if (await isOwned(account)) return respond(200, { owned: true });
-    const origin = returnOrigin(body.origin, secretKey.startsWith("sk_live_"));
+    const origin = returnOrigin(body.origin, isLiveKey(secretKey));
     if (!origin) return respond(400, { message: "Unsupported origin" });
     const email = typeof body.email === "string" && body.email.length <= 254 ? body.email : null;
     const session = await stripe(secretKey, "/checkout/sessions", {

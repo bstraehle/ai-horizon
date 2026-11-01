@@ -19,7 +19,8 @@
 
         <p class="instructions">
           AI HORIZON processes information when you play the game, when the app performs an
-          end-of-run mission debrief, and when you submit a leaderboard score.
+          end-of-run mission debrief, when you submit a leaderboard score, and when you buy the
+          Bullet Upgrade.
         </p>
 
         <h3>Offline mode</h3>
@@ -62,10 +63,24 @@
           headline and its language, never your device data, mission history, or initials.
         </p>
 
+        <h3>Bullet Upgrade purchase</h3>
+        <p class="instructions">
+          Only if you buy the Bullet Upgrade, you sign in with Google, and Google tells the backend
+          your Google account's ID and email address. The backend stores the account ID with the
+          purchase's status and Stripe reference in Amazon DynamoDB, so the upgrade works wherever
+          you sign in; your browser keeps a sign-in token in its local storage. The checkout passes
+          the account ID to Stripe as the order reference, and the email address to fill in the
+          form; AI HORIZON does not store the email address. Stripe processes the payment as the
+          merchant of record under its own privacy policy; AI HORIZON never receives your card
+          details. Leaderboard scores flown with the upgrade are marked with ⚡, never with your
+          account.
+        </p>
+
         <h3>How data is used</h3>
         <ul class="instructions">
           <li>To generate an end-of-run mission debrief</li>
           <li>To show and persist leaderboard rankings</li>
+          <li>To sell the Bullet Upgrade and recognize it on your devices</li>
           <li>To operate, secure, and monitor the app</li>
         </ul>
 

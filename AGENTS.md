@@ -55,12 +55,14 @@
 - Table `ai-horizon-purchases` (key `account` = `google:<subject>`; `status` `active`/`revoked`).
   The leaderboard Lambda (env `SIGNING_SECRET_ID` too, beside `ALERT_TOPIC_ARN`) verifies the
   `upgrade-token` of upgraded runs against it and stores `bulletUpgrade: true` (⚡).
-- Stripe runs in **test mode** (test key, test price `price_1UX0JDFrMGh3bUqYNirkICkC`, webhook
-  `we_1UX1cHFrMGh3bUqYiWCDU8hk`); test keys only accept checkout returns to localhost, and the
-  client offers the upgrade only on localhost while `CONFIG.PURCHASES.LIVE` is false. Going live:
-  live key and new live webhook secret into `ai-horizon-stripe`, `STRIPE_PRICE_ID` =
-  `price_1UX0TyFyAA1uvMq5u2MplkN7`, `LIVE: true`, site deploy, and clear test purchases from the
-  table. Keys live in `.secrets/` (gitignored) and Secrets Manager only; never print them.
+- Stripe runs **live** (restricted key `rk_live_…`, needs Checkout Sessions and Webhook Endpoints
+  write; live price `price_1UX0TyFyAA1uvMq5u2MplkN7`, webhook `we_1UX34VFyAA1uvMq5cNvkg0xm`), and
+  `CONFIG.PURCHASES.LIVE` is true. Live keys only accept checkout returns to the production site;
+  to test locally, put a test key and its webhook secret back into `ai-horizon-stripe` and set
+  `STRIPE_PRICE_ID` to the test price `price_1UX0JDFrMGh3bUqYNirkICkC` (test webhook
+  `we_1UX1cHFrMGh3bUqYiWCDU8hk`). The Lambda caches the secret per warm container: update its
+  configuration (env vars) after changing the secret so new containers read it. Keys live in
+  `.secrets/` (gitignored) and Secrets Manager only; never print them.
 - Google sign-in is the OpenID Connect redirect (`response_type=id_token`, redirect URI = site
   origin + `/`), so the OAuth client needs `https://www.agentmode.dev/`, `https://agentmode.dev/`
   and `http://localhost:8000/` as authorized redirect URIs.

@@ -477,10 +477,11 @@ export const CONFIG = deepFreeze({
   },
   /**
    * Bullet Upgrade purchase (PurchaseManager / UpgradeLink; server/lambda/purchases.js). `LIVE`
-   * offers it on the production site; otherwise only on `DEV_HOSTS` (Stripe test mode).
+   * offers it on the production site; `DEV_HOSTS` always show it, but checkout there only works
+   * while the backend runs a Stripe test key (live keys only return to the production site).
    */
   PURCHASES: {
-    LIVE: false,
+    LIVE: true,
     DEV_HOSTS: ["localhost", "127.0.0.1"],
     GOOGLE_CLIENT_ID: "543292441425-m7omsj7v8507s76j14iticcd380v6i3c.apps.googleusercontent.com",
     PRICE_LABEL: "$0.99",

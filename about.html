@@ -97,19 +97,38 @@
             <li>8 bonus asteroids (10 hits): +250</li>
             <li>Every 1000 points: +250</li>
             <li>
-              Bullet upgrade (after 2500 points): hardened and bonus asteroids take 50% fewer hits
+              Bullet upgrade (after 2500 points, or from the first shot with the Bullet Upgrade):
+              hardened and bonus asteroids take 50% fewer hits
             </li>
             <li>Finale (last 15 seconds): all points double</li>
             <li>End-of-run shots fired accuracy bonus (0-100%)</li>
           </ol>
         </div>
 
+        <h3>Bullet Upgrade</h3>
+        <ul class="instructions">
+          <li>
+            A one-time $0.99 purchase: upgraded bullets from the first shot of every mission. Find
+            it as the last link on the start and leaderboard screens (on the website; not yet in the
+            Google Play app).
+          </li>
+          <li>
+            Sign in with Google once, then pay with Stripe. The upgrade belongs to your Google
+            account, so it works on every device and browser where you sign in with it.
+          </li>
+          <li>Leaderboard scores flown with it show ⚡ after the initials.</li>
+          <li>
+            Stripe sells it as the merchant of record: your receipt comes from Stripe, which handles
+            payment questions and refunds. A refunded purchase removes the upgrade.
+          </li>
+        </ul>
+
         <h3>Technology</h3>
         <ul class="instructions">
           <li>
             An AWS serverless architecture comprised of CloudFront & S3 (frontend) and Cognito, API
             Gateway, Lambda, Bedrock, Polly & DynamoDB (backend), with Captain “Altair” Straehle's
-            voice by ElevenLabs.
+            voice by ElevenLabs, sign-in with Google and payments by Stripe.
           </li>
           <li>
             A Progressive Web App (PWA) that works offline and can be installed on your device.

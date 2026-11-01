@@ -179,6 +179,14 @@ describe("helpers", () => {
     expect(verifyStripeSignature(body, undefined, "whsec", now)).toBe(false);
   });
 
+  it("isLiveKey accepts live secret and restricted keys only", () => {
+    expect(purchases.isLiveKey("sk_live_x")).toBe(true);
+    expect(purchases.isLiveKey("rk_live_x")).toBe(true);
+    expect(purchases.isLiveKey("sk_test_x")).toBe(false);
+    expect(purchases.isLiveKey("rk_test_x")).toBe(false);
+    expect(purchases.isLiveKey(undefined)).toBe(false);
+  });
+
   it("returnOrigin allows the production site for live keys and local servers for test keys", () => {
     expect(returnOrigin("https://www.agentmode.dev", true)).toBe("https://www.agentmode.dev");
     expect(returnOrigin("http://localhost:8000", true)).toBeNull();
