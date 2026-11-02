@@ -1,0 +1,1008 @@
+# AI HORIZON production infrastructure, managed by the CloudFormation stack "ai-horizon" (us-west-2).
+#
+# Imported from the live resources (CloudFormation IaC generator + resource import), so the IDs are
+# the real ones. Every resource is DeletionPolicy/UpdateReplacePolicy Retain: deleting the stack or
+# replacing a resource never deletes production data.
+#
+# Not in this template, on purpose:
+#   - Lambda code: deployed with update-function-code (AGENTS.md); CloudFormation owns the configuration.
+#   - Secret values: set with put-secret-value from .secrets/ (gitignored); never in this file.
+#   - The alerts e-mail subscription (a personal address) and the ACM certificate (us-east-1).
+#   - The CloudFront function apex-to-www-redirect (global; referenced by ARN).
+# See infra/README.md for how to change and deploy it.
+AWSTemplateFormatVersion: "2010-09-09"
+Description:
+  "AI HORIZON production infrastructure (us-west-2): static site, API, Lambdas, tables, identity,
+  secrets, alerts."
+Resources:
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      FifoTopic: false
+      TopicName: ai-horizon-alerts
+  AnalysisFunction:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      MemorySize: 256
+      Description: ""
+      TracingConfig:
+        Mode: PassThrough
+      Timeout: 30
+      RuntimeManagementConfig:
+        UpdateRuntimeOn: Auto
+      Handler: index.handler
+      ReservedConcurrentExecutions: 3
+      Code:
+        ZipFile: "// Deployed separately: see AGENTS.md (Deploy) and infra/README.md"
+      Role: arn:aws:iam::819097794827:role/service-role/ai-horizon-analysis-role-jj8nlat7
+      FileSystemConfigs: []
+      FunctionName: ai-horizon-analysis
+      Runtime: nodejs22.x
+      PackageType: Zip
+      LoggingConfig:
+        LogFormat: Text
+        LogGroup: /aws/lambda/ai-horizon-analysis
+      RecursiveLoop: Terminate
+      Environment:
+        Variables:
+          MODEL_ID: us.anthropic.claude-haiku-4-5-20251001-v1:0
+          ELEVENLABS_SECRET_ID: arn:aws:secretsmanager:us-west-2:819097794827:secret:Eleven_Labs-SJVA2t
+      EphemeralStorage:
+        Size: 512
+      Architectures:
+        - x86_64
+  AnalysisLogsPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ManagedPolicyName: AWSLambdaBasicExecutionRole-d8c8b37e-719c-48df-8f44-97a40f899fbe
+      Path: /service-role/
+      Description: ""
+      Groups: []
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Resource: arn:aws:logs:us-west-2:819097794827:*
+            Action: logs:CreateLogGroup
+            Effect: Allow
+          - Resource:
+              - arn:aws:logs:us-west-2:819097794827:log-group:/aws/lambda/ai-horizon-analysis:*
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+          - Resource: arn:aws:logs:*:*:*
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+      Roles:
+        - ai-horizon-analysis-role-jj8nlat7
+      Users: []
+  AnalysisPostPermission:
+    Type: AWS::Lambda::Permission
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      FunctionName: arn:aws:lambda:us-west-2:819097794827:function:ai-horizon-analysis
+      Action: lambda:InvokeFunction
+      SourceArn: arn:aws:execute-api:us-west-2:819097794827:0p6x6bw6c2/*/POST/leaderboard
+      Principal: apigateway.amazonaws.com
+  AnalysisRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Path: /service-role/
+      ManagedPolicyArns:
+        - arn:aws:iam::819097794827:policy/service-role/AWSLambdaBasicExecutionRole-d8c8b37e-719c-48df-8f44-97a40f899fbe
+      MaxSessionDuration: 3600
+      RoleName: ai-horizon-analysis-role-jj8nlat7
+      Policies:
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Resource:
+                  - arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0
+                  - arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0
+                  - arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0
+                  - arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku-5-5
+                  - arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-haiku-5-5
+                  - arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-haiku-5-5
+                  - arn:aws:bedrock:*:819097794827:inference-profile/us.amazon.nova-2-lite-v1:0
+                  - arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-2-lite-v1:0
+                  - arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-2-lite-v1:0
+                  - arn:aws:bedrock:us-west-1::foundation-model/amazon.nova-2-lite-v1:0
+                  - arn:aws:bedrock:us-west-2::foundation-model/amazon.nova-2-lite-v1:0
+                  - arn:aws:bedrock:us-west-2:819097794827:guardrail/6w2hf5g6l179
+                  - arn:aws:bedrock:*:819097794827:guardrail-profile/us.guardrail.v1:0
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                  - bedrock:ApplyGuardrail
+                Effect: Allow
+                Sid: BedrockInferenceProfileAccess
+          PolicyName: BedrockInferenceAccess
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Resource:
+                  - arn:aws:bedrock:*:819097794827:inference-profile/*
+                  - arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku-5-5
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Effect: Allow
+                Sid: BedrockCrossRegionInference
+              - Resource: "*"
+                Action:
+                  - aws-marketplace:ViewSubscriptions
+                  - aws-marketplace:Subscribe
+                  - aws-marketplace:Unsubscribe
+                Effect: Allow
+                Sid: MarketplaceBedrock
+          PolicyName: BedrockMarketplaceAccess
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Resource: arn:aws:secretsmanager:us-west-2:819097794827:secret:Eleven_Labs-SJVA2t
+                Action: secretsmanager:GetSecretValue
+                Effect: Allow
+                Sid: ReadElevenLabsKey
+              - Condition:
+                  StringEquals:
+                    kms:ViaService: secretsmanager.us-west-2.amazonaws.com
+                Resource: arn:aws:kms:us-west-2:819097794827:key/700f5e78-3e09-411a-b62b-632eab957643
+                Action: kms:Decrypt
+                Effect: Allow
+                Sid: DecryptElevenLabsKey
+          PolicyName: elevenLabsSecretRead
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Resource: "*"
+                Action: polly:SynthesizeSpeech
+                Effect: Allow
+                Sid: PollySynthesizeSpeech
+          PolicyName: pollySynthesizeSpeech
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+  Api:
+    Type: AWS::ApiGateway::RestApi
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ApiKeySourceType: HEADER
+      EndpointConfiguration:
+        IpAddressType: ipv4
+        Types:
+          - EDGE
+      DisableExecuteApiEndpoint: false
+      SecurityPolicy: TLS_1_0
+      Name: AI Horizon
+  ApiDefault4xxResponse:
+    Type: AWS::ApiGateway::GatewayResponse
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RestApiId: 0p6x6bw6c2
+      ResponseTemplates:
+        application/json: '{"message":$context.error.messageString}'
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-amz-content-sha256'"
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST,PUT'"
+      ResponseType: DEFAULT_4XX
+  ApiDefault5xxResponse:
+    Type: AWS::ApiGateway::GatewayResponse
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RestApiId: 0p6x6bw6c2
+      ResponseTemplates:
+        application/json: '{"message":$context.error.messageString}'
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-amz-content-sha256'"
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST,PUT'"
+      ResponseType: DEFAULT_5XX
+  ApiLeaderboardResource:
+    Type: AWS::ApiGateway::Resource
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ParentId: drrzngexdj
+      PathPart: leaderboard
+      RestApiId: 0p6x6bw6c2
+  ApiPurchasesResource:
+    Type: AWS::ApiGateway::Resource
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ParentId: drrzngexdj
+      PathPart: purchases
+      RestApiId: 0p6x6bw6c2
+  ApiStageDev:
+    Type: AWS::ApiGateway::Stage
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      DeploymentId: t00idk
+      StageName: dev
+      TracingEnabled: false
+      RestApiId: 0p6x6bw6c2
+      MethodSettings:
+        - CacheTtlInSeconds: 300
+          ResourcePath: /*
+          CacheDataEncrypted: false
+          DataTraceEnabled: false
+          ThrottlingBurstLimit: 10
+          CachingEnabled: false
+          MetricsEnabled: false
+          HttpMethod: "*"
+          ThrottlingRateLimit: 5
+        - CacheTtlInSeconds: 300
+          ResourcePath: /~1leaderboard
+          CacheDataEncrypted: false
+          DataTraceEnabled: false
+          ThrottlingBurstLimit: 2
+          CachingEnabled: false
+          MetricsEnabled: false
+          HttpMethod: POST
+          ThrottlingRateLimit: 1
+        - CacheTtlInSeconds: 300
+          ResourcePath: /~1leaderboard
+          CacheDataEncrypted: false
+          DataTraceEnabled: false
+          ThrottlingBurstLimit: 2
+          CachingEnabled: false
+          MetricsEnabled: false
+          HttpMethod: PUT
+          ThrottlingRateLimit: 1
+      CacheClusterSize: "0.5"
+      CacheClusterEnabled: false
+  ApiStripeWebhookResource:
+    Type: AWS::ApiGateway::Resource
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ParentId: tuj1dq
+      PathPart: stripe
+      RestApiId: 0p6x6bw6c2
+  CognitoUnauthenticatedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ManagedPolicyName: Cognito-unauthenticated-1758116129272
+      Path: /service-role/
+      Description: ""
+      Groups: []
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Resource:
+              - "*"
+            Action:
+              - cognito-identity:GetCredentialsForIdentity
+            Effect: Allow
+      Roles:
+        - cognito-ai-horizon
+      Users: []
+  CognitoUnauthenticatedRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Path: /service-role/
+      ManagedPolicyArns:
+        - arn:aws:iam::819097794827:policy/service-role/Cognito-unauthenticated-1758116129272
+      MaxSessionDuration: 3600
+      RoleName: cognito-ai-horizon
+      Policies:
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Resource:
+                  - arn:aws:execute-api:us-west-2:819097794827:0p6x6bw6c2/dev/*/leaderboard*
+                  - arn:aws:execute-api:us-west-2:819097794827:0p6x6bw6c2/dev/POST/purchases
+                Action: execute-api:Invoke
+                Effect: Allow
+          PolicyName: cognito_api_gateway_ai_horizon
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Condition:
+              StringEquals:
+                cognito-identity.amazonaws.com:aud: us-west-2:3039071f-2d61-42c8-a869-af7594fa2c7d
+              ForAnyValue:StringLike:
+                cognito-identity.amazonaws.com:amr: unauthenticated
+            Action: sts:AssumeRoleWithWebIdentity
+            Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+  ElevenLabsSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ReplicaRegions: []
+      KmsKeyId: arn:aws:kms:us-west-2:819097794827:key/700f5e78-3e09-411a-b62b-632eab957643
+      Tags: []
+      Name: Eleven_Labs
+  IdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      CognitoIdentityProviders: []
+      IdentityPoolName: ai-horizon
+      SupportedLoginProviders: {}
+      AllowUnauthenticatedIdentities: true
+      SamlProviderARNs: []
+      OpenIdConnectProviderARNs: []
+      AllowClassicFlow: false
+      IdentityPoolTags: []
+  IdentityPoolRoles:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RoleMappings: {}
+      IdentityPoolId: us-west-2:3039071f-2d61-42c8-a869-af7594fa2c7d
+      Roles:
+        unauthenticated: arn:aws:iam::819097794827:role/service-role/cognito-ai-horizon
+  LeaderboardDestinationPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ManagedPolicyName: AWSLambdaLambdaFunctionDestinationExecutionRole-dad37fdc-072d-4c2b-ab02-f73565278c5d
+      Path: /service-role/
+      Description: ""
+      Groups: []
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Resource: arn:aws:lambda:us-west-2:819097794827:function:ai-horizon-leaderboard*
+            Action: lambda:InvokeFunction
+            Effect: Allow
+      Roles:
+        - ai-horizon-leaderboard
+      Users: []
+  LeaderboardFunction:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      MemorySize: 128
+      Description: ""
+      TracingConfig:
+        Mode: PassThrough
+      Timeout: 3
+      RuntimeManagementConfig:
+        UpdateRuntimeOn: Auto
+      Handler: index.handler
+      Code:
+        ZipFile: "// Deployed separately: see AGENTS.md (Deploy) and infra/README.md"
+      Role: arn:aws:iam::819097794827:role/service-role/ai-horizon-leaderboard
+      FileSystemConfigs: []
+      FunctionName: ai-horizon-leaderboard
+      Runtime: nodejs22.x
+      PackageType: Zip
+      LoggingConfig:
+        LogFormat: Text
+        LogGroup: /aws/lambda/ai-horizon-leaderboard
+      RecursiveLoop: Terminate
+      Environment:
+        Variables:
+          SIGNING_SECRET_ID: arn:aws:secretsmanager:us-west-2:819097794827:secret:ai-horizon-purchases-signing-hUyDvp
+          ALERT_TOPIC_ARN: arn:aws:sns:us-west-2:819097794827:ai-horizon-alerts
+      EphemeralStorage:
+        Size: 512
+      Architectures:
+        - x86_64
+  LeaderboardGetMethod:
+    Type: AWS::ApiGateway::Method
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RestApiId: 0p6x6bw6c2
+      ResourceId: we6bjn
+      HttpMethod: GET
+      AuthorizationType: AWS_IAM
+      ApiKeyRequired: false
+      RequestParameters:
+        method.request.querystring.id: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: arn:aws:apigateway:us-west-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-west-2:819097794827:function:ai-horizon-leaderboard/invocations
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        ContentHandling: CONVERT_TO_TEXT
+        IntegrationResponses:
+          - StatusCode: "200"
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates: {}
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: false
+          ResponseModels:
+            application/json: Empty
+  LeaderboardGetPermission:
+    Type: AWS::Lambda::Permission
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      FunctionName: arn:aws:lambda:us-west-2:819097794827:function:ai-horizon-leaderboard
+      Action: lambda:InvokeFunction
+      SourceArn: arn:aws:execute-api:us-west-2:819097794827:0p6x6bw6c2/*/GET/leaderboard
+      Principal: apigateway.amazonaws.com
+  LeaderboardLogsPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ManagedPolicyName: AWSLambdaBasicExecutionRole-9bddc3f3-8547-4d1b-82bc-9746157e35f9
+      Path: /service-role/
+      Description: ""
+      Groups: []
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Resource: arn:aws:logs:us-west-2:819097794827:*
+            Action: logs:CreateLogGroup
+            Effect: Allow
+          - Resource:
+              - arn:aws:logs:us-west-2:819097794827:log-group:/aws/lambda/ai-horizon-leaderboard:*
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+      Roles:
+        - ai-horizon-leaderboard
+      Users: []
+  LeaderboardMicroservicePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ManagedPolicyName: AWSLambdaMicroserviceExecutionRole-4018ad92-cfa4-4dbf-af62-5253ae808886
+      Path: /service-role/
+      Description: ""
+      Groups: []
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Resource: arn:aws:dynamodb:us-west-2:819097794827:table/*
+            Action:
+              - dynamodb:DeleteItem
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:Scan
+              - dynamodb:UpdateItem
+            Effect: Allow
+      Roles:
+        - ai-horizon-leaderboard
+      Users: []
+  LeaderboardOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RestApiId: 0p6x6bw6c2
+      ResourceId: we6bjn
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      ApiKeyRequired: false
+      Integration:
+        Type: MOCK
+        PassthroughBehavior: WHEN_NO_MATCH
+        TimeoutInMillis: 29000
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: "200"
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-amz-content-sha256'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST,PUT'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          ResponseModels:
+            application/json: Empty
+  LeaderboardPostMethod:
+    Type: AWS::ApiGateway::Method
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RestApiId: 0p6x6bw6c2
+      ResourceId: we6bjn
+      HttpMethod: POST
+      AuthorizationType: AWS_IAM
+      ApiKeyRequired: false
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: arn:aws:apigateway:us-west-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-west-2:819097794827:function:ai-horizon-analysis/invocations
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        ContentHandling: CONVERT_TO_TEXT
+        IntegrationResponses:
+          - StatusCode: "200"
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates: {}
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: false
+          ResponseModels:
+            application/json: Empty
+  LeaderboardPutMethod:
+    Type: AWS::ApiGateway::Method
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RestApiId: 0p6x6bw6c2
+      ResourceId: we6bjn
+      HttpMethod: PUT
+      AuthorizationType: AWS_IAM
+      ApiKeyRequired: false
+      RequestParameters:
+        method.request.querystring.id: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: arn:aws:apigateway:us-west-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-west-2:819097794827:function:ai-horizon-leaderboard/invocations
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        TimeoutInMillis: 29000
+        ContentHandling: CONVERT_TO_TEXT
+        IntegrationResponses:
+          - StatusCode: "200"
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates: {}
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: false
+          ResponseModels:
+            application/json: Empty
+  LeaderboardPutPermission:
+    Type: AWS::Lambda::Permission
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      FunctionName: arn:aws:lambda:us-west-2:819097794827:function:ai-horizon-leaderboard
+      Action: lambda:InvokeFunction
+      SourceArn: arn:aws:execute-api:us-west-2:819097794827:0p6x6bw6c2/*/PUT/leaderboard
+      Principal: apigateway.amazonaws.com
+  LeaderboardRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Path: /service-role/
+      ManagedPolicyArns:
+        - arn:aws:iam::819097794827:policy/service-role/AWSLambdaMicroserviceExecutionRole-4018ad92-cfa4-4dbf-af62-5253ae808886
+        - arn:aws:iam::819097794827:policy/service-role/AWSLambdaLambdaFunctionDestinationExecutionRole-dad37fdc-072d-4c2b-ab02-f73565278c5d
+        - arn:aws:iam::819097794827:policy/service-role/AWSLambdaBasicExecutionRole-9bddc3f3-8547-4d1b-82bc-9746157e35f9
+      MaxSessionDuration: 3600
+      RoleName: ai-horizon-leaderboard
+      Policies:
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Resource: arn:aws:sns:us-west-2:819097794827:ai-horizon-alerts
+                Action: sns:Publish
+                Effect: Allow
+          PolicyName: ai-horizon-alerts-publish
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Resource: arn:aws:dynamodb:us-west-2:819097794827:table/ai-horizon-purchases
+                Action: dynamodb:GetItem
+                Effect: Allow
+              - Resource: arn:aws:secretsmanager:us-west-2:819097794827:secret:ai-horizon-purchases-signing-hUyDvp
+                Action: secretsmanager:GetSecretValue
+                Effect: Allow
+          PolicyName: bulletUpgradeRead
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+  LeaderboardTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      SSESpecification:
+        SSEEnabled: false
+      ContributorInsightsSpecification:
+        Enabled: false
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      WarmThroughput:
+        ReadUnitsPerSecond: 12000
+        WriteUnitsPerSecond: 4000
+      TableName: ai-horizon-leaderboard
+      AttributeDefinitions:
+        - AttributeType: N
+          AttributeName: id
+      BillingMode: PAY_PER_REQUEST
+      ResourcePolicy:
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Resource: arn:aws:dynamodb:us-west-2:819097794827:table/ai-horizon-leaderboard
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+                - dynamodb:Scan
+                - dynamodb:BatchGetItem
+                - dynamodb:BatchWriteItem
+              Effect: Allow
+              Principal:
+                AWS: arn:aws:iam::819097794827:role/service-role/ai-horizon-leaderboard
+              Sid: AllowLambdaAccess
+      KeySchema:
+        - KeyType: HASH
+          AttributeName: id
+      DeletionProtectionEnabled: true
+      TableClass: STANDARD
+      Tags: []
+      TimeToLiveSpecification:
+        Enabled: false
+  PurchasesFunction:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      MemorySize: 256
+      Description: ""
+      TracingConfig:
+        Mode: PassThrough
+      Timeout: 10
+      RuntimeManagementConfig:
+        UpdateRuntimeOn: Auto
+      Handler: index.handler
+      Code:
+        ZipFile: "// Deployed separately: see AGENTS.md (Deploy) and infra/README.md"
+      Role: arn:aws:iam::819097794827:role/ai-horizon-purchases
+      FileSystemConfigs: []
+      FunctionName: ai-horizon-purchases
+      Runtime: nodejs22.x
+      PackageType: Zip
+      LoggingConfig:
+        LogFormat: Text
+        LogGroup: /aws/lambda/ai-horizon-purchases
+      RecursiveLoop: Terminate
+      Environment:
+        Variables:
+          SIGNING_SECRET_ID: arn:aws:secretsmanager:us-west-2:819097794827:secret:ai-horizon-purchases-signing-hUyDvp
+          STRIPE_PRICE_ID: price_1UX0TyFyAA1uvMq5u2MplkN7
+          STRIPE_SECRET_ID: arn:aws:secretsmanager:us-west-2:819097794827:secret:ai-horizon-stripe-PhvFh4
+          GOOGLE_CLIENT_ID: 543292441425-m7omsj7v8507s76j14iticcd380v6i3c.apps.googleusercontent.com
+      EphemeralStorage:
+        Size: 512
+      Architectures:
+        - x86_64
+  PurchasesOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RestApiId: 0p6x6bw6c2
+      ResourceId: tuj1dq
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      ApiKeyRequired: false
+      Integration:
+        Type: MOCK
+        PassthroughBehavior: WHEN_NO_MATCH
+        TimeoutInMillis: 29000
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: "200"
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-amz-content-sha256'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          ResponseModels:
+            application/json: Empty
+  PurchasesPermission:
+    Type: AWS::Lambda::Permission
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      FunctionName: arn:aws:lambda:us-west-2:819097794827:function:ai-horizon-purchases
+      Action: lambda:InvokeFunction
+      SourceArn: arn:aws:execute-api:us-west-2:819097794827:0p6x6bw6c2/*/POST/purchases*
+      Principal: apigateway.amazonaws.com
+  PurchasesPostMethod:
+    Type: AWS::ApiGateway::Method
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RestApiId: 0p6x6bw6c2
+      ResourceId: tuj1dq
+      HttpMethod: POST
+      AuthorizationType: AWS_IAM
+      ApiKeyRequired: false
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: arn:aws:apigateway:us-west-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-west-2:819097794827:function:ai-horizon-purchases/invocations
+        PassthroughBehavior: WHEN_NO_MATCH
+        TimeoutInMillis: 29000
+  PurchasesRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      MaxSessionDuration: 3600
+      RoleName: ai-horizon-purchases
+      Policies:
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Resource: arn:aws:dynamodb:us-west-2:819097794827:table/ai-horizon-purchases
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                Effect: Allow
+              - Resource:
+                  - arn:aws:secretsmanager:us-west-2:819097794827:secret:ai-horizon-purchases-signing-hUyDvp
+                  - arn:aws:secretsmanager:us-west-2:819097794827:secret:ai-horizon-stripe-PhvFh4
+                Action: secretsmanager:GetSecretValue
+                Effect: Allow
+          PolicyName: purchases
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+  PurchasesTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      SSESpecification:
+        SSEEnabled: false
+      TableName: ai-horizon-purchases
+      AttributeDefinitions:
+        - AttributeType: S
+          AttributeName: account
+      ContributorInsightsSpecification:
+        Enabled: false
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      KeySchema:
+        - KeyType: HASH
+          AttributeName: account
+      WarmThroughput:
+        ReadUnitsPerSecond: 12000
+        WriteUnitsPerSecond: 4000
+      DeletionProtectionEnabled: false
+      Tags: []
+      TimeToLiveSpecification:
+        Enabled: false
+  SigningSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ReplicaRegions: []
+      Description: AI Horizon purchases account-token signing key
+      Tags: []
+      Name: ai-horizon-purchases-signing
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AbacStatus: Disabled
+      WebsiteConfiguration:
+        IndexDocument: index.html
+      PublicAccessBlockConfiguration:
+        RestrictPublicBuckets: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        BlockPublicAcls: true
+      BucketName: ai-horizon
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            BlockedEncryptionTypes:
+              EncryptionType:
+                - SSE-C
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Bucket: ai-horizon
+      PolicyDocument:
+        Version: "2008-10-17"
+        Statement:
+          - Condition:
+              StringEquals:
+                AWS:SourceArn: arn:aws:cloudfront::819097794827:distribution/E1W9EL4KRYQ8VQ
+            Resource: arn:aws:s3:::ai-horizon/*
+            Action: s3:GetObject
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Sid: AllowCloudFrontServicePrincipal
+        Id: PolicyForCloudFrontPrivateContent
+  SiteCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      CachePolicyConfig:
+        Comment: Policy with caching enabled. Supports Gzip and Brotli compression.
+        MinTTL: 1
+        MaxTTL: 3.1536E7
+        ParametersInCacheKeyAndForwardedToOrigin:
+          QueryStringsConfig:
+            QueryStringBehavior: none
+          EnableAcceptEncodingBrotli: true
+          HeadersConfig:
+            HeaderBehavior: none
+          CookiesConfig:
+            CookieBehavior: none
+          EnableAcceptEncodingGzip: true
+        DefaultTTL: 86400
+        Name: Managed-CachingOptimized
+  SiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      DistributionConfig:
+        Logging:
+          IncludeCookies: false
+          Bucket: ""
+          Prefix: ""
+        Comment: ""
+        DefaultRootObject: index.html
+        Origins:
+          - ConnectionTimeout: 10
+            OriginAccessControlId: E1SMCOQ8CK2WNN
+            ConnectionAttempts: 3
+            OriginCustomHeaders: []
+            DomainName: ai-horizon.s3.us-west-2.amazonaws.com
+            OriginShield:
+              Enabled: false
+            S3OriginConfig:
+              OriginReadTimeout: 30
+              OriginAccessIdentity: ""
+            OriginPath: ""
+            Id: ai-horizon.s3.us-west-2.amazonaws.com
+        ViewerCertificate:
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+          AcmCertificateArn: arn:aws:acm:us-east-1:819097794827:certificate/ded47ed5-d03f-4732-881b-f64e58eb46ce
+        PriceClass: PriceClass_100
+        DefaultCacheBehavior:
+          Compress: true
+          FunctionAssociations:
+            - FunctionARN: arn:aws:cloudfront::819097794827:function/apex-to-www-redirect
+              EventType: viewer-request
+          LambdaFunctionAssociations: []
+          TargetOriginId: ai-horizon.s3.us-west-2.amazonaws.com
+          ViewerProtocolPolicy: redirect-to-https
+          GrpcConfig:
+            Enabled: false
+          TrustedSigners: []
+          FieldLevelEncryptionId: ""
+          TrustedKeyGroups: []
+          AllowedMethods:
+            - HEAD
+            - GET
+          CachedMethods:
+            - HEAD
+            - GET
+          SmoothStreaming: false
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        Staging: false
+        CustomErrorResponses: []
+        ContinuousDeploymentPolicyId: ""
+        OriginGroups:
+          Quantity: 0
+          Items: []
+        Enabled: true
+        Aliases:
+          - www.agentmode.dev
+          - agentmode.dev
+        IPV6Enabled: true
+        WebACLId: ""
+        HttpVersion: http2
+        Restrictions:
+          GeoRestriction:
+            Locations: []
+            RestrictionType: none
+        CacheBehaviors: []
+      Tags:
+        - Value: AI Horizon
+          Key: Name
+  SiteOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      OriginAccessControlConfig:
+        SigningBehavior: always
+        Description: ""
+        SigningProtocol: sigv4
+        OriginAccessControlOriginType: s3
+        Name: ai-horizon.s3.us-west-2.amazonaws.com
+  StripeSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ReplicaRegions: []
+      Description: AI Horizon Stripe secret key and webhook secret
+      Tags: []
+      Name: ai-horizon-stripe
+  StripeWebhookPostMethod:
+    Type: AWS::ApiGateway::Method
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RestApiId: 0p6x6bw6c2
+      ResourceId: y01rg0
+      HttpMethod: POST
+      AuthorizationType: NONE
+      ApiKeyRequired: false
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: arn:aws:apigateway:us-west-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-west-2:819097794827:function:ai-horizon-purchases/invocations
+        PassthroughBehavior: WHEN_NO_MATCH
+        TimeoutInMillis: 29000

@@ -44,6 +44,16 @@
    prompt helpers against `aws bedrock-runtime converse` (Windows CLI: pass `file://` JSON with
    non-ASCII escaped and set `PYTHONUTF8=1`).
 
+## Infrastructure (CloudFormation stack `ai-horizon`, `infra/template.yaml`)
+
+- The production AWS resources (site bucket, CloudFront, API Gateway, Lambda configuration and
+  permissions, DynamoDB tables, Cognito, IAM, secrets without values, alerts topic) are managed by
+  the stack `ai-horizon` (us-west-2); see `infra/README.md`. All resources are `Retain`.
+- Make infrastructure changes in `infra/template.yaml` and apply them through a reviewed change set,
+  not with the console or ad-hoc CLI calls (those show up as drift). Lambda code still deploys with
+  `update-function-code`, and secret values with `put-secret-value`; neither is in the template.
+- After a change, run a drift detection; the stack should stay `IN_SYNC`.
+
 ## Bullet Upgrade purchases (spec: `docs/bullet-upgrade-spec.md`)
 
 - Lambda `ai-horizon-purchases` (`server/lambda/purchases.js`, role `ai-horizon-purchases`), API

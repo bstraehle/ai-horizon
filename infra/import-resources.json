@@ -1,0 +1,325 @@
+[
+  {
+    "ResourceType": "AWS::SNS::Topic",
+    "LogicalResourceId": "AlertTopic",
+    "ResourceIdentifier": {
+      "TopicArn": "arn:aws:sns:us-west-2:819097794827:ai-horizon-alerts"
+    }
+  },
+  {
+    "ResourceType": "AWS::Lambda::Function",
+    "LogicalResourceId": "AnalysisFunction",
+    "ResourceIdentifier": {
+      "FunctionName": "ai-horizon-analysis"
+    }
+  },
+  {
+    "ResourceType": "AWS::IAM::ManagedPolicy",
+    "LogicalResourceId": "AnalysisLogsPolicy",
+    "ResourceIdentifier": {
+      "PolicyArn": "arn:aws:iam::819097794827:policy/service-role/AWSLambdaBasicExecutionRole-d8c8b37e-719c-48df-8f44-97a40f899fbe"
+    }
+  },
+  {
+    "ResourceType": "AWS::Lambda::Permission",
+    "LogicalResourceId": "AnalysisPostPermission",
+    "ResourceIdentifier": {
+      "FunctionName": "arn:aws:lambda:us-west-2:819097794827:function:ai-horizon-analysis",
+      "Id": "5d41c3f5-047f-50e4-888f-8b0f6c5551c4"
+    }
+  },
+  {
+    "ResourceType": "AWS::IAM::Role",
+    "LogicalResourceId": "AnalysisRole",
+    "ResourceIdentifier": {
+      "RoleName": "ai-horizon-analysis-role-jj8nlat7"
+    }
+  },
+  {
+    "ResourceType": "AWS::ApiGateway::RestApi",
+    "LogicalResourceId": "Api",
+    "ResourceIdentifier": {
+      "RestApiId": "0p6x6bw6c2"
+    }
+  },
+  {
+    "ResourceType": "AWS::ApiGateway::GatewayResponse",
+    "LogicalResourceId": "ApiDefault4xxResponse",
+    "ResourceIdentifier": {
+      "Id": "0p6x6bw6c2:DEFAULT_4XX"
+    }
+  },
+  {
+    "ResourceType": "AWS::ApiGateway::GatewayResponse",
+    "LogicalResourceId": "ApiDefault5xxResponse",
+    "ResourceIdentifier": {
+      "Id": "0p6x6bw6c2:DEFAULT_5XX"
+    }
+  },
+  {
+    "ResourceType": "AWS::ApiGateway::Resource",
+    "LogicalResourceId": "ApiLeaderboardResource",
+    "ResourceIdentifier": {
+      "RestApiId": "0p6x6bw6c2",
+      "ResourceId": "we6bjn"
+    }
+  },
+  {
+    "ResourceType": "AWS::ApiGateway::Resource",
+    "LogicalResourceId": "ApiPurchasesResource",
+    "ResourceIdentifier": {
+      "RestApiId": "0p6x6bw6c2",
+      "ResourceId": "tuj1dq"
+    }
+  },
+  {
+    "ResourceType": "AWS::ApiGateway::Stage",
+    "LogicalResourceId": "ApiStageDev",
+    "ResourceIdentifier": {
+      "RestApiId": "0p6x6bw6c2",
+      "StageName": "dev"
+    }
+  },
+  {
+    "ResourceType": "AWS::ApiGateway::Resource",
+    "LogicalResourceId": "ApiStripeWebhookResource",
+    "ResourceIdentifier": {
+      "RestApiId": "0p6x6bw6c2",
+      "ResourceId": "y01rg0"
+    }
+  },
+  {
+    "ResourceType": "AWS::IAM::ManagedPolicy",
+    "LogicalResourceId": "CognitoUnauthenticatedPolicy",
+    "ResourceIdentifier": {
+      "PolicyArn": "arn:aws:iam::819097794827:policy/service-role/Cognito-unauthenticated-1758116129272"
+    }
+  },
+  {
+    "ResourceType": "AWS::IAM::Role",
+    "LogicalResourceId": "CognitoUnauthenticatedRole",
+    "ResourceIdentifier": {
+      "RoleName": "cognito-ai-horizon"
+    }
+  },
+  {
+    "ResourceType": "AWS::SecretsManager::Secret",
+    "LogicalResourceId": "ElevenLabsSecret",
+    "ResourceIdentifier": {
+      "Id": "arn:aws:secretsmanager:us-west-2:819097794827:secret:Eleven_Labs-SJVA2t"
+    }
+  },
+  {
+    "ResourceType": "AWS::Cognito::IdentityPool",
+    "LogicalResourceId": "IdentityPool",
+    "ResourceIdentifier": {
+      "Id": "us-west-2:3039071f-2d61-42c8-a869-af7594fa2c7d"
+    }
+  },
+  {
+    "ResourceType": "AWS::Cognito::IdentityPoolRoleAttachment",
+    "LogicalResourceId": "IdentityPoolRoles",
+    "ResourceIdentifier": {
+      "Id": "us-west-2:3039071f-2d61-42c8-a869-af7594fa2c7d"
+    }
+  },
+  {
+    "ResourceType": "AWS::IAM::ManagedPolicy",
+    "LogicalResourceId": "LeaderboardDestinationPolicy",
+    "ResourceIdentifier": {
+      "PolicyArn": "arn:aws:iam::819097794827:policy/service-role/AWSLambdaLambdaFunctionDestinationExecutionRole-dad37fdc-072d-4c2b-ab02-f73565278c5d"
+    }
+  },
+  {
+    "ResourceType": "AWS::Lambda::Function",
+    "LogicalResourceId": "LeaderboardFunction",
+    "ResourceIdentifier": {
+      "FunctionName": "ai-horizon-leaderboard"
+    }
+  },
+  {
+    "ResourceType": "AWS::ApiGateway::Method",
+    "LogicalResourceId": "LeaderboardGetMethod",
+    "ResourceIdentifier": {
+      "RestApiId": "0p6x6bw6c2",
+      "ResourceId": "we6bjn",
+      "HttpMethod": "GET"
+    }
+  },
+  {
+    "ResourceType": "AWS::Lambda::Permission",
+    "LogicalResourceId": "LeaderboardGetPermission",
+    "ResourceIdentifier": {
+      "FunctionName": "arn:aws:lambda:us-west-2:819097794827:function:ai-horizon-leaderboard",
+      "Id": "d2d38b33-37df-5ea2-b91d-1a072efdaf7b"
+    }
+  },
+  {
+    "ResourceType": "AWS::IAM::ManagedPolicy",
+    "LogicalResourceId": "LeaderboardLogsPolicy",
+    "ResourceIdentifier": {
+      "PolicyArn": "arn:aws:iam::819097794827:policy/service-role/AWSLambdaBasicExecutionRole-9bddc3f3-8547-4d1b-82bc-9746157e35f9"
+    }
+  },
+  {
+    "ResourceType": "AWS::IAM::ManagedPolicy",
+    "LogicalResourceId": "LeaderboardMicroservicePolicy",
+    "ResourceIdentifier": {
+      "PolicyArn": "arn:aws:iam::819097794827:policy/service-role/AWSLambdaMicroserviceExecutionRole-4018ad92-cfa4-4dbf-af62-5253ae808886"
+    }
+  },
+  {
+    "ResourceType": "AWS::ApiGateway::Method",
+    "LogicalResourceId": "LeaderboardOptionsMethod",
+    "ResourceIdentifier": {
+      "RestApiId": "0p6x6bw6c2",
+      "ResourceId": "we6bjn",
+      "HttpMethod": "OPTIONS"
+    }
+  },
+  {
+    "ResourceType": "AWS::ApiGateway::Method",
+    "LogicalResourceId": "LeaderboardPostMethod",
+    "ResourceIdentifier": {
+      "RestApiId": "0p6x6bw6c2",
+      "ResourceId": "we6bjn",
+      "HttpMethod": "POST"
+    }
+  },
+  {
+    "ResourceType": "AWS::ApiGateway::Method",
+    "LogicalResourceId": "LeaderboardPutMethod",
+    "ResourceIdentifier": {
+      "RestApiId": "0p6x6bw6c2",
+      "ResourceId": "we6bjn",
+      "HttpMethod": "PUT"
+    }
+  },
+  {
+    "ResourceType": "AWS::Lambda::Permission",
+    "LogicalResourceId": "LeaderboardPutPermission",
+    "ResourceIdentifier": {
+      "FunctionName": "arn:aws:lambda:us-west-2:819097794827:function:ai-horizon-leaderboard",
+      "Id": "e7593501-1cd9-57ad-b351-81a7d80125a7"
+    }
+  },
+  {
+    "ResourceType": "AWS::IAM::Role",
+    "LogicalResourceId": "LeaderboardRole",
+    "ResourceIdentifier": {
+      "RoleName": "ai-horizon-leaderboard"
+    }
+  },
+  {
+    "ResourceType": "AWS::DynamoDB::Table",
+    "LogicalResourceId": "LeaderboardTable",
+    "ResourceIdentifier": {
+      "TableName": "ai-horizon-leaderboard"
+    }
+  },
+  {
+    "ResourceType": "AWS::Lambda::Function",
+    "LogicalResourceId": "PurchasesFunction",
+    "ResourceIdentifier": {
+      "FunctionName": "ai-horizon-purchases"
+    }
+  },
+  {
+    "ResourceType": "AWS::ApiGateway::Method",
+    "LogicalResourceId": "PurchasesOptionsMethod",
+    "ResourceIdentifier": {
+      "RestApiId": "0p6x6bw6c2",
+      "ResourceId": "tuj1dq",
+      "HttpMethod": "OPTIONS"
+    }
+  },
+  {
+    "ResourceType": "AWS::Lambda::Permission",
+    "LogicalResourceId": "PurchasesPermission",
+    "ResourceIdentifier": {
+      "FunctionName": "arn:aws:lambda:us-west-2:819097794827:function:ai-horizon-purchases",
+      "Id": "apigateway-purchases"
+    }
+  },
+  {
+    "ResourceType": "AWS::ApiGateway::Method",
+    "LogicalResourceId": "PurchasesPostMethod",
+    "ResourceIdentifier": {
+      "RestApiId": "0p6x6bw6c2",
+      "ResourceId": "tuj1dq",
+      "HttpMethod": "POST"
+    }
+  },
+  {
+    "ResourceType": "AWS::IAM::Role",
+    "LogicalResourceId": "PurchasesRole",
+    "ResourceIdentifier": {
+      "RoleName": "ai-horizon-purchases"
+    }
+  },
+  {
+    "ResourceType": "AWS::DynamoDB::Table",
+    "LogicalResourceId": "PurchasesTable",
+    "ResourceIdentifier": {
+      "TableName": "ai-horizon-purchases"
+    }
+  },
+  {
+    "ResourceType": "AWS::SecretsManager::Secret",
+    "LogicalResourceId": "SigningSecret",
+    "ResourceIdentifier": {
+      "Id": "arn:aws:secretsmanager:us-west-2:819097794827:secret:ai-horizon-purchases-signing-hUyDvp"
+    }
+  },
+  {
+    "ResourceType": "AWS::S3::Bucket",
+    "LogicalResourceId": "SiteBucket",
+    "ResourceIdentifier": {
+      "BucketName": "ai-horizon"
+    }
+  },
+  {
+    "ResourceType": "AWS::S3::BucketPolicy",
+    "LogicalResourceId": "SiteBucketPolicy",
+    "ResourceIdentifier": {
+      "Bucket": "ai-horizon"
+    }
+  },
+  {
+    "ResourceType": "AWS::CloudFront::CachePolicy",
+    "LogicalResourceId": "SiteCachePolicy",
+    "ResourceIdentifier": {
+      "Id": "658327ea-f89d-4fab-a63d-7e88639e58f6"
+    }
+  },
+  {
+    "ResourceType": "AWS::CloudFront::Distribution",
+    "LogicalResourceId": "SiteDistribution",
+    "ResourceIdentifier": {
+      "Id": "E1W9EL4KRYQ8VQ"
+    }
+  },
+  {
+    "ResourceType": "AWS::CloudFront::OriginAccessControl",
+    "LogicalResourceId": "SiteOriginAccessControl",
+    "ResourceIdentifier": {
+      "Id": "E1SMCOQ8CK2WNN"
+    }
+  },
+  {
+    "ResourceType": "AWS::SecretsManager::Secret",
+    "LogicalResourceId": "StripeSecret",
+    "ResourceIdentifier": {
+      "Id": "arn:aws:secretsmanager:us-west-2:819097794827:secret:ai-horizon-stripe-PhvFh4"
+    }
+  },
+  {
+    "ResourceType": "AWS::ApiGateway::Method",
+    "LogicalResourceId": "StripeWebhookPostMethod",
+    "ResourceIdentifier": {
+      "RestApiId": "0p6x6bw6c2",
+      "ResourceId": "y01rg0",
+      "HttpMethod": "POST"
+    }
+  }
+]
