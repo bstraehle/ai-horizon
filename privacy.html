@@ -67,13 +67,14 @@
         <p class="instructions">
           Only if you buy the Bullet Upgrade, you sign in with Google, and Google tells the backend
           your Google account's ID and email address. The backend stores the account ID with the
-          purchase's status and Stripe reference in Amazon DynamoDB, so the upgrade works wherever
-          you sign in; your browser keeps a sign-in token in its local storage. The checkout passes
-          the account ID to Stripe as the order reference, and the email address to fill in the
-          form; AI HORIZON does not store the email address. Stripe processes the payment as the
-          merchant of record under its own privacy policy; AI HORIZON never receives your card
-          details. Leaderboard scores flown with the upgrade are marked with ⚡, never with your
-          account.
+          purchase's status and its Stripe or Google Play reference in Amazon DynamoDB, so the
+          upgrade works wherever you sign in; your browser keeps a sign-in token in its local
+          storage. On the website, the checkout passes the account ID to Stripe as the order
+          reference, and the email address to fill in the form; AI HORIZON does not store the email
+          address. In the Android app, Google Play takes the payment and the backend checks the
+          purchase with Google Play. Stripe or Google Play processes the payment as the merchant of
+          record under its own privacy policy; AI HORIZON never receives your card details.
+          Leaderboard scores flown with the upgrade are marked with ⚡, never with your account.
         </p>
 
         <h3>How data is used</h3>

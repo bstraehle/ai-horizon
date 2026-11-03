@@ -218,6 +218,13 @@
     }
   },
   {
+    "ResourceType": "AWS::SecretsManager::Secret",
+    "LogicalResourceId": "PlayServiceAccountSecret",
+    "ResourceIdentifier": {
+      "Id": "arn:aws:secretsmanager:us-west-2:819097794827:secret:ai-horizon-play-service-account-OGlFQQ"
+    }
+  },
+  {
     "ResourceType": "AWS::Lambda::Function",
     "LogicalResourceId": "PurchasesFunction",
     "ResourceIdentifier": {

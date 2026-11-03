@@ -708,6 +708,7 @@ Resources:
           STRIPE_PRICE_ID: price_1UX0TyFyAA1uvMq5u2MplkN7
           STRIPE_SECRET_ID: arn:aws:secretsmanager:us-west-2:819097794827:secret:ai-horizon-stripe-PhvFh4
           GOOGLE_CLIENT_ID: 543292441425-m7omsj7v8507s76j14iticcd380v6i3c.apps.googleusercontent.com
+          PLAY_SECRET_ID: arn:aws:secretsmanager:us-west-2:819097794827:secret:ai-horizon-play-service-account-OGlFQQ
       EphemeralStorage:
         Size: 512
       Architectures:
@@ -789,6 +790,7 @@ Resources:
               - Resource:
                   - arn:aws:secretsmanager:us-west-2:819097794827:secret:ai-horizon-purchases-signing-hUyDvp
                   - arn:aws:secretsmanager:us-west-2:819097794827:secret:ai-horizon-stripe-PhvFh4
+                  - arn:aws:secretsmanager:us-west-2:819097794827:secret:ai-horizon-play-service-account-OGlFQQ
                 Action: secretsmanager:GetSecretValue
                 Effect: Allow
           PolicyName: purchases
@@ -825,6 +827,15 @@ Resources:
       Tags: []
       TimeToLiveSpecification:
         Enabled: false
+  PlayServiceAccountSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ReplicaRegions: []
+      Description: AI Horizon Google Play Developer API service account key
+      Tags: []
+      Name: ai-horizon-play-service-account
   SigningSecret:
     Type: AWS::SecretsManager::Secret
     DeletionPolicy: Retain
