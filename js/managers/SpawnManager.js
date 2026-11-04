@@ -16,7 +16,6 @@ import { Star } from "../entities/Star.js";
  * @property {number} starSpeed
  * @property {boolean} [_isMobile]
  * @property {boolean} [_isLowPowerMode]
- * @property {number} [_spawnRateScale]
  * @property {AsteroidPool | null | undefined} [asteroidPool]
  * @property {StarPool | null | undefined} [starPool]
  * @property {Asteroid[]} asteroids
@@ -130,12 +129,10 @@ export class SpawnManager {
       : isMobile === false
         ? CONFIG.GAME.STAR_SPAWN_RATE_DESKTOP
         : CONFIG.GAME.STAR_SPAWN_RATE;
-    const spawnScale =
-      typeof game._spawnRateScale === "number" && game._spawnRateScale > 0
-        ? Math.max(0.1, Math.min(1, game._spawnRateScale))
-        : 1;
-    const asteroidRate = asteroidBase * spawnScale;
-    const starRate = starBase * spawnScale;
+    // Rates depend on the device class only, never on the performance level: a slow device keeps
+    // the same objects (and scoring chances) and saves work on particles, starfield and resolution.
+    const asteroidRate = asteroidBase;
+    const starRate = starBase;
 
     const pAst = 1 - Math.exp(-asteroidRate * dt);
     const pStar = 1 - Math.exp(-starRate * dt);

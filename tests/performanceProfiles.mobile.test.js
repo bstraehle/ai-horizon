@@ -6,7 +6,6 @@ function createGameStub() {
   return {
     _performanceLevel: 0,
     _starfieldScale: 1,
-    _spawnRateScale: 1,
     _performanceParticleMultiplier: 1,
     _particleBudget: Number.POSITIVE_INFINITY,
     _dprOverride: null,

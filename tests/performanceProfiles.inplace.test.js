@@ -11,7 +11,6 @@ function makeGame(level = 0) {
   return /** @type {any} */ ({
     _performanceLevel: level,
     _starfieldScale: 1,
-    _spawnRateScale: 1,
     _performanceParticleMultiplier: 1,
     _particleBudget: Number.POSITIVE_INFINITY,
     _dprOverride: null,
@@ -111,9 +110,17 @@ describe("applyPerformanceProfile in-place tier changes", () => {
   it("level 1 lowers resolution and effects but leaves spawn rates (gameplay) alone", () => {
     const game = makeGame(0);
     applyPerformanceProfile(game, 1, { reinitialize: false });
-    expect(game._spawnRateScale).toBe(1);
     expect(game._dprOverride).toBeLessThan(CONFIG.VIEW.DPR_MAX);
     expect(game._performanceParticleMultiplier).toBeLessThan(1);
+  });
+
+  it("no tier changes spawn rates, so a slower device keeps the same scoring chances", () => {
+    expect(CONFIG.PERFORMANCE.LEVELS.every((l) => !("spawnRateScale" in l))).toBe(true);
+    for (let level = 0; level <= CONFIG.PERFORMANCE.LEVELS.length; level++) {
+      const game = makeGame(0);
+      applyPerformanceProfile(game, level, { reinitialize: false, force: true });
+      expect("_spawnRateScale" in game).toBe(false);
+    }
   });
 
   it("every tier's DPR ceiling sits below the desktop cap and decreases monotonically", () => {

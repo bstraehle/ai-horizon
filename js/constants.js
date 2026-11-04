@@ -254,7 +254,6 @@ export const CONFIG = deepFreeze({
       {
         thresholdMs: 20,
         starfieldScale: 0.85,
-        spawnRateScale: 1,
         particleMultiplier: 0.85,
         particleBudget: 2600,
         dprMax: 1.25,
@@ -265,7 +264,6 @@ export const CONFIG = deepFreeze({
       {
         thresholdMs: 24,
         starfieldScale: 0.6,
-        spawnRateScale: 0.75,
         particleMultiplier: 0.6,
         particleBudget: 1500,
         dprMax: 1.1,
@@ -276,7 +274,6 @@ export const CONFIG = deepFreeze({
       {
         thresholdMs: 30,
         starfieldScale: 0.4,
-        spawnRateScale: 0.6,
         particleMultiplier: 0.4,
         particleBudget: 950,
         dprMax: 1.0,
@@ -287,7 +284,6 @@ export const CONFIG = deepFreeze({
       {
         thresholdMs: 36,
         starfieldScale: 0.3,
-        spawnRateScale: 0.5,
         particleMultiplier: 0.3,
         particleBudget: 700,
         dprMax: 0.9,

@@ -5,7 +5,7 @@ import { adjustBackgroundQuality } from "../systems/BackgroundLifecycle.js";
 /**
  * Apply a performance tier to the running game instance.
  *
- * Adjusts particle budgets, spawn rates, starfield density, DPR ceilings, engine trail cadence,
+ * Adjusts particle budgets, starfield density, DPR ceilings, engine trail cadence,
  * and low-power flag. Tier changes are applied in place so they are not visually disruptive
  * mid-game: the canvas is only resized when the DPR ceiling actually changed, and the starfield
  * is thinned/thickened rather than regenerated (nebula is left untouched).
@@ -32,7 +32,6 @@ export function applyPerformanceProfile(game, level, meta = {}) {
   const defaults = {
     dprMax: CONFIG.VIEW.DPR_MAX,
     starfieldScale: 1,
-    spawnRateScale: 1,
     particleMultiplier: 1,
     particleBudget: Number.POSITIVE_INFINITY,
     engineTrailModulo: 1,
@@ -44,7 +43,6 @@ export function applyPerformanceProfile(game, level, meta = {}) {
 
   game._performanceLevel = level;
   game._starfieldScale = Math.max(minStarfieldScale, Math.min(1, profile.starfieldScale || 1));
-  game._spawnRateScale = Math.max(0.35, Math.min(1, profile.spawnRateScale || 1));
   game._performanceParticleMultiplier = Math.max(0.1, Math.min(1, profile.particleMultiplier || 1));
   game._particleBudget = Number.isFinite(profile.particleBudget)
     ? Math.max(200, profile.particleBudget)

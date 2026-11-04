@@ -133,7 +133,6 @@
  * @property {ObjectPoolOf<Star>} starPool
  * @property {ObjectPoolOf<Explosion>} explosionPool
  * @property {GameLoop} loop
- * @property {number} [_spawnRateScale]
  * @property {number} [_starfieldScale]
  * @property {number} [_performanceLevel]
  * @property {number} [_performanceParticleMultiplier]
@@ -162,7 +161,6 @@
  * @property {Particle[]} particles
  * @property {Star[]} stars
  * @property {boolean=} _isLowPowerMode
- * @property {number=} _spawnRateScale
  * @property {number=} _engineTrailModulo
  * @property {number=} _engineTrailStep
  */

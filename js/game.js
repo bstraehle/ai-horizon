@@ -207,7 +207,6 @@ class AIHorizon {
     this._isLowPowerMode = false;
     this._performanceLevel = Math.min(perfLevels.length, initialPerfLevel);
     this._starfieldScale = 1;
-    this._spawnRateScale = 1;
     this._particleBudget = Number.POSITIVE_INFINITY;
     this._performanceParticleMultiplier = 1;
     this._dprOverride = null;
