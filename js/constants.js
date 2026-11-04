@@ -379,6 +379,13 @@ export const CONFIG = deepFreeze({
     ASTEROID_SPAWN_RATE_MOBILE: 1.5,
     STAR_SPAWN_RATE_DESKTOP: 2.0,
     STAR_SPAWN_RATE_MOBILE: 1.0,
+    /**
+     * Tablets: touch devices whose shorter CSS side is at least TABLET_MIN_SHORT_SIDE px. Their
+     * screen is 2-3x wider than a phone's, so phone rates would leave it sparse.
+     */
+    ASTEROID_SPAWN_RATE_TABLET: 2.5,
+    STAR_SPAWN_RATE_TABLET: 1.5,
+    TABLET_MIN_SHORT_SIDE: 600,
     STAR_NORMAL_BEFORE_BONUS: 4,
     ASTEROID_NORMAL_BEFORE_HARDENED: 4,
     BONUS_ASTEROID_COUNT: 8,

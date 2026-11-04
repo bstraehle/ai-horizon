@@ -9,6 +9,44 @@ import { Star } from "../entities/Star.js";
 /** @typedef {{ width:number, height:number }} ViewSize */
 
 /**
+ * Spawn class of the device and its asteroid / star rates (per second). Desktops (`_isMobile`
+ * false) get the desktop rates; touch devices (or low-power mode with unknown platform) are a
+ * tablet when the shorter side of the CSS viewport is at least `TABLET_MIN_SHORT_SIDE`, otherwise
+ * a phone. Unknown platforms fall back to the generic rates. Never depends on the performance
+ * level, so a slower device keeps the same scoring chances.
+ * @param {{ _isMobile?: boolean, _isLowPowerMode?: boolean, view?: ViewSize }} game
+ * @returns {{ deviceClass: "desktop"|"tablet"|"phone"|"default", asteroid: number, star: number }}
+ */
+export function spawnRates(game) {
+  const G = CONFIG.GAME;
+  const isMobile = typeof game._isMobile === "boolean" ? game._isMobile : null;
+  if (isMobile === false) {
+    return {
+      deviceClass: "desktop",
+      asteroid: G.ASTEROID_SPAWN_RATE_DESKTOP,
+      star: G.STAR_SPAWN_RATE_DESKTOP,
+    };
+  }
+  if (isMobile === true || game._isLowPowerMode) {
+    const w = game.view?.width || 0;
+    const h = game.view?.height || 0;
+    const shortSide = Math.min(w, h);
+    return shortSide >= G.TABLET_MIN_SHORT_SIDE
+      ? {
+          deviceClass: "tablet",
+          asteroid: G.ASTEROID_SPAWN_RATE_TABLET,
+          star: G.STAR_SPAWN_RATE_TABLET,
+        }
+      : {
+          deviceClass: "phone",
+          asteroid: G.ASTEROID_SPAWN_RATE_MOBILE,
+          star: G.STAR_SPAWN_RATE_MOBILE,
+        };
+  }
+  return { deviceClass: "default", asteroid: G.ASTEROID_SPAWN_RATE, star: G.STAR_SPAWN_RATE };
+}
+
+/**
  * @typedef {Object} SpawnGameSlice
  * @property {RNGLike} rng
  * @property {ViewSize} view
@@ -116,23 +154,7 @@ export class SpawnManager {
   static spawnObjects(game, dtSec) {
     const dt = typeof dtSec === "number" ? dtSec : CONFIG.TIME.DEFAULT_DT;
     const rng = game.rng;
-    const isMobile = typeof game._isMobile === "boolean" ? game._isMobile : null;
-    const lowPower = !!game._isLowPowerMode;
-    const treatAsMobile = isMobile === true || (lowPower && isMobile !== false);
-    const asteroidBase = treatAsMobile
-      ? CONFIG.GAME.ASTEROID_SPAWN_RATE_MOBILE
-      : isMobile === false
-        ? CONFIG.GAME.ASTEROID_SPAWN_RATE_DESKTOP
-        : CONFIG.GAME.ASTEROID_SPAWN_RATE;
-    const starBase = treatAsMobile
-      ? CONFIG.GAME.STAR_SPAWN_RATE_MOBILE
-      : isMobile === false
-        ? CONFIG.GAME.STAR_SPAWN_RATE_DESKTOP
-        : CONFIG.GAME.STAR_SPAWN_RATE;
-    // Rates depend on the device class only, never on the performance level: a slow device keeps
-    // the same objects (and scoring chances) and saves work on particles, starfield and resolution.
-    const asteroidRate = asteroidBase;
-    const starRate = starBase;
+    const { asteroid: asteroidRate, star: starRate } = spawnRates(game);
 
     const pAst = 1 - Math.exp(-asteroidRate * dt);
     const pStar = 1 - Math.exp(-starRate * dt);

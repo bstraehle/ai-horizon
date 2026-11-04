@@ -86,11 +86,13 @@ describe("leaderboard run-summary check", () => {
       STAR_SPAWN_RATE_MAX: Math.max(
         G.STAR_SPAWN_RATE,
         G.STAR_SPAWN_RATE_DESKTOP,
+        G.STAR_SPAWN_RATE_TABLET,
         G.STAR_SPAWN_RATE_MOBILE
       ),
       ASTEROID_SPAWN_RATE_MAX: Math.max(
         G.ASTEROID_SPAWN_RATE,
         G.ASTEROID_SPAWN_RATE_DESKTOP,
+        G.ASTEROID_SPAWN_RATE_TABLET,
         G.ASTEROID_SPAWN_RATE_MOBILE
       ),
       STARS_BEFORE_BONUS: G.STAR_NORMAL_BEFORE_BONUS,
