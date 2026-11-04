@@ -326,9 +326,19 @@ async function playProduct(purchaseToken, op) {
     headers: { Authorization: `Bearer ${await playAccessToken()}` },
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`Play ${op}: ${json?.error?.message || res.status}`);
+  if (!res.ok) {
+    const message = `Play ${op}: ${json?.error?.message || res.status}`;
+    throw Object.assign(new Error(message), { status: res.status });
+  }
   return json;
 }
+
+/**
+ * Whether a Play API error means the purchase token itself is bad (malformed, unknown or expired)
+ * rather than a problem on our side (credentials, permissions, outage).
+ * @param {unknown} err
+ */
+export const isBadPlayToken = (err) => [400, 404, 410].includes(/** @type {any} */ (err)?.status);
 
 /**
  * @param {any} purchase Play `ProductPurchase`.
@@ -394,7 +404,13 @@ async function handleAction(body, { clientId, priceId }) {
     if (typeof purchaseToken !== "string" || !purchaseToken || purchaseToken.length > 1024) {
       return respond(400, { message: "Bad purchase" });
     }
-    const purchase = await playProduct(purchaseToken, "get");
+    let purchase;
+    try {
+      purchase = await playProduct(purchaseToken, "get");
+    } catch (err) {
+      if (isBadPlayToken(err)) return respond(400, { message: "Bad purchase" });
+      throw err;
+    }
     if (!playPurchaseActive(purchase)) return respond(200, { owned: false });
     if (purchase.acknowledgementState === 0) await playProduct(purchaseToken, "acknowledge");
     const fields = { platform: "play", purchaseId: purchase.orderId, playToken: purchaseToken };

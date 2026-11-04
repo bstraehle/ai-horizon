@@ -387,6 +387,26 @@ describe("handler", () => {
     expect((await post({ action: "play", purchaseToken: "" })).statusCode).toBe(400);
   });
 
+  it("play answers 400 for a purchase token Google Play rejects, 500 for other Play errors", async () => {
+    const reply = (status) =>
+      vi
+        .mocked(fetch)
+        .mockImplementation(async (/** @type {any} */ url) =>
+          String(url).startsWith("https://androidpublisher.googleapis.com/")
+            ? new Response(JSON.stringify({ error: { message: "nope" } }), { status })
+            : new Response(JSON.stringify({ access_token: "ya29.test", expires_in: 3600 }))
+        );
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    reply(400);
+    const bad = await post({ action: "play", purchaseToken: "garbage" });
+    expect(bad.statusCode).toBe(400);
+    expect(json(bad)).toEqual({ message: "Bad purchase" });
+    reply(401);
+    expect((await post({ action: "play", purchaseToken: "garbage" })).statusCode).toBe(500);
+    expect(purchases.isBadPlayToken({ status: 410 })).toBe(true);
+    expect(purchases.isBadPlayToken({ status: 403 })).toBe(false);
+  });
+
   it("status revokes a Play purchase that was refunded", async () => {
     table.set("google:7", { status: "active", platform: "play", playToken: "ptok" });
     const token = signAccountToken("google:7", SIGNING_KEY);
