@@ -229,7 +229,12 @@ export const CONFIG = deepFreeze({
   TWO_PI: Math.PI * 2,
   VIEW: {
     DPR_MIN: 1.0,
-    DPR_MAX: 1.5,
+    /**
+     * Desktop cap: 2 renders a 4K screen natively (1920x1080 CSS at 2x = 3840x2160, inside
+     * MAX_CANVAS_PIXELS). The PerformanceMonitor tiers drop it (1.25 and lower) on sustained slow
+     * frames, so slower GPUs fall back on their own.
+     */
+    DPR_MAX: 2,
     DPR_MOBILE_MAX: 1.2,
     MAX_CANVAS_PIXELS: 9000000,
     MIN_RESOLUTION_SCALE: 0.5,

@@ -4,7 +4,11 @@
  *
  * Usage:
  *   node --experimental-websocket scripts/perf-bench.cjs [url] [--seconds=100] [--chrome=path]
+ *       [--size=1600x900] [--scale=1]
  *   npm run perf:bench -- http://localhost:8000
+ *
+ * `--size` is the CSS window size and `--scale` the device pixel ratio, e.g. `--size=1920x1080
+ * --scale=2` for a 4K screen; add `dpr=<cap>` to the URL to compare resolution caps on it.
  *
  * The page URL gets `?seed=12345&debug=perf&autoplay=1` appended unless it already carries a
  * query string. The script drives Chrome through the DevTools protocol (no extra dependencies:
@@ -23,6 +27,11 @@ const args = process.argv.slice(2);
 const url = args.find((a) => !a.startsWith("--")) || "http://localhost:8000";
 const seconds = Number((args.find((a) => a.startsWith("--seconds=")) || "").split("=")[1]) || 100;
 const chromeArg = (args.find((a) => a.startsWith("--chrome=")) || "").split("=")[1];
+/** CSS window size (`--size=1920x1080`) and device pixel ratio (`--scale=2` emulates a 4K screen). */
+const [winW, winH] = ((args.find((a) => a.startsWith("--size=")) || "").split("=")[1] || "1600x900")
+  .split("x")
+  .map(Number);
+const scale = Number((args.find((a) => a.startsWith("--scale=")) || "").split("=")[1]) || 1;
 const port = 9333 + Math.floor(Math.random() * 500);
 
 const CHROME_CANDIDATES = [
@@ -87,7 +96,8 @@ async function main() {
       "--disable-extensions",
       "--disable-background-timer-throttling",
       "--disable-renderer-backgrounding",
-      "--window-size=1600,900",
+      `--window-size=${winW},${winH}`,
+      `--force-device-scale-factor=${scale}`,
       "--autoplay-policy=no-user-gesture-required",
       targetUrl(),
     ],
