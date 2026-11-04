@@ -48,8 +48,13 @@ export function initUpgradeLinks(purchases, doc = document) {
   const render = ({ status }) => {
     confirming = false;
     if (status === "cancelled") flash("Purchase cancelled", CONFIG.SHARE.FEEDBACK_MS);
-    else if (status === "error") flash("Purchase failed", CONFIG.SHARE.FEEDBACK_MS);
-    else {
+    else if (status === "error") {
+      const reason = purchases.lastError;
+      flash(
+        reason ? `Purchase failed (${reason})` : "Purchase failed",
+        reason ? 8000 : CONFIG.SHARE.FEEDBACK_MS
+      );
+    } else {
       if (timer) clearTimeout(timer);
       // "ready": signed in inside the Play app; the payment sheet needs a fresh tap.
       confirming = status === "ready";

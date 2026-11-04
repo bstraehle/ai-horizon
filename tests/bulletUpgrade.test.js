@@ -204,6 +204,30 @@ describe("PurchaseManager", () => {
       await back.pm.buy();
       expect(back.pm.status).toBe("cancelled");
     });
+
+    it("reports why Google Play's payment sheet failed to open", async () => {
+      const storage = memoryStorage();
+      storage.setItem(
+        CONFIG.PURCHASES.STORAGE_KEY,
+        JSON.stringify({ token: "acct", owned: false })
+      );
+      const playPayment = vi.fn(async () => {
+        throw Object.assign(new Error("The payment method is not supported"), {
+          name: "NotSupportedError",
+        });
+      });
+      const { pm } = setup({
+        referrer: PLAY,
+        storage,
+        goods: goods(),
+        playPayment,
+        replies: { status: { owned: false } },
+      });
+      await pm.init();
+      await pm.buy();
+      expect(pm.status).toBe("error");
+      expect(pm.lastError).toBe("NotSupportedError: The payment method is not supported");
+    });
   });
 
   it("ignores a fragment whose state does not match", async () => {

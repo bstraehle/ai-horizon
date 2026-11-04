@@ -129,6 +129,8 @@ export class PurchaseManager {
     this.playBilling = false;
     /** Price shown on the link: Play's localized price in the Play app. */
     this.priceLabel = CONFIG.PURCHASES.PRICE_LABEL;
+    /** Reason of the last failed Play payment (shown on the link), or null. */
+    this.lastError = /** @type {string|null} */ (null);
     /** @type {{ token?: string, owned?: boolean, email?: string|null }} */
     this.saved = this._read();
     /** @type {PurchaseStatus} */
@@ -301,8 +303,17 @@ export class PurchaseManager {
     let response;
     try {
       response = await this.playPayment();
-    } catch {
-      this._set("cancelled"); // dismissed, or the sheet could not open
+    } catch (err) {
+      // AbortError: the player closed Google's sheet. Anything else means it could not open (or
+      // Play refused the purchase); keep the reason so the link can show it.
+      const e = /** @type {any} */ (err);
+      if (e?.name === "AbortError") {
+        this._set("cancelled");
+      } else {
+        this.lastError = `${e?.name || "Error"}${e?.message ? `: ${e.message}` : ""}`.slice(0, 80);
+        console.warn("Play payment failed:", err);
+        this._set("error");
+      }
       return;
     }
     let owned = false;
