@@ -95,8 +95,10 @@ Out of scope: subscriptions, other products, ads, refunds UI (handled by Google 
 - `js/ui/UpgradeLink.js` (new, like `Share.js` / `SoundToggle.js`): the links and their labels.
 - Analysis prompt: `upgrade.purchased` lets the debrief stop advising "reach 2500 points early to
   upgrade your bullets" for upgraded runs.
-- Content-Security-Policy: unchanged (top-level redirects to Google and Stripe are not limited by
-  it, and the API calls go to the existing API Gateway).
+- Content-Security-Policy: `connect-src` adds `https://play.google.com`, because Chrome checks the
+  Play Billing payment method identifier (`https://play.google.com/billing`) against it when the
+  Payment Request is constructed (otherwise `RangeError: Failed to construct 'PaymentRequest'`).
+  Top-level redirects to Google sign-in and Stripe are not limited by the policy.
 
 ## 4. Backend design
 
