@@ -71,6 +71,7 @@ import { getPurchases } from "./managers/PurchaseManager.js";
 import { MouseCapture, isMouseEvent } from "./ui/MouseCapture.js";
 import { detectMobilePlatform } from "./utils/mobilePlatform.js";
 import { updateGame } from "./systems/GameUpdate.js";
+import { isDying, startDeathSequence, updateDeathSequence } from "./systems/DeathSequence.js";
 import { drawGame, drawFrame, samplePerformance } from "./systems/GameRender.js";
 import { initBackgroundLifecycle, drawBackgroundLifecycle } from "./systems/BackgroundLifecycle.js";
 import { softReinitForPlatformChange as platformSoftReinit } from "./systems/PlatformLifecycle.js";
@@ -314,15 +315,20 @@ class AIHorizon {
       }
     );
     this.explosionPool = /* @__PURE__ */ new ObjectPool(
-      (x, y, w, h, life, maxLife) => new Explosion(x, y, w, h, life, maxLife),
+      (x, y, w, h, life, maxLife, accent) => new Explosion(x, y, w, h, life, maxLife, accent),
       undefined,
       { maxSize: 256 }
     );
 
-    /** @param {number} x @param {number} y */
-    this.createExplosion = (x, y) => {
+    /**
+     * @param {number} x
+     * @param {number} y
+     * @param {import('./ui/GameFactories.js').BlastKind} [kind] What was destroyed (default: rock).
+     * @param {number} [bodySize] Its width; planets scale their blast to it.
+     */
+    this.createExplosion = (x, y, kind, bodySize) => {
       try {
-        GameFactories.createExplosion(this, x, y);
+        GameFactories.createExplosion(this, x, y, kind, bodySize);
       } catch (_e) {
         /* ignore */
       }
@@ -435,7 +441,7 @@ class AIHorizon {
         if (metrics) this._frameMetrics = metrics;
         this.draw(frameDtMs);
       },
-      shouldUpdate: () => this.state.isRunning(),
+      shouldUpdate: () => this.state.isRunning() || isDying(this),
       stepMs: CONFIG.TIME.STEP_MS,
       maxSubSteps: CONFIG.TIME.MAX_SUB_STEPS,
       onMetrics: (m) => {
@@ -1107,22 +1113,15 @@ class AIHorizon {
   }
 
   /**
-   * End the game.
+   * End the run: apply the accuracy bonus, settle state, music, high score and run summary, then
+   * show the game-over screens. When the timer ran out they appear at once; after a crash they
+   * follow the death sequence (systems/DeathSequence.js), which keeps the loop running while the
+   * wreck plays out. A run ends only once: further calls are ignored.
    */
   gameOver() {
+    if (this.state.isGameOver()) return;
     /** @type {{ applied:boolean, baseScore:number, accuracy:number, bonus:number, newScore:number }|null} */
     let accuracySummary = null;
-    try {
-      if (this.input && this.input.fireHeld) {
-        this._uiTouchGuardActive = true;
-        if (this._uiTouchGuardTimeout) clearTimeout(this._uiTouchGuardTimeout);
-        this._uiTouchGuardTimeout = setTimeout(() => {
-          this._uiTouchGuardActive = false;
-        }, 0);
-      }
-    } catch {
-      /* ignore */
-    }
     try {
       if (ScoringManager && typeof ScoringManager.applyAccuracyBonus === "function") {
         accuracySummary = ScoringManager.applyAccuracyBonus(this);
@@ -1158,6 +1157,27 @@ class AIHorizon {
         : null;
     } catch (_e) {
       this._lastHistory = null;
+    }
+    if (this._dramaticEndPlayed && startDeathSequence(this)) return;
+    this._showGameOverScreens();
+  }
+
+  /**
+   * Show the game-over screens and stop the loop. A fire control still held at this moment arms
+   * the guard that swallows the first unintended click on the new screen.
+   * @private
+   */
+  _showGameOverScreens() {
+    try {
+      if (this.input && this.input.fireHeld) {
+        this._uiTouchGuardActive = true;
+        if (this._uiTouchGuardTimeout) clearTimeout(this._uiTouchGuardTimeout);
+        this._uiTouchGuardTimeout = setTimeout(() => {
+          this._uiTouchGuardActive = false;
+        }, 0);
+      }
+    } catch {
+      /* ignore */
     }
     handleGameOver(this);
     if (this.loop) {
@@ -1440,9 +1460,17 @@ class AIHorizon {
     this.highScore = LeaderboardManager.setHighScore(this.score, this.highScore, this.highScoreEl);
   }
 
-  /** Update all game objects and advance simulation for one tick. */
+  /**
+   * Advance one tick: the simulation while the mission is running, or the death sequence after
+   * a crash (the game-over screens follow when it ends). Otherwise a no-op, so the sub-steps
+   * left in a frame after the run ended cannot spawn, collide or score.
+   */
   update(dtSec = CONFIG.TIME.DEFAULT_DT) {
-    updateGame(this, dtSec);
+    if (isDying(this)) {
+      if (updateDeathSequence(this, dtSec)) this._showGameOverScreens();
+    } else if (this.state.isRunning()) {
+      updateGame(this, dtSec);
+    }
   }
 
   /**

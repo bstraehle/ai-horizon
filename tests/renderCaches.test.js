@@ -7,7 +7,7 @@ import { CONFIG } from "../js/constants.js";
 
 function makeCtx() {
   const ctx = {
-    calls: { drawImage: 0, fillText: 0, strokeText: 0, save: 0, measureText: 0 },
+    calls: { drawImage: 0, fillText: 0, strokeText: 0, save: 0, measureText: 0, stroke: 0 },
     globalAlpha: 1,
     font: "",
     fillStyle: "",
@@ -40,6 +40,9 @@ function makeCtx() {
     arc() {},
     ellipse() {},
     fill() {},
+    stroke() {
+      ctx.calls.stroke++;
+    },
     createRadialGradient: () => ({ addColorStop() {} }),
   };
   return ctx;
@@ -111,11 +114,35 @@ describe("Explosion sprite tables", () => {
     expect(e2._sprites.length).toBe(Explosion._SPRITE_STEPS + 1);
   });
 
-  it("draw falls back to gradients when no sprite can be created and keeps working", () => {
+  it("draw paints directly when no sprite can be created and keeps working", () => {
     const e = new Explosion(0, 0, 50, 50, 0.25, 0.25);
     const ctx = makeCtx();
     expect(() => e.draw(/** @type {any} */ (ctx))).not.toThrow();
     expect(ctx.calls.drawImage).toBe(0);
+  });
+
+  it("paints bigger and accented blasts directly, without sprites", () => {
+    MockOffscreenCanvas.created = 0;
+    vi.stubGlobal("OffscreenCanvas", MockOffscreenCanvas);
+    try {
+      const big = new Explosion(0, 0, 120, 120, 0.2, 0.4);
+      const accented = new Explosion(0, 0, 50, 50, 0.2, 0.4, "#ff5c5c");
+      expect(big._sprites).toBeNull();
+      expect(accented._sprites).toBeNull();
+      const ctx = makeCtx();
+      big.draw(/** @type {any} */ (ctx));
+      accented.draw(/** @type {any} */ (ctx));
+      // Half-way through: the flash plus the shockwave ring, straight onto the canvas.
+      expect(ctx.calls.stroke).toBe(2);
+      expect(ctx.calls.drawImage).toBe(0);
+      expect(MockOffscreenCanvas.created).toBe(0);
+      // A pooled instance reused for a rock's blast goes back to the shared sprite table.
+      big.reset(0, 0, 50, 50, 0.25, 0.25);
+      expect(big.accent).toBeNull();
+      expect(big._sprites).toBe(new Explosion(0, 0, 50, 50, 0.25, 0.25)._sprites);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

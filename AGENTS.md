@@ -8,6 +8,14 @@
 
 - `npm run ci:local` (eslint, prettier check, tsc, vitest).
 
+## Seeded runs
+
+- `game.rng` drives the simulation, and a seeded run (`?seed=`, the store video) must repeat frame
+  for frame. Effects that are only drawn take their randomness from `game.visualRng`, never from
+  `game.rng`, and must not change how often existing code draws from `game.rng`.
+- A change to how the run itself looks (not only the post-run screens) makes the store video and
+  the 4K screenshots stale: they need the full render, not the splice.
+
 ## Deploy (static site)
 
 1. `npm run build`. This is the only command that writes `dist/` to disk; `npm run serve` / `watch`

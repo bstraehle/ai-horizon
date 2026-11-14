@@ -31,13 +31,15 @@ function soundOptions(game, asteroid) {
  * Behavior & Covered Events
  * -------------------------
  * - bulletHitAsteroid: Awards score (different value for hardened asteroids), spawns an
- *   explosion entity, optionally a score popup, and plays the asteroid-hit or planet-explosion
- *   sound via the optional `game.audio` (AudioManager), panned by screen position and heavier
- *   once the bullet caliber upgrade is active.
+ *   explosion sized to what was destroyed (rock, planet or bonus planet; see
+ *   GameFactories.createExplosion), optionally a score popup, and plays the asteroid-hit or
+ *   planet-explosion sound via the optional `game.audio` (AudioManager), panned by screen
+ *   position and heavier once the bullet caliber upgrade is active.
  * - bulletDamagedAsteroid: Non-lethal hit on a hardened planet; plays the regular asteroid-hit
  *   sound (same pan / heavy rules).
- * - playerHitAsteroid: Plays the fatal crash sound, cuts the music, and triggers the game over
- *   sequence exactly once per emission chain.
+ * - playerHitAsteroid: Plays the fatal crash sound, cuts the music, blows up the ship (the
+ *   "ship" blast) and ends the run exactly once per emission chain; `game.gameOver()` then lets
+ *   the wreck play out before the game-over screens (systems/DeathSequence.js).
  * - Planet kills and the player's death also request a short screen shake (render-only, skipped
  *   under prefers-reduced-motion; see systems/ScreenShake.js).
  * - collectedStar (score path): Awards score (bonus for red stars), plays the star or bonus-star
@@ -137,7 +139,12 @@ export const EventHandlers = {
             game.regularAsteroidsKilled = (game.regularAsteroidsKilled || 0) + 1;
           }
         }
-        game.createExplosion(asteroid.x + asteroid.width / 2, asteroid.y + asteroid.height / 2);
+        game.createExplosion(
+          asteroid.x + asteroid.width / 2,
+          asteroid.y + asteroid.height / 2,
+          !asteroid.isHardened ? "rock" : asteroid.isBonus ? "bonus" : "planet",
+          asteroid.width
+        );
         if (asteroid && asteroid.isHardened) {
           game.audio?.playHardenedExplosion(!!asteroid.isBonus, sound);
         } else {
@@ -194,8 +201,7 @@ export const EventHandlers = {
           if (p && typeof game.createExplosion === "function") {
             const cx = (p.x || 0) + (p.width || 0) / 2;
             const cy = (p.y || 0) + (p.height || 0) / 2;
-            /** @param {number} min @param {number} max @returns {number} */
-            game.createExplosion(cx, cy);
+            game.createExplosion(cx, cy, "ship");
           }
           triggerShake(game, 12, 0.5);
         } catch {

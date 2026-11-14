@@ -352,6 +352,35 @@ export const CONFIG = deepFreeze({
     PARTICLE_GRAY_STEP: 5,
     SIZE: 50,
     SCALE_GAIN: 2,
+    /**
+     * Bigger blasts than a rock's (GameFactories.createExplosion): a destroyed planet, a bonus
+     * planet and the player's ship. The flash is `size` px wide, or `sizeFactor` times the
+     * destroyed body's width (never smaller than SIZE), and lasts `life` seconds; `sparks` extra
+     * sparks fly out at up to `sparkSpeed` px/s for up to `sparkLife` seconds. With `accent` the
+     * shockwave ring and half of the extra sparks take the run's accent colour.
+     */
+    BLASTS: {
+      planet: { sizeFactor: 1, life: 0.4, sparks: 20, sparkSpeed: 380, sparkLife: 0.6 },
+      bonus: {
+        sizeFactor: 1.25,
+        life: 0.5,
+        sparks: 32,
+        sparkSpeed: 460,
+        sparkLife: 0.75,
+        accent: true,
+      },
+      ship: { size: 90, life: 0.6, sparks: 40, sparkSpeed: 460, sparkLife: 0.8, accent: true },
+    },
+  },
+  /**
+   * Crash sequence (systems/DeathSequence.js): once the ship is hit, its wreck plays out for
+   * SECONDS before the game-over screens appear, with the asteroids and stars slowed to
+   * WORLD_TIME_SCALE so the one that hit the ship stays in view. SECONDS 0 shows the screens at
+   * once.
+   */
+  DEATH: {
+    SECONDS: 0.8,
+    WORLD_TIME_SCALE: 0.25,
   },
   PARTICLE: {
     GRAVITY: 360,

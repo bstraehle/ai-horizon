@@ -24,6 +24,7 @@ import { prefersReducedMotion } from "../utils/motion.js";
  * @property {number} [_shakeT] Screen shake remaining seconds (see systems/ScreenShake.js)
  * @property {number} [_shakeDur]
  * @property {number} [_shakeMag]
+ * @property {boolean} [_dramaticEndPlayed] The ship crashed this run and is no longer drawn
  * @property {import('../entities/ScorePopup.js').ScorePopupData[]} [scorePopups]
  * @property {()=>void} [drawBackground]
  */
@@ -197,7 +198,8 @@ export class RenderManager {
 
   /**
    * Composite full frame in fixed order (background→asteroids→bullets→stars→explosions→particles→trail→player→score popups).
-   * The engine trail is drawn beneath the ship so the exhaust glow sits behind the hull.
+   * The engine trail is drawn beneath the ship so the exhaust glow sits behind the hull. After a
+   * crash the ship is left out, so only its blast and the fading trail remain.
    * Score popups are advanced, culled and drawn by ScorePopup.drawAll (pre-rendered text sprites).
    * @param {RenderGameContext} game
    * @param {number} [extrapolateSec=0] Seconds past the last simulated state to project linear motion.
@@ -239,7 +241,7 @@ export class RenderManager {
     if (game.engineTrail && typeof game.engineTrail.draw === "function") {
       game.engineTrail.draw(ctx, t);
     }
-    if (game.player && typeof game.player.draw === "function") {
+    if (game.player && typeof game.player.draw === "function" && !game._dramaticEndPlayed) {
       game.player.draw(ctx, t, BackgroundManager.getCurrentNebulaPalette());
     }
     if (shaking) ctx.restore();

@@ -7,9 +7,11 @@ import { prefersReducedMotion } from "../utils/motion.js";
  * advanced with the real frame delta inside the render pass, so it never touches the fixed-step
  * simulation or the seeded RNG. Disabled entirely under prefers-reduced-motion.
  *
- * Lifecycle: a shake only decays while frames render. The death jolt is triggered on the same tick
- * that stops the loop, so it stays pending across the game-over screens; `resetShake` is called
- * from the run reset (systems/ResetLifecycle) so it does not replay on the next spawn.
+ * Lifecycle: a shake only decays while frames render. The death jolt plays out during the death
+ * sequence (systems/DeathSequence.js), which keeps the loop running after a crash; if the loop
+ * stops before it has decayed (the sequence is shorter than the jolt, or disabled), the rest
+ * stays pending across the game-over screens, so `resetShake` is called from the run reset
+ * (systems/ResetLifecycle) and it does not replay on the next spawn.
  */
 
 /** @typedef {{ _shakeT?: number, _shakeDur?: number, _shakeMag?: number }} ShakeHost */

@@ -213,8 +213,9 @@ describe("ScreenShake", () => {
     resetShake(host);
     expect(shakeOffset(host, 1 / 60, out)).toEqual({ x: 0, y: 0 });
 
-    // Player death triggers the shake and stops the loop on the same tick, so most of it is still
-    // pending when the next game starts; the core reset must drop it.
+    // A death jolt that the loop did not render to its end (the death sequence can be shorter
+    // than the jolt, or disabled) is still pending when the next game starts; the core reset
+    // must drop it.
     const game = /** @type {any} */ ({
       timerSeconds: 90,
       updateScore() {},
