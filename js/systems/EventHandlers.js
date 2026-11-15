@@ -20,6 +20,33 @@ function soundOptions(game, asteroid) {
 }
 
 /**
+ * Mark a milestone bonus (see ScoringManager.add: `bonusPoints` for the thresholds this score
+ * crossed): its own chime and a larger "+N" popup in the run's accent colour above the ship.
+ * @param {any} game
+ * @param {{ bonusCount: number, bonusPoints: number } | null | undefined} result
+ */
+function markMilestone(game, result) {
+  if (!result || !(result.bonusCount > 0)) return;
+  game.audio?.playMilestone();
+  const p = game.player;
+  if (!p || typeof game.createScorePopup !== "function") return;
+  const accent =
+    BackgroundManager.getCurrentNebulaPalette() === "blue"
+      ? CONFIG.COLORS.ACCENT.BLUE
+      : CONFIG.COLORS.ACCENT.RED;
+  game.createScorePopup(p.x + p.width / 2, p.y - 18, result.bonusPoints, {
+    color: accent,
+    fontSize: 24,
+    fontWeight: "700",
+    glow: true,
+    glowColor: accent,
+    glowBlur: 14,
+    stroke: CONFIG.COLORS.SCORE.POPUP_STROKE,
+    maxLife: 1.4,
+  });
+}
+
+/**
  * EventHandlers – centralized wiring of EventBus driven gameplay side‑effects.
  *
  * Purpose
@@ -42,6 +69,8 @@ function soundOptions(game, asteroid) {
  *   the wreck play out before the game-over screens (systems/DeathSequence.js).
  * - Planet kills and the player's death also request a short screen shake (render-only, skipped
  *   under prefers-reduced-motion; see systems/ScreenShake.js).
+ * - A kill or pickup whose points cross a milestone (every CONFIG.GAME.SCORING_BONUS_THRESHOLD)
+ *   also plays the milestone chime and shows the bonus as an accent "+N" popup above the ship.
  * - collectedStar (score path): Awards score (bonus for red stars), plays the star or bonus-star
  *   pickup sound (panned by position) and shows a popup for red stars.
  * - collectedStar (particle path): Emits a deterministic radial particle burst whose velocity
@@ -129,6 +158,7 @@ export const EventHandlers = {
             : CONFIG.GAME.ASTEROID_SCORE_HARDENED;
         }
         const r = ScoringManager.add(game, add);
+        markMilestone(game, r);
         if (asteroid) {
           if (asteroid.isHardened) {
             game.hardenedAsteroidsKilled = (game.hardenedAsteroidsKilled || 0) + 1;
@@ -237,6 +267,7 @@ export const EventHandlers = {
           pan: soundOptions(game, star).pan,
         });
         const r = ScoringManager.add(game, add);
+        markMilestone(game, r);
         try {
           game.regularStarsCollected = (game.regularStarsCollected || 0) + 1;
           if (star && star.isRed) {

@@ -953,7 +953,8 @@ class AIHorizon {
   }
 
   /**
-   * Fire a bullet if cooldown allows.
+   * Fire a bullet if cooldown allows, with its muzzle flash and shot sound (panned by the ship's
+   * position, lower and accent-coloured once the bullets are upgraded).
    */
   shoot() {
     if (!this.state.isRunning()) return;
@@ -961,6 +962,12 @@ class AIHorizon {
       this.bullets.push(GameFactories.createBullet(this));
       this.shotsFired = (this.shotsFired || 0) + 1;
       GameUI.setScore(this);
+      const heavy = ScoringManager.bulletUpgradeActive(this);
+      const width = this.view.width;
+      const center = this.player.x + this.player.width / 2;
+      const pan = width > 0 ? Math.max(-1, Math.min(1, (center / width) * 2 - 1)) : 0;
+      this.player.flashMuzzle(heavy);
+      this.audio.playShot({ heavy, pan });
     });
   }
 
@@ -1087,6 +1094,7 @@ class AIHorizon {
     // re-check cannot change it mid-run); with it there is no 2500-point upgrade cue to play.
     this.bulletUpgradePurchased = getPurchases().owned;
     this._caliberUpgraded = this.bulletUpgradePurchased;
+    this._musicLifted = false;
     // Launch / restart is a user gesture, so this is where browsers allow audio to start.
     this.audio.unlock();
     this.audio.stopSpeech();
@@ -1437,23 +1445,25 @@ class AIHorizon {
   }
 
   /**
-   * Update the on-screen score display, and play the caliber-upgrade cue once per run when the
-   * score first reaches `CONFIG.GAME.BULLET_UPGRADE_SCORE` during play (not from the end-of-run
-   * accuracy bonus).
+   * Update the on-screen score display and mark the moment the score first reaches
+   * `CONFIG.GAME.BULLET_UPGRADE_SCORE` during play (not from the end-of-run accuracy bonus),
+   * once per run: the caliber-upgrade cue with the pulse around the ship (skipped when the
+   * mission launched with the Bullet Upgrade, whose bolts are upgraded from the start), and
+   * the mission music's lift (for every pilot).
    */
   updateScore() {
     GameUI.setScore(this);
+    const playing = !this._accuracyBonusApplied && !!this.state && this.state.isRunning();
     const upgraded = ScoringManager.bulletUpgradeActive(this);
-    if (
-      upgraded &&
-      !this._caliberUpgraded &&
-      !this._accuracyBonusApplied &&
-      this.state &&
-      this.state.isRunning()
-    ) {
+    if (upgraded && !this._caliberUpgraded && playing) {
       this.audio.playUpgrade();
+      this.player.pulse();
     }
     this._caliberUpgraded = upgraded;
+    if (playing && !this._musicLifted && ScoringManager.isBulletUpgraded(this.score)) {
+      this._musicLifted = true;
+      this.audio.liftMusic();
+    }
   }
   /** Recalculate and persist high score if exceeded. */
   updateHighScore() {

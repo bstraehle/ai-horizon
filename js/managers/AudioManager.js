@@ -33,6 +33,9 @@ const STAR_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
  *    destroyed or a non-lethal hit on a hardened/bonus planet – crack, distorted punch, debris.
  *  - playHardenedExplosion(isBonus, opts): planet destroyed – blast crack, distorted sub drop,
  *    long rumble and scattered debris pops; bonus planets add a second, deeper detonation.
+ *  - playShot(opts): the ship fires – a very short, quiet blip (lower when `heavy`), far below
+ *    the impacts because it repeats up to five times a second.
+ *  - playMilestone(): milestone bonus – a rising three-note chime on the score's tonic.
  *  - playUpgrade(): one-shot when the bullet caliber upgrades – resonant power-up sweep followed
  *    by a two-click "racking" sound. From then on callers pass `heavy: true` for heavier impacts.
  *  - playStarCollect({ bonus, pan }): regular star – a short two-note "pling"; pickups within
@@ -54,9 +57,10 @@ const STAR_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
  *  - setMusic(mood, { delay, style, length }): "mission" while flying (the red or blue nebula
  *    palette picks the score: "Abyss" or "Event Horizon"), "finale" building over its last
  *    seconds into "end" (the closing impact) when the mission is survived, "off" on a crash; it
- *    stays silent through the game-over screens and the radio debrief. Notes are scheduled a
- *    short lookahead ahead by a timer (offline renders call scheduleMusic(until) instead); the
- *    music follows mute through the master bus. A no-op until unlocked.
+ *    stays silent through the game-over screens and the radio debrief. liftMusic() adds a bass
+ *    pulse to the mission score once the score reaches the upgrade threshold. Notes are
+ *    scheduled a short lookahead ahead by a timer (offline renders call scheduleMusic(until)
+ *    instead); the music follows mute through the master bus. A no-op until unlocked.
  *
  * Lifecycle & policy
  *  - The AudioContext is created lazily by `unlock()`, which callers invoke from a user gesture
@@ -216,6 +220,62 @@ export class AudioManager {
    */
   scheduleMusic(until) {
     if (this._music) this._music.schedule(until);
+  }
+
+  /**
+   * Add the mission score's bass pulse from now on (see MusicSequencer.lift): the score has
+   * reached the bullet-upgrade threshold. No-op before the music has started.
+   */
+  liftMusic() {
+    if (this._ctx && this._music) this._music.lift(this._ctx.currentTime);
+  }
+
+  /**
+   * The ship fires: a very short, quiet blip, lower for upgraded bolts. It is not counted as a
+   * voice, so rapid fire never crowds out the impacts.
+   * @param {HitOptions} [opts]
+   */
+  playShot(opts = {}) {
+    const t = this._begin("shot", CONFIG.AUDIO.MIN_INTERVAL_MS.SHOT);
+    if (t === null) return;
+    const heavy = !!opts.heavy;
+    const v = 0.96 + this._random() * 0.08;
+    const level = CONFIG.AUDIO.SHOT_GAIN;
+    const bus = this._bus(opts.pan, 0);
+    this._tone(
+      "triangle",
+      (heavy ? 620 : 880) * v,
+      (heavy ? 170 : 260) * v,
+      t,
+      0.06,
+      this._env(t, level, 0.002, 0.06, bus)
+    );
+    this._noiseBurst(
+      t,
+      0.015,
+      "highpass",
+      6000,
+      6000,
+      0.7,
+      this._env(t, level / 2, 0.001, 0.015, bus)
+    );
+  }
+
+  /**
+   * Milestone bonus (every CONFIG.GAME.SCORING_BONUS_THRESHOLD points): a rising open fifth and
+   * octave on the score's tonic (D), so it sits with the music and apart from the star chimes.
+   */
+  playMilestone() {
+    const t = this._begin("milestone", CONFIG.AUDIO.MIN_INTERVAL_MS.MILESTONE);
+    if (t === null) return;
+    const bus = this._bus(0, 0.3);
+    [0, 7, 12].forEach((semis, i) => {
+      const at = t + i * 0.07;
+      const f = 587.33 * 2 ** (semis / 12);
+      const osc = this._tone("triangle", f, f, at, 0.24, this._env(at, 0.14, 0.004, 0.24, bus));
+      this._tone("sine", f * 2, f * 2, at, 0.12, this._env(at, 0.05, 0.004, 0.12, bus));
+      if (i === 0) this._track(osc);
+    });
   }
 
   /**

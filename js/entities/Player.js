@@ -29,9 +29,14 @@ const BANK_SPEED_SCALE = 1.6;
  *  - `_bank` (render-only) eases toward the lateral velocity fraction each update; `draw` leans
  *    the sprite (slight rotation + horizontal squash). Disabled under prefers-reduced-motion.
  *
+ * Effects (render-only, started by the game, faded in `update`):
+ *  - `flashMuzzle()`: a spark at the nose for each shot (skipped under prefers-reduced-motion).
+ *  - `pulse()`: two accent rings expanding from the ship when the bullets upgrade.
+ *
  * Performance Notes:
  *  - Update: O(1) arithmetic + clamp; no allocations.
- *  - Draw: one drawImage (plus a save/transform/restore while banking).
+ *  - Draw: one drawImage (plus a save/transform/restore while banking, and a few path
+ *    operations while a muzzle flash or the upgrade pulse shows).
  *
  * Separation of Concerns:
  *  - Engine flame particles handled by EngineTrail / external systems.
@@ -60,6 +65,29 @@ export class Player {
     this._maxY = Infinity;
     /** @private Eased lateral lean in [-1, 1] (render-only). */
     this._bank = 0;
+    /** @private Muzzle flash level, 1 at a shot fading to 0 (render-only). */
+    this._muzzle = 0;
+    /** @private Whether the current muzzle flash takes the run's accent colour (upgraded bolt). */
+    this._muzzleAccent = false;
+    /** @private Bullet-upgrade pulse, 1 as it starts fading to 0 (render-only). */
+    this._pulse = 0;
+  }
+
+  /**
+   * Flash the muzzle for a shot: a small spark at the nose for CONFIG.PLAYER.MUZZLE_FLASH_S.
+   * @param {boolean} [upgraded=false] Upgraded bolts flash in the run's accent colour.
+   */
+  flashMuzzle(upgraded = false) {
+    this._muzzle = 1;
+    this._muzzleAccent = !!upgraded;
+  }
+
+  /**
+   * Mark the bullet upgrade: two accent rings expand from the ship for
+   * CONFIG.PLAYER.UPGRADE_PULSE_S, following it.
+   */
+  pulse() {
+    this._pulse = 1;
   }
 
   /**
@@ -110,18 +138,26 @@ export class Player {
       this.vy = (this.y - prevY) / dtSec;
       const target = this.speed > 0 ? clamp(this.vx / (this.speed * BANK_SPEED_SCALE), -1, 1) : 0;
       this._bank += (target - this._bank) * Math.min(1, dtSec * BANK_RESPONSE);
+      if (this._muzzle > 0) {
+        this._muzzle = Math.max(0, this._muzzle - dtSec / CONFIG.PLAYER.MUZZLE_FLASH_S);
+      }
+      if (this._pulse > 0) {
+        this._pulse = Math.max(0, this._pulse - dtSec / CONFIG.PLAYER.UPGRADE_PULSE_S);
+      }
     }
   }
 
   /**
    * Forget carried-over motion (velocity hint and bank) after the ship is teleported, e.g. to its
    * spawn point at game start, so it appears level and still rather than leaning from the previous
-   * run's last movement.
+   * run's last movement. A muzzle flash or upgrade pulse still showing is dropped with it.
    */
   resetMotion() {
     this.vx = 0;
     this.vy = 0;
     this._bank = 0;
+    this._muzzle = 0;
+    this._pulse = 0;
   }
 
   /**
@@ -143,18 +179,65 @@ export class Player {
     if (Math.abs(bank) < 0.02) {
       if (sprite) ctx.drawImage(sprite.canvas, x - sprite.padX, y - sprite.padY);
       else Player._drawShip(ctx, this.width, this.height, x, y, accent);
-      return;
-    }
-    const cx = x + this.width / 2;
-    const cy = y + this.height / 2;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(bank * MAX_BANK * 0.55);
-    ctx.scale(1 - 0.28 * Math.abs(bank), 1);
-    if (sprite) {
-      ctx.drawImage(sprite.canvas, -this.width / 2 - sprite.padX, -this.height / 2 - sprite.padY);
     } else {
-      Player._drawShip(ctx, this.width, this.height, -this.width / 2, -this.height / 2, accent);
+      const cx = x + this.width / 2;
+      const cy = y + this.height / 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(bank * MAX_BANK * 0.55);
+      ctx.scale(1 - 0.28 * Math.abs(bank), 1);
+      if (sprite) {
+        ctx.drawImage(sprite.canvas, -this.width / 2 - sprite.padX, -this.height / 2 - sprite.padY);
+      } else {
+        Player._drawShip(ctx, this.width, this.height, -this.width / 2, -this.height / 2, accent);
+      }
+      ctx.restore();
+    }
+    if (this._muzzle > 0 || this._pulse > 0) this._drawEffects(ctx, x, y, accent);
+  }
+
+  /**
+   * Additive overlays on the ship at its drawn position: the muzzle flash (a spark at the nose,
+   * skipped under prefers-reduced-motion since it flickers with every shot) and the upgrade
+   * pulse (two accent rings, the second trailing the first).
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {number} x Drawn top-left x.
+   * @param {number} y Drawn top-left y.
+   * @param {"red"|"blue"} accent
+   * @private
+   */
+  _drawEffects(ctx, x, y, accent) {
+    const color = accent === "blue" ? CONFIG.COLORS.ACCENT.BLUE : CONFIG.COLORS.ACCENT.RED;
+    const u = Math.min(this.width, this.height);
+    const cx = x + this.width / 2;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    if (this._muzzle > 0 && !prefersReducedMotion()) {
+      const noseY = y - u * 0.1;
+      const reach = u * (0.3 + 0.4 * this._muzzle);
+      const half = u * 0.16;
+      ctx.globalAlpha = this._muzzle;
+      ctx.fillStyle = this._muzzleAccent ? color : CONFIG.COLORS.PLAYER.HULL;
+      ctx.beginPath();
+      ctx.moveTo(cx, noseY - reach);
+      ctx.lineTo(cx + half, noseY);
+      ctx.lineTo(cx, noseY + reach * 0.4);
+      ctx.lineTo(cx - half, noseY);
+      ctx.closePath();
+      ctx.fill();
+    }
+    if (this._pulse > 0) {
+      const cy = y + this.height / 2;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      for (const delay of [0, 0.3]) {
+        const p = (1 - this._pulse - delay) / (1 - delay);
+        if (p <= 0) continue;
+        ctx.globalAlpha = 1 - p;
+        ctx.beginPath();
+        ctx.arc(cx, cy, u * (0.9 + 2.6 * p), 0, CONFIG.TWO_PI);
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }

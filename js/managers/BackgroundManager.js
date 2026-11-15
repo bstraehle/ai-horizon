@@ -3,6 +3,7 @@ import { Background } from "../entities/Background.js";
 import { BackgroundLayer } from "../entities/BackgroundLayer.js";
 import { Nebula } from "../entities/Nebula.js";
 import { StarField } from "../entities/StarField.js";
+import { prefersReducedMotion } from "../utils/motion.js";
 
 /**
  * Cached gradient + nebula layer per main context (see BackgroundLayer).
@@ -43,6 +44,7 @@ const LAYERS = new WeakMap();
  * @property {number} animTime Accumulated animation time in ms
  * @property {number} [timeSec] Override absolute time in seconds
  * @property {number} [dtSec] Override frame delta in seconds
+ * @property {number} [timerRemaining] Mission seconds left (the starfield speeds up in the finale)
  * @property {{ nebulaConfigs?: any, starField: any }} background Pre-initialised background assets
  * @property {RNGLike} [rng]
  */
@@ -176,7 +178,24 @@ export class BackgroundManager {
     }
     const timeSec = typeof ctxObj.timeSec === "number" ? ctxObj.timeSec : (animTime || 0) / 1000;
     const dtSec = typeof ctxObj.dtSec === "number" ? ctxObj.dtSec : CONFIG.TIME.DEFAULT_DT;
-    StarField.draw(ctx, width, height, starField, timeSec, paused, dtSec, ctxObj.rng);
+    const drift = dtSec * BackgroundManager.starfieldSpeed(ctxObj);
+    StarField.draw(ctx, width, height, starField, timeSec, paused, drift, ctxObj.rng);
+  }
+
+  /**
+   * How many times faster than usual the starfield drifts. The finale shows on the playfield:
+   * while the mission runs its last CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS, the factor jumps to
+   * CONFIG.STARFIELD.FINALE_SPEED_START and climbs linearly to FINALE_SPEED_END as the timer
+   * runs out. 1 at any other time and under prefers-reduced-motion.
+   * @param {{ running?: boolean, timerRemaining?: number }} ctxObj
+   * @returns {number}
+   */
+  static starfieldSpeed({ running, timerRemaining }) {
+    const window = CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS;
+    if (!running || !(window > 0) || typeof timerRemaining !== "number") return 1;
+    if (timerRemaining <= 0 || timerRemaining > window || prefersReducedMotion()) return 1;
+    const { FINALE_SPEED_START: start, FINALE_SPEED_END: end } = CONFIG.STARFIELD;
+    return start + (end - start) * (1 - timerRemaining / window);
   }
 
   /**

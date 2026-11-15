@@ -12,6 +12,7 @@ function makeAudio() {
     playHardenedExplosion: vi.fn(),
     playStarCollect: vi.fn(),
     playFatal: vi.fn(),
+    playMilestone: vi.fn(),
     setMusic: vi.fn(),
   };
 }
@@ -52,6 +53,40 @@ describe("star and crash sound routing", () => {
     expect(game.audio.playFatal).toHaveBeenCalledTimes(1);
     expect(game.audio.setMusic.mock.calls).toEqual([["off"]]);
     expect(game.gameOver).toHaveBeenCalledTimes(2);
+    unsub();
+  });
+});
+
+describe("milestone bonus", () => {
+  it("marks it with the chime and an accent popup above the ship, for stars and kills", () => {
+    const game = /** @type {any} */ ({
+      ...makeGame(),
+      createScorePopup: vi.fn(),
+      player: { x: 90, y: 150, width: 20, height: 20 },
+    });
+    const unsub = EventHandlers.register(game);
+    const { SCORING_BONUS_THRESHOLD: threshold, SCORING_BONUS_POINTS: bonus } = CONFIG.GAME;
+    const star = { x: 0, y: 0, width: 10, height: 10 };
+
+    game.score = threshold - 2 * CONFIG.GAME.STAR_SCORE;
+    game.events.emit("collectedStar", { star });
+    expect(game.audio.playMilestone).not.toHaveBeenCalled();
+    expect(game.createScorePopup).not.toHaveBeenCalled();
+
+    game.events.emit("collectedStar", { star });
+    expect(game.score).toBe(threshold + bonus);
+    expect(game.audio.playMilestone).toHaveBeenCalledTimes(1);
+    const [x, y, points, opts] = game.createScorePopup.mock.calls[0];
+    expect([x, y, points]).toEqual([100, 132, bonus]);
+    expect([CONFIG.COLORS.ACCENT.RED, CONFIG.COLORS.ACCENT.BLUE]).toContain(opts.color);
+    // The pickup itself is still counted after the milestone is marked.
+    expect(game.regularStarsCollected).toBe(2);
+
+    game.score = 2 * threshold - 1;
+    game.events.emit("bulletHitAsteroid", { asteroid: { x: 0, y: 0, width: 10, height: 10 } });
+    expect(game.audio.playMilestone).toHaveBeenCalledTimes(2);
+    expect(game.createScorePopup).toHaveBeenCalledTimes(2);
+    expect(game.regularAsteroidsKilled).toBe(1);
     unsub();
   });
 });

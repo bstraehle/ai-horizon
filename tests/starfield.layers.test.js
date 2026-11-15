@@ -1,5 +1,7 @@
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, afterEach } from "vitest";
 import { StarField } from "../js/entities/StarField.js";
+import { BackgroundManager } from "../js/managers/BackgroundManager.js";
+import { setReducedMotion } from "../js/utils/motion.js";
 import { CONFIG } from "../js/constants.js";
 
 // Basic mock RNG for deterministic tests
@@ -62,5 +64,68 @@ describe("Layered StarField", () => {
         expect(r.speed).toBeCloseTo(o.speed * sAvg, 5);
       }
     }
+  });
+});
+
+describe("Starfield drift in the finale", () => {
+  const window = CONFIG.GAME.FINALE_BONUS_WINDOW_SECONDS;
+  const { FINALE_SPEED_START: start, FINALE_SPEED_END: end } = CONFIG.STARFIELD;
+  const speed = (timerRemaining, running = true) =>
+    BackgroundManager.starfieldSpeed({ running, timerRemaining });
+
+  afterEach(() => setReducedMotion(null));
+
+  test("jumps as the finale begins and climbs until the timer runs out", () => {
+    setReducedMotion(false);
+    expect(speed(window + 0.1)).toBe(1);
+    expect(speed(window)).toBeCloseTo(start, 9);
+    expect(speed(window / 2)).toBeCloseTo((start + end) / 2, 9);
+    expect(speed(0.001)).toBeCloseTo(end, 2);
+  });
+
+  test("stays at normal speed outside a running finale and under reduced motion", () => {
+    setReducedMotion(false);
+    expect(speed(0)).toBe(1);
+    expect(speed(window / 2, false)).toBe(1);
+    expect(BackgroundManager.starfieldSpeed({ running: true })).toBe(1);
+    setReducedMotion(true);
+    expect(speed(window / 2)).toBe(1);
+  });
+
+  test("moves the stars that much further per frame", () => {
+    setReducedMotion(false);
+    const noop = () => {};
+    const gradient = () => ({ addColorStop: noop });
+    const ctx = {
+      canvas: { width: 800, height: 600 },
+      save: noop,
+      restore: noop,
+      beginPath: noop,
+      arc: noop,
+      fill: noop,
+      fillRect: noop,
+      drawImage: noop,
+      createRadialGradient: gradient,
+      createLinearGradient: gradient,
+      fillStyle: "",
+      globalAlpha: 1,
+    };
+    const driftOf = (timerRemaining) => {
+      const star = { x: 10, y: 10, size: 1, speed: 100, brightness: 1, twinkleOffset: 0 };
+      BackgroundManager.draw({
+        ctx,
+        view: { width: 800, height: 600 },
+        running: true,
+        paused: false,
+        animTime: 0,
+        timeSec: 0,
+        dtSec: 0.01,
+        timerRemaining,
+        background: { starField: [star] },
+      });
+      return star.y - 10;
+    };
+    expect(driftOf(window + 5)).toBeCloseTo(1, 9);
+    expect(driftOf(window / 2)).toBeCloseTo((start + end) / 2, 9);
   });
 });

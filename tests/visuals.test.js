@@ -176,6 +176,71 @@ describe("Player banking", () => {
   });
 });
 
+describe("Player shot and upgrade effects", () => {
+  const STEP = 1 / 60;
+  const view = { width: 800, height: 600 };
+  const still = { x: 0, y: 0 };
+
+  /** Draw the ship and report its fills, strokes and composite-mode switches. */
+  function drawn(/** @type {Player} */ p, /** @type {"red"|"blue"} */ accent = "red") {
+    const ctx = makeCtx();
+    const calls = { fill: 0, stroke: 0 };
+    ctx.fill = () => void calls.fill++;
+    ctx.stroke = () => void calls.stroke++;
+    p.draw(/** @type {any} */ (ctx), 0, accent);
+    return { ...calls, composites: ctx.composites, strokeStyle: ctx.strokeStyle };
+  }
+
+  it("flashes the muzzle additively for a few frames after a shot", () => {
+    setReducedMotion(false);
+    const p = new Player(100, 100, 25, 25, 480);
+    const idle = drawn(p);
+    expect(idle.composites).toEqual([]);
+    p.flashMuzzle();
+    p.update({}, still, view, STEP);
+    const lit = drawn(p);
+    expect(lit.fill).toBe(idle.fill + 1);
+    expect(lit.composites).toEqual(["lighter"]);
+    const frames = Math.ceil(CONFIG.PLAYER.MUZZLE_FLASH_S / STEP);
+    for (let i = 0; i < frames; i++) p.update({}, still, view, STEP);
+    expect(drawn(p)).toEqual(idle);
+  });
+
+  it("skips the muzzle flash when the user prefers reduced motion", () => {
+    setReducedMotion(true);
+    const p = new Player(100, 100, 25, 25, 480);
+    const idle = drawn(p);
+    p.flashMuzzle(true);
+    expect(drawn(p).fill).toBe(idle.fill);
+  });
+
+  it("pulses two accent rings from the ship when the bullets upgrade", () => {
+    setReducedMotion(false);
+    const p = new Player(100, 100, 25, 25, 480);
+    const idle = drawn(p);
+    p.pulse();
+    p.update({}, still, view, STEP);
+    expect(drawn(p).stroke).toBe(idle.stroke + 1);
+    const half = Math.round(CONFIG.PLAYER.UPGRADE_PULSE_S / 2 / STEP);
+    for (let i = 0; i < half; i++) p.update({}, still, view, STEP);
+    const both = drawn(p, "blue");
+    expect(both.stroke).toBe(idle.stroke + 2);
+    expect(both.strokeStyle).toBe(CONFIG.COLORS.ACCENT.BLUE);
+    for (let i = 0; i < half + 2; i++) p.update({}, still, view, STEP);
+    expect(drawn(p)).toEqual(idle);
+  });
+
+  it("drops both effects when the ship is reset for a new run", () => {
+    setReducedMotion(false);
+    const p = new Player(100, 100, 25, 25, 480);
+    const idle = drawn(p);
+    p.flashMuzzle();
+    p.pulse();
+    p.resetMotion();
+    expect(drawn(p)).toEqual(idle);
+  });
+});
+
 describe("ScreenShake", () => {
   it("produces a decaying offset that settles back to zero", () => {
     setReducedMotion(false);

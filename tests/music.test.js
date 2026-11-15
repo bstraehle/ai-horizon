@@ -127,6 +127,9 @@ const thump = (f0) => (/** @type {any} */ o) =>
 const isTick = (o) => o.type === "square" && o.frequency.value === 2000;
 /** @param {number} note */
 const hzOf = (note) => 440 * 2 ** ((note - 69) / 12);
+/** A bass pulse / ostinato note: a low saw without detune (the braam's low saws are detuned). */
+const isBassPulse = (/** @type {any} */ o) =>
+  o.type === "sawtooth" && o.frequency.value < 80 && o.detune.value === 0;
 /** Notes (MIDI) of the saws started in [from, to). @param {any} ctx */
 const sawNotes = (ctx, from, to) =>
   [
@@ -255,6 +258,33 @@ describe("MusicSequencer", () => {
     };
     expect(run()).toEqual(run());
   });
+
+  it("adds a bass pulse on every beat once lifted, until the music stops", () => {
+    const { ctx, seq } = sequencer();
+    const beat = bar("blue") / 4;
+    // Nothing to lift while the music is off.
+    seq.lift(0);
+    seq.setMood("mission", 0, { style: "blue" });
+    seq.schedule(8);
+    expect(started(ctx, 0, 8, isBassPulse)).toHaveLength(0);
+
+    // Notes already scheduled stay as they are: the pulse starts at the lift, not before.
+    seq.lift(4);
+    seq.schedule(16);
+    expect(started(ctx, 0, 8, isBassPulse)).toHaveLength(0);
+    const pulses = started(ctx, 8, 16, isBassPulse);
+    expect(pulses).toHaveLength(8 / beat);
+    for (const o of pulses) expect((o.at / beat) % 1).toBeCloseTo(0, 6);
+    // The roots of the bars' chords (F, then C), an octave down.
+    const notes = pulses.map((o) => Math.round(69 + 12 * Math.log2(o.frequency.value / 440)));
+    expect([...new Set(notes)]).toEqual([29, 36]);
+
+    // The finale's own ostinato takes over; a new mission starts without the pulse.
+    seq.setMood("off", 16);
+    seq.setMood("mission", 20, { style: "blue" });
+    seq.schedule(28);
+    expect(started(ctx, 20, 28, isBassPulse)).toHaveLength(0);
+  });
 });
 
 describe("AudioManager music", () => {
@@ -315,6 +345,26 @@ describe("AudioManager music", () => {
     } finally {
       g.OfflineAudioContext = saved;
       timers.mockRestore();
+    }
+  });
+
+  it("lifts the mission score from the current time, once the music has started", () => {
+    const { audio, instances } = setup();
+    const g = /** @type {any} */ (globalThis);
+    const saved = g.OfflineAudioContext;
+    g.OfflineAudioContext = FakeContext;
+    try {
+      audio.unlock();
+      const ctx = instances[0];
+      expect(() => audio.liftMusic()).not.toThrow();
+      audio.setMusic("mission", { style: "blue" });
+      ctx.currentTime = 8;
+      audio.liftMusic();
+      audio.scheduleMusic(12);
+      expect(started(ctx, 0, 8, isBassPulse)).toHaveLength(0);
+      expect(started(ctx, 8, 12, isBassPulse)).toHaveLength(4);
+    } finally {
+      g.OfflineAudioContext = saved;
     }
   });
 });

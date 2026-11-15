@@ -1,7 +1,12 @@
 // @ts-check
 import { describe, it, expect, vi } from "vitest";
 import { JSDOM } from "jsdom";
-import { attachDevTools, attachFocusTrace, attachSoundLog } from "../js/ui/DevTools.js";
+import {
+  attachDevTools,
+  attachFocusTrace,
+  attachSoundLog,
+  SOUND_LOG_METHODS,
+} from "../js/ui/DevTools.js";
 
 function makeGame() {
   return {
@@ -149,6 +154,21 @@ describe("attachDevTools", () => {
     ]);
     expect(log.every((e) => typeof e.t === "number")).toBe(true);
     expect(attachSoundLog({}, [])).toBeNull();
+  });
+
+  it("soundlog covers the shot, milestone and music-lift calls for the offline sound render", () => {
+    expect(SOUND_LOG_METHODS).toEqual(
+      expect.arrayContaining(["playShot", "playMilestone", "liftMusic"])
+    );
+    const audio = { playShot: vi.fn(), liftMusic: vi.fn() };
+    const log = /** @type {any[]} */ ([]);
+    attachSoundLog({ audio }, log);
+    audio.playShot({ heavy: false, pan: 0.25 });
+    audio.liftMusic();
+    expect(log.map((e) => [e.method, e.args])).toEqual([
+      ["playShot", [{ heavy: false, pan: 0.25 }]],
+      ["liftMusic", []],
+    ]);
   });
 
   it("forwards metrics to the overlay and drives input via the autopilot", () => {

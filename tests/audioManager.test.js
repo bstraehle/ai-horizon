@@ -424,4 +424,55 @@ describe("AudioManager", () => {
     ctx.currentTime += 1;
     expect(created(ctx, () => audio.playUpgrade()).osc).toBe(first.osc);
   });
+
+  it("plays a short shot blip, lower for upgraded bolts, throttled per shot", () => {
+    const { audio, ctx } = unlocked();
+    const normal = created(ctx, () => audio.playShot({ pan: -0.5 }));
+    expect([normal.osc, normal.src]).toEqual([1, 1]);
+    expect(ctx.panners[0].pan.value).toBeCloseTo(-0.5 * CONFIG.AUDIO.MAX_PAN, 6);
+    expect(created(ctx, () => audio.playShot()).osc).toBe(0);
+    ctx.currentTime += CONFIG.AUDIO.MIN_INTERVAL_MS.SHOT / 1000 + 0.001;
+    const heavy = created(ctx, () => audio.playShot({ heavy: true }));
+    expect(heavy.osc).toBe(1);
+    expect(heavy.oscillators[0].frequency.set[0]).toBeLessThan(
+      normal.oscillators[0].frequency.set[0]
+    );
+  });
+
+  it("does not count shots as voices, so rapid fire never crowds out the impacts", () => {
+    const { audio, ctx } = unlocked();
+    for (let i = 0; i < CONFIG.AUDIO.MAX_VOICES + 5; i++) {
+      ctx.currentTime += 0.2;
+      expect(created(ctx, () => audio.playShot()).osc).toBe(1);
+    }
+    ctx.currentTime += 1;
+    expect(created(ctx, () => audio.playAsteroidHit()).osc).toBeGreaterThan(0);
+  });
+
+  it("plays the milestone chime as three rising notes, once per throttle window", () => {
+    const { audio, ctx } = unlocked();
+    const chime = created(ctx, () => audio.playMilestone());
+    const notes = chime.oscillators
+      .filter((o) => o.type === "triangle")
+      .map((o) => o.frequency.set[0]);
+    expect(notes).toHaveLength(3);
+    expect(notes[1] / notes[0]).toBeCloseTo(1.5, 2);
+    expect(notes[2] / notes[0]).toBeCloseTo(2, 6);
+    expect(created(ctx, () => audio.playMilestone()).osc).toBe(0);
+    ctx.currentTime += CONFIG.AUDIO.MIN_INTERVAL_MS.MILESTONE / 1000 + 0.001;
+    expect(created(ctx, () => audio.playMilestone()).osc).toBe(chime.osc);
+  });
+
+  it("stays silent for the new cues while muted or locked", () => {
+    const locked = setup();
+    expect(() => {
+      locked.audio.playShot();
+      locked.audio.playMilestone();
+      locked.audio.liftMusic();
+    }).not.toThrow();
+    expect(locked.instances).toHaveLength(0);
+    const { audio, ctx } = unlocked({ muted: true });
+    expect(created(ctx, () => audio.playShot()).osc).toBe(0);
+    expect(created(ctx, () => audio.playMilestone()).osc).toBe(0);
+  });
 });

@@ -462,7 +462,14 @@ export const CONFIG = deepFreeze({
       BONUS_STAR: 60,
       FATAL: 1000,
       TRANSMISSION: 1000,
+      SHOT: 60,
+      MILESTONE: 400,
     },
+    /**
+     * Peak level of the shot blip. It repeats up to five times a second under everything else,
+     * so it sits far below the impacts (their layers peak at 0.3-0.45).
+     */
+    SHOT_GAIN: 0.07,
     STAR_STREAK_WINDOW_MS: 700,
     /**
      * The two debrief commanders (see managers/Commanders.js): each keeps one voice gender (the
@@ -491,11 +498,13 @@ export const CONFIG = deepFreeze({
      * Background music (managers/MusicSequencer.js; the scores and their tempos are its
      * MUSIC_STYLES): level relative to the master bus, how much louder the finale ends (gain
      * factor, about +8 dB), fade-in and arrangement seed; notes are scheduled LOOKAHEAD_S ahead
-     * every TICK_MS.
+     * every TICK_MS. LIFT_GAIN is the peak of the bass pulse that joins the mission score once
+     * the score reaches BULLET_UPGRADE_SCORE (0 leaves it out).
      */
     MUSIC: {
       VOLUME: 0.25,
       FINALE_GAIN: 2.5,
+      LIFT_GAIN: 0.3,
       FADE_S: 1.5,
       SEED: 7,
       LOOKAHEAD_S: 0.4,
@@ -554,6 +563,9 @@ export const CONFIG = deepFreeze({
   PLAYER: {
     SPAWN_Y_OFFSET: 100,
     MOUSE_LERP: 6,
+    /** Seconds a shot's muzzle flash and the bullet-upgrade pulse around the ship last. */
+    MUZZLE_FLASH_S: 0.07,
+    UPGRADE_PULSE_S: 0.7,
     DRAW: {
       OUTLINE_WIDTH: 2.5,
       COCKPIT_RX: 4,
@@ -584,6 +596,13 @@ export const CONFIG = deepFreeze({
     TWINKLE_RATE: 4,
     TWINKLE_X_FACTOR: 0.01,
     SHADOW_BLUR_MULT: 2,
+    /**
+     * Drift speed factor through the finale (the last GAME.FINALE_BONUS_WINDOW_SECONDS): it
+     * jumps to FINALE_SPEED_START as the finale begins and climbs to FINALE_SPEED_END as the
+     * timer runs out (BackgroundManager.starfieldSpeed).
+     */
+    FINALE_SPEED_START: 2,
+    FINALE_SPEED_END: 6,
     LAYERS: [
       {
         name: "far",

@@ -13,6 +13,8 @@ import { CONFIG } from "../constants.js";
  * Both finales open with a hit, add a pulsing bass ostinato (eighths, then sixteenths, its filter
  * opening) and a noise-and-saw riser, and swell by CONFIG.AUDIO.MUSIC.FINALE_GAIN over the
  * remaining seconds into an impact when the mission is survived. `level` evens out their loudness.
+ * Once lifted (the score reached the bullet-upgrade threshold) the mission adds a quiet bass
+ * pulse on the chord's root every beat, the slow form of that ostinato.
  */
 export const MUSIC_STYLES = {
   red: { name: "Abyss", bpm: 70, level: 0.45 },
@@ -105,6 +107,8 @@ export class MusicSequencer {
     this._finale = null;
     /** @type {{ gain: GainNode, end: number }[]} Sustained envelopes, released when the score stops. */
     this._held = [];
+    /** Whether the mission plays its bass pulse (see lift()); cleared when the music stops. */
+    this._lifted = false;
 
     this._level = ctx.createGain();
     this._level.gain.value = 0;
@@ -162,6 +166,18 @@ export class MusicSequencer {
   }
 
   /**
+   * Add the mission's bass pulse from context time `at`: a quiet note on the chord's root every
+   * beat (CONFIG.AUDIO.MUSIC.LIFT_GAIN), which the finale's ostinato then takes over. The grid
+   * is first filled up to `at`, so notes already scheduled stay as they are. It lasts until the
+   * music stops; no effect while the music is off.
+   * @param {number} at
+   */
+  lift(at) {
+    this.schedule(at);
+    if (this._mood !== "off") this._lifted = true;
+  }
+
+  /**
    * Create the notes of every grid step before `until` (context time), applying mood changes as
    * the grid reaches them. While the music is off the grid waits for the next change.
    * @param {number} until
@@ -211,6 +227,7 @@ export class MusicSequencer {
       );
       this._release(at);
       this._mood = "off";
+      this._lifted = false;
       return;
     }
     if (was === "off" || style !== this._style) {
@@ -246,10 +263,16 @@ export class MusicSequencer {
     const blue = this._style === "blue";
     if (blue) this._horizon(n, t, this._mood, k);
     else this._abyss(n, t, this._mood, k);
+    const chords = blue ? HORIZON_CHORDS : ABYSS_CHORDS;
+    const root = chords[Math.floor(n / (blue ? 16 : 32)) % 4][0] - 12;
+    const lift = CONFIG.AUDIO.MUSIC.LIFT_GAIN;
+    if (this._mood === "mission" && this._lifted && lift > 0 && n % 4 === 0) {
+      // Lifted mission: the ostinato's slow form, one root note per beat, bar starts accented.
+      const peak = n % 16 === 0 ? lift : lift * 0.65;
+      this._pluck("sawtooth", hz(root), t, peak, this._step * 3, this._pulse);
+    }
     if (this._mood === "finale" && n % (k < 0.5 ? 2 : 1) === 0) {
       // Bass ostinato on the chord's root: eighths, then sixteenths for the second half.
-      const chords = blue ? HORIZON_CHORDS : ABYSS_CHORDS;
-      const root = chords[Math.floor(n / (blue ? 16 : 32)) % 4][0] - 12;
       const accent = n % 4 === 0;
       this._pluck(
         "sawtooth",

@@ -91,7 +91,7 @@ export function attachDevTools(game, search) {
 
 /**
  * AudioManager methods captured by `soundlog=1`: the sound effects and the music's mood changes
- * (narration is deliberately absent).
+ * and lift (narration is deliberately absent).
  */
 export const SOUND_LOG_METHODS = [
   "playAsteroidHit",
@@ -100,7 +100,10 @@ export const SOUND_LOG_METHODS = [
   "playStarCollect",
   "playFatal",
   "playTransmission",
+  "playShot",
+  "playMilestone",
   "setMusic",
+  "liftMusic",
 ];
 
 /**
