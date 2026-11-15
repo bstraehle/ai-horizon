@@ -26,6 +26,8 @@ import { prefersReducedMotion } from "../utils/motion.js";
  * @property {number} [_shakeMag]
  * @property {boolean} [_dramaticEndPlayed] The ship crashed this run and is no longer drawn
  * @property {import('../entities/ScorePopup.js').ScorePopupData[]} [scorePopups]
+ * @property {import('../ui/ControlsHint.js').ControlsHint} [controlsHint] Fire-control pictogram
+ * @property {{ isRunning: () => boolean }} [state]
  * @property {()=>void} [drawBackground]
  */
 /**
@@ -201,6 +203,7 @@ export class RenderManager {
    * The engine trail is drawn beneath the ship so the exhaust glow sits behind the hull. After a
    * crash the ship is left out, so only its blast and the fading trail remain.
    * Score popups are advanced, culled and drawn by ScorePopup.drawAll (pre-rendered text sprites).
+   * The controls hint, while it shows, is drawn last, on top of everything.
    * @param {RenderGameContext} game
    * @param {number} [extrapolateSec=0] Seconds past the last simulated state to project linear motion.
    */
@@ -249,6 +252,11 @@ export class RenderManager {
     if (game.scorePopups && game.scorePopups.length > 0) {
       const dpr = view && typeof view.dpr === "number" && view.dpr > 0 ? view.dpr : 1;
       ScorePopup.drawAll(ctx, game.scorePopups, dtSec, viewWidth, viewHeight, dpr);
+    }
+    if (game.controlsHint) {
+      const running = !!game.state && game.state.isRunning();
+      const accent = BackgroundManager.getCurrentNebulaPalette();
+      game.controlsHint.draw(ctx, viewWidth, viewHeight, dtSec, running, accent);
     }
   }
 }

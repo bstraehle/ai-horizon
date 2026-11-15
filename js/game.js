@@ -69,6 +69,7 @@ import { initSoundToggles } from "./ui/SoundToggle.js";
 import { initUpgradeLinks } from "./ui/UpgradeLink.js";
 import { getPurchases } from "./managers/PurchaseManager.js";
 import { MouseCapture, isMouseEvent } from "./ui/MouseCapture.js";
+import { ControlsHint } from "./ui/ControlsHint.js";
 import { detectMobilePlatform } from "./utils/mobilePlatform.js";
 import { updateGame } from "./systems/GameUpdate.js";
 import { isDying, startDeathSequence, updateDeathSequence } from "./systems/DeathSequence.js";
@@ -173,6 +174,8 @@ class AIHorizon {
     this.input = new InputState();
     /** Touch gestures (drag to steer, second finger / tap to fire) feeding `input`. */
     this.touch = new TouchControls(() => this.input);
+    /** Pictogram of the fire control, shown until the pilot has used it on this device. */
+    this.controlsHint = new ControlsHint();
     /** Recent missions on this device, for the debrief commanders' story hooks. */
     this.runHistory = new RunHistory();
     /** @type {import('./managers/RunHistory.js').DebriefHistory|null} */
@@ -719,6 +722,7 @@ class AIHorizon {
       if (!e.repeat) {
         e.preventDefault();
         this.input.fireHeld = true;
+        if (this.state.isRunning()) this.controlsHint.markLearned();
         this.shoot();
       }
       return;
@@ -775,6 +779,7 @@ class AIHorizon {
     this.mouseCapture.request();
     this._mouseDown = true;
     this.input.fireHeld = true;
+    this.controlsHint.markLearned();
     this.shoot();
   }
 
@@ -807,14 +812,18 @@ class AIHorizon {
 
   /**
    * Touch down (mobile): the first finger steers (the ship heads to it) without firing; any
-   * further finger starts continuous fire.
+   * further finger starts continuous fire, which is the control the hint teaches (a touch also
+   * switches the hint to its two-finger pictogram on devices taken for a desktop).
    * @param {TouchEvent} e - The touch event.
    */
   handleTouchStart(e) {
     e.preventDefault();
     if (!this.state.isRunning()) return;
-    if (this.touch.start(e.changedTouches, this.pointerFrame(), e.timeStamp, e.touches))
+    this.controlsHint.useTouch();
+    if (this.touch.start(e.changedTouches, this.pointerFrame(), e.timeStamp, e.touches)) {
+      this.controlsHint.markLearned();
       this.shoot();
+    }
   }
 
   /** Touch lift/cancel: a quick, still tap of the steering finger fires one shot; fire stops
@@ -1103,6 +1112,11 @@ class AIHorizon {
     // pointer move / touch / key press.
     this.input.clearMouse();
     this.touch.reset();
+    // Autopilot missions (recordings, profiling) never show the controls hint.
+    this.controlsHint.begin({
+      touch: !!this._isMobile,
+      enabled: !(this.devTools && this.devTools.autopilot),
+    });
     this.resizeCanvas();
     GameUI.hideGameInfo(this);
     this.state.start();

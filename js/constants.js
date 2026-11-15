@@ -516,6 +516,15 @@ export const CONFIG = deepFreeze({
     STORAGE_KEY: "aiHorizonRunHistory",
     MAX_RUNS: 25,
   },
+  /**
+   * Controls hint (ui/ControlsHint.js): a pictogram of the fire control, shown on the playfield
+   * until the pilot has used it once on this device (remembered under STORAGE_KEY). FADE_S is
+   * its fade in and out.
+   */
+  HINT: {
+    STORAGE_KEY: "aiHorizonControlsLearned",
+    FADE_S: 0.35,
+  },
   SHARE: {
     URL: "https://www.agentmode.dev/",
     TITLE: "AI HORIZON",
